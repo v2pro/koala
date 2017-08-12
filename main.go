@@ -35,5 +35,10 @@ func on_send(sockFd C.int, span C.struct_ch_span, flags C.int) {
 	color.Red(string(ch_span_to_bytes(span)))
 }
 
+//export on_recv
+func on_recv(sockFd C.int, span C.struct_ch_span, flags C.int) {
+	color.Green(string(ch_span_to_bytes(span)))
+}
+
 func main() {
 }

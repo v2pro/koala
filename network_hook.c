@@ -35,12 +35,16 @@ static connect_pfn_t orig_connect_func;
 typedef int (*accept_pfn_t)(int, struct sockaddr *, socklen_t *);
 static accept_pfn_t orig_accept_func;
 
+typedef ssize_t (*recv_pfn_t)(int socket, void *buffer, size_t size, int flags);
+static recv_pfn_t orig_recv_func;
+
 void libc_hook_init() {
     HOOK_SYS_FUNC( socket );
     HOOK_SYS_FUNC( send );
     HOOK_SYS_FUNC( sendto );
     HOOK_SYS_FUNC( connect );
     HOOK_SYS_FUNC( accept );
+    HOOK_SYS_FUNC( recv );
 }
 
 int socket(int domain, int type, int protocol) {
@@ -49,14 +53,26 @@ int socket(int domain, int type, int protocol) {
     return orig_socket_func(domain, type, protocol);
 }
 
-ssize_t send(int sockFd, const void *buf, size_t len, int flags) {
-//    fwrite(buf, len, 1, stdout);
-//    printf("\n");
-    struct ch_span span;
-    span.Ptr = buf;
-    span.Len = len;
-    on_send(sockFd, span, flags);
-    return orig_send_func(sockFd, buf, len, flags);
+ssize_t send(int sockFd, const void *buffer, size_t size, int flags) {
+    ssize_t sent_size = orig_send_func(sockFd, buffer, size, flags);
+    if (sent_size != -1) {
+        struct ch_span span;
+        span.Ptr = buffer;
+        span.Len = sent_size;
+        on_send(sockFd, span, flags);
+    }
+    return sent_size;
+}
+
+ssize_t recv (int sockFd, void *buffer, size_t size, int flags) {
+    ssize_t received_size = orig_recv_func(sockFd, buffer, size, flags);
+    if (received_size != -1) {
+        struct ch_span span;
+        span.Ptr = buffer;
+        span.Len = received_size;
+        on_recv(sockFd, span, flags);
+    }
+    return received_size;
 }
 
 ssize_t sendto(int sockfd, const void *buf, size_t len, int flags,
