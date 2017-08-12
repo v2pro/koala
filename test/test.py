@@ -12,7 +12,7 @@ def main():
     shell_execute('go build -buildmode=c-shared -o koala-recoder.so github.com/v2pro/koala')
     env = os.environ.copy()
     env['LD_PRELOAD'] = '%s/koala-recoder.so' % os.path.abspath('.')
-    server = subprocess.Popen(['python', 'server.py'], env=env)
+    server = subprocess.Popen(['strace', '-e', 'trace=network', 'python', 'server.py'], env=env)
     time.sleep(1)
     print(urllib2.urlopen('http://127.0.0.1:9000').read())
     server.send_signal(signal.SIGTERM)

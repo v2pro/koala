@@ -13,6 +13,7 @@
 #include <sys/types.h>
 #include <sys/syscall.h>
 #include "network_hook.h"
+#include "span.h"
 #include "_cgo_export.h"
 
 #define RTLD_NEXT	((void *) -1l)
@@ -48,16 +49,18 @@ int socket(int domain, int type, int protocol) {
     return orig_socket_func(domain, type, protocol);
 }
 
-ssize_t send(int sockfd, const void *buf, size_t len, int flags) {
+ssize_t send(int sockFd, const void *buf, size_t len, int flags) {
 //    fwrite(buf, len, 1, stdout);
 //    printf("\n");
-    on_send(sockfd, (void *)(buf), len);
-    return orig_send_func(sockfd, buf, len, flags);
+    struct ch_span span;
+    span.Ptr = buf;
+    span.Len = len;
+    on_send(sockFd, span, flags);
+    return orig_send_func(sockFd, buf, len, flags);
 }
 
 ssize_t sendto(int sockfd, const void *buf, size_t len, int flags,
                const struct sockaddr *dest_addr, socklen_t addrlen) {
-    on_send(sockfd, (void *)(buf), len);
     return orig_sendto_func(sockfd, buf, len, flags, dest_addr, addrlen);
 }
 

@@ -5,12 +5,13 @@ package main
 // #include <netinet/in.h>
 // #include <sys/types.h>
 // #include <sys/socket.h>
+// #include "span.h"
 // #include "network_hook.h"
 import "C"
 import (
-	"unsafe"
 	"fmt"
 	"github.com/v2pro/koala/ch"
+	"github.com/fatih/color"
 )
 
 func init() {
@@ -30,7 +31,8 @@ func on_accept(serverSockFd C.int, clientSockFd C.int, sin *C.struct_sockaddr_in
 }
 
 //export on_send
-func on_send(sockfd C.int, buf unsafe.Pointer, len C.int) {
+func on_send(sockFd C.int, span C.struct_ch_span, flags C.int) {
+	color.Red(string(ch_span_to_bytes(span)))
 }
 
 func main() {

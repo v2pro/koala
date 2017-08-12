@@ -1,2 +1,4 @@
 *.so
 *.iml
+/vendor
+/test/*.h
