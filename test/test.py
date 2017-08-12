@@ -4,6 +4,7 @@ import subprocess
 import signal
 import urllib2
 import time
+import threading
 import os
 
 
@@ -16,7 +17,16 @@ def main():
         ['strace', '-e', 'trace=network', 'python', 'server.py'],
         env=env, stdout=subprocess.PIPE)
     time.sleep(1)
-    print(urllib2.urlopen('http://127.0.0.1:9000').read())
+
+    def call_server():
+        print(urllib2.urlopen('http://127.0.0.1:9000').read())
+
+    thread1 = threading.Thread(target=call_server)
+    thread1.start()
+    thread2 = threading.Thread(target=call_server)
+    thread2.start()
+    thread1.join()
+    thread2.join()
     server.send_signal(signal.SIGTERM)
     print(server.communicate()[0])
 

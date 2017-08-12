@@ -20,39 +20,51 @@ func init() {
 }
 
 //export on_connect
-func on_connect(sockfd C.int, ip *C.char, port C.int) {
-}
-
-//export on_bind
-func on_bind(socketFD C.int, addr *C.struct_sockaddr_in) {
+func on_connect(threadID C.pid_t, socketFD C.int, addr *C.struct_sockaddr_in) {
 	if sockaddr_in_sin_family_get(addr) != syscall.AF_INET {
 		panic("expect ipv4 addr")
 	}
-	network.OnBind(network.SocketFD(socketFD), net.TCPAddr{
+	network.GetThread(network.ThreadID(threadID)).
+		OnConnect(network.SocketFD(socketFD), net.TCPAddr{
+		IP:   ch.Int2ip(sockaddr_in_sin_addr_get(addr)),
+		Port: int(ch.Ntohs(sockaddr_in_sin_port_get(addr))),
+	})
+}
+
+//export on_bind
+func on_bind(threadID C.pid_t, socketFD C.int, addr *C.struct_sockaddr_in) {
+	if sockaddr_in_sin_family_get(addr) != syscall.AF_INET {
+		panic("expect ipv4 addr")
+	}
+	network.GetThread(network.ThreadID(threadID)).
+		OnBind(network.SocketFD(socketFD), net.TCPAddr{
 		IP:   ch.Int2ip(sockaddr_in_sin_addr_get(addr)),
 		Port: int(ch.Ntohs(sockaddr_in_sin_port_get(addr))),
 	})
 }
 
 //export on_accept
-func on_accept(serverSocketFD C.int, clientSocketFD C.int, addr *C.struct_sockaddr_in) {
+func on_accept(threadID C.pid_t, serverSocketFD C.int, clientSocketFD C.int, addr *C.struct_sockaddr_in) {
 	if sockaddr_in_sin_family_get(addr) != syscall.AF_INET {
 		panic("expect ipv4 addr")
 	}
-	network.OnAccept(network.SocketFD(serverSocketFD), network.SocketFD(clientSocketFD), net.TCPAddr{
+	network.GetThread(network.ThreadID(threadID)).
+		OnAccept(network.SocketFD(serverSocketFD), network.SocketFD(clientSocketFD), net.TCPAddr{
 		IP:   ch.Int2ip(sockaddr_in_sin_addr_get(addr)),
 		Port: int(ch.Ntohs(sockaddr_in_sin_port_get(addr))),
 	})
 }
 
 //export on_send
-func on_send(socketFD C.int, span C.struct_ch_span, flags C.int) {
-	network.OnSend(network.SocketFD(socketFD), ch_span_to_bytes(span), network.SendFlags(flags))
+func on_send(threadID C.pid_t, socketFD C.int, span C.struct_ch_span, flags C.int) {
+	network.GetThread(network.ThreadID(threadID)).
+		OnSend(network.SocketFD(socketFD), ch_span_to_bytes(span), network.SendFlags(flags))
 }
 
 //export on_recv
-func on_recv(socketFD C.int, span C.struct_ch_span, flags C.int) {
-	network.OnRecv(network.SocketFD(socketFD), ch_span_to_bytes(span), network.RecvFlags(flags))
+func on_recv(threadID C.pid_t, socketFD C.int, span C.struct_ch_span, flags C.int) {
+	network.GetThread(network.ThreadID(threadID)).
+		OnRecv(network.SocketFD(socketFD), ch_span_to_bytes(span), network.RecvFlags(flags))
 }
 
 func main() {

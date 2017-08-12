@@ -52,59 +52,64 @@ void libc_hook_init() {
 }
 
 int socket(int domain, int type, int protocol) {
-//    pid_t thread_id = syscall(__NR_gettid);
-//    printf("create socket from %d\n", thread_id);
     return orig_socket_func(domain, type, protocol);
 }
 
-int bind (int sockFd, const struct sockaddr *addr, socklen_t length) {
-    if (addr->sa_family == AF_INET) {
+int bind (int socketFD, const struct sockaddr *addr, socklen_t length) {
+    int errno = orig_bind_func(socketFD,addr, length);
+    if (errno == 0 && addr->sa_family == AF_INET) {
         struct sockaddr_in *typed_addr = (struct sockaddr_in *)(addr);
-        on_bind(sockFd, typed_addr);
+        pid_t thread_id = syscall(__NR_gettid);
+        on_bind(thread_id, socketFD, typed_addr);
     }
-    return orig_bind_func(sockFd,addr, length);
+    return errno;
 }
 
-ssize_t send(int sockFd, const void *buffer, size_t size, int flags) {
-    ssize_t sent_size = orig_send_func(sockFd, buffer, size, flags);
+ssize_t send(int socketFD, const void *buffer, size_t size, int flags) {
+    ssize_t sent_size = orig_send_func(socketFD, buffer, size, flags);
     if (sent_size >= 0) {
         struct ch_span span;
         span.Ptr = buffer;
         span.Len = sent_size;
-        on_send(sockFd, span, flags);
+        pid_t thread_id = syscall(__NR_gettid);
+        on_send(thread_id, socketFD, span, flags);
     }
     return sent_size;
 }
 
-ssize_t recv (int sockFd, void *buffer, size_t size, int flags) {
-    ssize_t received_size = orig_recv_func(sockFd, buffer, size, flags);
+ssize_t recv (int socketFD, void *buffer, size_t size, int flags) {
+    ssize_t received_size = orig_recv_func(socketFD, buffer, size, flags);
     if (received_size >= 0) {
         struct ch_span span;
         span.Ptr = buffer;
         span.Len = received_size;
-        on_recv(sockFd, span, flags);
+        pid_t thread_id = syscall(__NR_gettid);
+        on_recv(thread_id, socketFD, span, flags);
     }
     return received_size;
 }
 
-ssize_t sendto(int sockfd, const void *buf, size_t len, int flags,
+ssize_t sendto(int socketFD, const void *buf, size_t len, int flags,
                const struct sockaddr *dest_addr, socklen_t addrlen) {
-    return orig_sendto_func(sockfd, buf, len, flags, dest_addr, addrlen);
+    return orig_sendto_func(socketFD, buf, len, flags, dest_addr, addrlen);
 }
 
-int connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen) {
-    if (addr->sa_family == AF_INET) {
-        struct sockaddr_in *sin = (struct sockaddr_in *)(addr);
-        on_connect(sockfd, inet_ntoa(sin->sin_addr), ntohs(sin->sin_port));
-    }
-    return orig_connect_func(sockfd, addr, addrlen);
-}
-
-int accept(int serverSockFd, struct sockaddr *addr, socklen_t *addrlen) {
-    int clientSockFd = orig_accept_func(serverSockFd, addr, addrlen);
-    if (addr->sa_family == AF_INET) {
+int connect(int socketFD, const struct sockaddr *addr, socklen_t addrlen) {
+    int errno = orig_connect_func(socketFD, addr, addrlen);
+    if (errno == 0 && addr->sa_family == AF_INET) {
         struct sockaddr_in *typed_addr = (struct sockaddr_in *)(addr);
-        on_accept(serverSockFd, clientSockFd, typed_addr);
+        pid_t thread_id = syscall(__NR_gettid);
+        on_connect(thread_id, socketFD, typed_addr);
     }
-    return clientSockFd;
+    return errno;
+}
+
+int accept(int serverSocketFD, struct sockaddr *addr, socklen_t *addrlen) {
+    int clientSocketFD = orig_accept_func(serverSocketFD, addr, addrlen);
+    if (clientSocketFD > 0 && addr->sa_family == AF_INET) {
+        struct sockaddr_in *typed_addr = (struct sockaddr_in *)(addr);
+        pid_t thread_id = syscall(__NR_gettid);
+        on_accept(thread_id, serverSocketFD, clientSocketFD, typed_addr);
+    }
+    return clientSocketFD;
 }

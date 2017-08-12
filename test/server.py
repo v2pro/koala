@@ -11,8 +11,12 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         self.send_response(200, 'hello')
 
 
+class ThreadedTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
+    pass
+
+
 SocketServer.TCPServer.allow_reuse_address = True
-httpd = SocketServer.TCPServer(("", PORT), MyHandler)
+httpd = ThreadedTCPServer(("", PORT), MyHandler)
 
 print "serving at port", PORT
 httpd.serve_forever()

@@ -5,20 +5,18 @@ import (
 	"net"
 )
 
-type SocketFD int
-
 type SendFlags int
 
-func OnSend(socketFD SocketFD, span []byte, flags SendFlags) {
-	sock := socks[socketFD]
+func (thread *Thread) OnSend(socketFD SocketFD, span []byte, flags SendFlags) {
+	sock := thread.lookupSocket(socketFD)
 	if sock == nil {
-		fmt.Println("=== send to unknown ===")
+		fmt.Println(fmt.Sprintf("=== [%d] send to unknown ===", thread.threadID))
 		return
 	}
 	if sock.isServer {
-		fmt.Println("=== inbound send ===")
+		fmt.Println(fmt.Sprintf("=== [%d] inbound send ===", thread.threadID))
 	} else {
-		fmt.Println("=== outbound send ===")
+		fmt.Println(fmt.Sprintf("=== [%d] outbound send ===", thread.threadID))
 	}
 	fmt.Println(sock.addr)
 	fmt.Println(string(span))
@@ -26,37 +24,60 @@ func OnSend(socketFD SocketFD, span []byte, flags SendFlags) {
 
 type RecvFlags int
 
-func OnRecv(socketFD SocketFD, span []byte, flags RecvFlags) {
-	sock := socks[socketFD]
+func (thread *Thread) OnRecv(socketFD SocketFD, span []byte, flags RecvFlags) {
+	sock := thread.lookupSocket(socketFD)
 	if sock == nil {
-		fmt.Println("=== recv from unknown ===")
+		fmt.Println(fmt.Sprintf("=== [%d] recv from unknown ===", thread.threadID))
 		return
 	}
 	if sock.isServer {
-		fmt.Println("=== inbound recv ===")
+		fmt.Println(fmt.Sprintf("=== [%d] inbound recv ===", thread.threadID))
 	} else {
-		fmt.Println("=== outbound recv ===")
+		fmt.Println(fmt.Sprintf("=== [%d] outbound recv ===", thread.threadID))
 	}
 	fmt.Println(sock.addr)
 	fmt.Println(string(span))
 }
 
-func OnAccept(serverSocketFD SocketFD, clientSocketFD SocketFD, addr net.TCPAddr) {
-	socks[clientSocketFD] = &sock{
+func (thread *Thread) lookupSocket(socketFD SocketFD) *socket {
+	sock := thread.socks[socketFD]
+	if sock == nil {
+		sock = getGlobalSock(socketFD)
+		if sock == nil {
+			return nil
+		}
+		thread.socks[socketFD] = sock
+	}
+	return sock
+}
+
+func (thread *Thread) OnAccept(serverSocketFD SocketFD, clientSocketFD SocketFD, addr net.TCPAddr) {
+	thread.socks[clientSocketFD] = &socket{
 		socketFD: clientSocketFD,
 		isServer: true,
-		addr: addr,
+		addr:     addr,
 	}
-	fmt.Println("=== accept ===")
+	setGlobalSock(clientSocketFD, thread.socks[clientSocketFD])
+	fmt.Println(fmt.Sprintf("=== [%d] accept ===", thread.threadID))
 	fmt.Println(addr)
 }
 
-func OnBind(socketFD SocketFD, addr net.TCPAddr) {
-	socks[socketFD] = &sock{
+func (thread *Thread) OnBind(socketFD SocketFD, addr net.TCPAddr) {
+	thread.socks[socketFD] = &socket{
 		socketFD: socketFD,
 		isServer: true,
-		addr: addr,
+		addr:     addr,
 	}
-	fmt.Println("=== bind ===")
+	fmt.Println(fmt.Sprintf("=== [%d] bind ===", thread.threadID))
+	fmt.Println(addr)
+}
+
+func (thread *Thread) OnConnect(socketFD SocketFD, addr net.TCPAddr) {
+	thread.socks[socketFD] = &socket{
+		socketFD: socketFD,
+		isServer: false,
+		addr:     addr,
+	}
+	fmt.Println(fmt.Sprintf("=== [%d] connect ===", thread.threadID))
 	fmt.Println(addr)
 }
