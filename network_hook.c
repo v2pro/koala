@@ -38,6 +38,9 @@ static accept_pfn_t orig_accept_func;
 typedef ssize_t (*recv_pfn_t)(int socket, void *buffer, size_t size, int flags);
 static recv_pfn_t orig_recv_func;
 
+typedef int (*bind_pfn_t)(int socket, const struct sockaddr *addr, socklen_t length);
+static bind_pfn_t orig_bind_func;
+
 void libc_hook_init() {
     HOOK_SYS_FUNC( socket );
     HOOK_SYS_FUNC( send );
@@ -45,6 +48,7 @@ void libc_hook_init() {
     HOOK_SYS_FUNC( connect );
     HOOK_SYS_FUNC( accept );
     HOOK_SYS_FUNC( recv );
+    HOOK_SYS_FUNC( bind );
 }
 
 int socket(int domain, int type, int protocol) {
@@ -53,9 +57,17 @@ int socket(int domain, int type, int protocol) {
     return orig_socket_func(domain, type, protocol);
 }
 
+int bind (int sockFd, const struct sockaddr *addr, socklen_t length) {
+    if (addr->sa_family == AF_INET) {
+        struct sockaddr_in *typed_addr = (struct sockaddr_in *)(addr);
+        on_bind(sockFd, typed_addr);
+    }
+    return orig_bind_func(sockFd,addr, length);
+}
+
 ssize_t send(int sockFd, const void *buffer, size_t size, int flags) {
     ssize_t sent_size = orig_send_func(sockFd, buffer, size, flags);
-    if (sent_size != -1) {
+    if (sent_size >= 0) {
         struct ch_span span;
         span.Ptr = buffer;
         span.Len = sent_size;
@@ -66,7 +78,7 @@ ssize_t send(int sockFd, const void *buffer, size_t size, int flags) {
 
 ssize_t recv (int sockFd, void *buffer, size_t size, int flags) {
     ssize_t received_size = orig_recv_func(sockFd, buffer, size, flags);
-    if (received_size != -1) {
+    if (received_size >= 0) {
         struct ch_span span;
         span.Ptr = buffer;
         span.Len = received_size;
@@ -91,8 +103,8 @@ int connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen) {
 int accept(int serverSockFd, struct sockaddr *addr, socklen_t *addrlen) {
     int clientSockFd = orig_accept_func(serverSockFd, addr, addrlen);
     if (addr->sa_family == AF_INET) {
-        struct sockaddr_in *sin = (struct sockaddr_in *)(addr);
-        on_accept(serverSockFd, clientSockFd, sin);
+        struct sockaddr_in *typed_addr = (struct sockaddr_in *)(addr);
+        on_accept(serverSockFd, clientSockFd, typed_addr);
     }
     return clientSockFd;
 }

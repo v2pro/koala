@@ -9,9 +9,10 @@ package main
 // #include "network_hook.h"
 import "C"
 import (
-	"fmt"
 	"github.com/v2pro/koala/ch"
-	"github.com/fatih/color"
+	"syscall"
+	"github.com/v2pro/koala/network"
+	"net"
 )
 
 func init() {
@@ -22,22 +23,36 @@ func init() {
 func on_connect(sockfd C.int, ip *C.char, port C.int) {
 }
 
+//export on_bind
+func on_bind(socketFD C.int, addr *C.struct_sockaddr_in) {
+	if sockaddr_in_sin_family_get(addr) != syscall.AF_INET {
+		panic("expect ipv4 addr")
+	}
+	network.OnBind(network.SocketFD(socketFD), net.TCPAddr{
+		IP:   ch.Int2ip(sockaddr_in_sin_addr_get(addr)),
+		Port: int(ch.Ntohs(sockaddr_in_sin_port_get(addr))),
+	})
+}
+
 //export on_accept
-func on_accept(serverSockFd C.int, clientSockFd C.int, sin *C.struct_sockaddr_in) {
-	//sockaddr_in.Get_sin_family((unsafe.Pointer)(sin))
-	fmt.Println(sockaddr_in_sin_family_get(sin))
-	fmt.Println(ch.Ntohs(sockaddr_in_sin_port_get(sin)))
-	fmt.Println(ch.Int2ip(sockaddr_in_sin_addr_get(sin)))
+func on_accept(serverSocketFD C.int, clientSocketFD C.int, addr *C.struct_sockaddr_in) {
+	if sockaddr_in_sin_family_get(addr) != syscall.AF_INET {
+		panic("expect ipv4 addr")
+	}
+	network.OnAccept(network.SocketFD(serverSocketFD), network.SocketFD(clientSocketFD), net.TCPAddr{
+		IP:   ch.Int2ip(sockaddr_in_sin_addr_get(addr)),
+		Port: int(ch.Ntohs(sockaddr_in_sin_port_get(addr))),
+	})
 }
 
 //export on_send
-func on_send(sockFd C.int, span C.struct_ch_span, flags C.int) {
-	color.Red(string(ch_span_to_bytes(span)))
+func on_send(socketFD C.int, span C.struct_ch_span, flags C.int) {
+	network.OnSend(network.SocketFD(socketFD), ch_span_to_bytes(span), network.SendFlags(flags))
 }
 
 //export on_recv
-func on_recv(sockFd C.int, span C.struct_ch_span, flags C.int) {
-	color.Green(string(ch_span_to_bytes(span)))
+func on_recv(socketFD C.int, span C.struct_ch_span, flags C.int) {
+	network.OnRecv(network.SocketFD(socketFD), ch_span_to_bytes(span), network.RecvFlags(flags))
 }
 
 func main() {
