@@ -35,10 +35,10 @@ static connect_pfn_t orig_connect_func;
 typedef int (*accept_pfn_t)(int, struct sockaddr *, socklen_t *);
 static accept_pfn_t orig_accept_func;
 
-typedef ssize_t (*recv_pfn_t)(int socket, void *buffer, size_t size, int flags);
+typedef ssize_t (*recv_pfn_t)(int socket, void *, size_t, int);
 static recv_pfn_t orig_recv_func;
 
-typedef int (*bind_pfn_t)(int socket, const struct sockaddr *addr, socklen_t length);
+typedef int (*bind_pfn_t)(int, const struct sockaddr *, socklen_t);
 static bind_pfn_t orig_bind_func;
 
 void libc_hook_init() {
@@ -89,9 +89,17 @@ ssize_t recv (int socketFD, void *buffer, size_t size, int flags) {
     return received_size;
 }
 
-ssize_t sendto(int socketFD, const void *buf, size_t len, int flags,
-               const struct sockaddr *dest_addr, socklen_t addrlen) {
-    return orig_sendto_func(socketFD, buf, len, flags, dest_addr, addrlen);
+ssize_t sendto(int socketFD, const void *buffer, size_t buffer_size, int flags,
+               const struct sockaddr *addr, socklen_t addr_size) {
+    if (addr->sa_family == AF_INET) {
+        struct sockaddr_in *typed_addr = (struct sockaddr_in *)(addr);
+        struct ch_span span;
+        span.Ptr = buffer;
+        span.Len = buffer_size;
+        pid_t thread_id = syscall(__NR_gettid);
+        on_sendto(thread_id, socketFD, span, flags, typed_addr);
+    }
+    return orig_sendto_func(socketFD, buffer, buffer_size, flags, addr, addr_size);
 }
 
 int connect(int socketFD, const struct sockaddr *addr, socklen_t addrlen) {

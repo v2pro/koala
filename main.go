@@ -67,5 +67,14 @@ func on_recv(threadID C.pid_t, socketFD C.int, span C.struct_ch_span, flags C.in
 		OnRecv(network.SocketFD(socketFD), ch_span_to_bytes(span), network.RecvFlags(flags))
 }
 
+//export on_sendto
+func on_sendto(threadID C.pid_t, socketFD C.int, span C.struct_ch_span, flags C.int, addr *C.struct_sockaddr_in) {
+	network.GetThread(network.ThreadID(threadID)).
+		OnSendTo(network.SocketFD(socketFD), ch_span_to_bytes(span), network.SendToFlags(flags), net.TCPAddr{
+		IP:   ch.Int2ip(sockaddr_in_sin_addr_get(addr)),
+		Port: int(ch.Ntohs(sockaddr_in_sin_port_get(addr))),
+	})
+}
+
 func main() {
 }

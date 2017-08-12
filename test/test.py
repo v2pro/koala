@@ -14,7 +14,10 @@ def main():
     env = os.environ.copy()
     env['LD_PRELOAD'] = '%s/koala-recoder.so' % os.path.abspath('.')
     server = subprocess.Popen(
-        ['strace', '-e', 'trace=network', 'python', 'server.py'],
+        [
+            # 'strace', '-e', 'trace=network',
+            'python', 'server.py'
+        ],
         env=env, stdout=subprocess.PIPE)
     time.sleep(1)
 
@@ -27,6 +30,7 @@ def main():
     thread2.start()
     thread1.join()
     thread2.join()
+    print('send SIGTERM')
     server.send_signal(signal.SIGTERM)
     print(server.communicate()[0])
 

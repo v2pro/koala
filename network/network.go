@@ -4,7 +4,11 @@ import (
 	"net"
 	"github.com/v2pro/koala/countlog"
 	"fmt"
+	"bytes"
+	"encoding/json"
 )
+
+var threadShutdownEvent = []byte("to-koala:thread-shutdown||")
 
 func init() {
 	logWriter := countlog.NewStdoutLogWriter(countlog.DEBUG)
@@ -12,10 +16,30 @@ func init() {
 		msg := []byte{}
 		msg = append(msg, fmt.Sprintf(
 			"=== [%d] %s ===\n", event.Get("threadID"), event.Event)...)
-		msg = append(msg, fmt.Sprintf("addr: %v\n", event.Get("addr"))...)
-		content, _ := event.Get("content").([]byte)
-		if content != nil {
-			msg = append(msg, fmt.Sprintf("%v\n", string(content))...)
+		for i := 0; i < len(event.Properties); i += 2 {
+			k, _ := event.Properties[i].(string)
+			if k == "" {
+				continue
+			}
+			v := event.Properties[i+1]
+			switch k {
+			case "content":
+				v = string(v.([]byte))
+			case "addr":
+				addr := v.(net.TCPAddr)
+				v = addr.String()
+			case "threadID":
+				continue
+			case "lineNumber":
+				continue
+			case "session":
+				b, err := json.MarshalIndent(v, "", "  ")
+				if err != nil {
+					panic(err)
+				}
+				v = string(b)
+			}
+			msg = append(msg, fmt.Sprintf("%s: %v\n", k, v)...)
 		}
 		return string(msg)
 	}
@@ -45,8 +69,11 @@ func (thread *Thread) OnSend(socketFD SocketFD, span []byte, flags SendFlags) {
 		return
 	}
 	event := "inbound-send"
-	if !sock.isServer {
+	if sock.isServer {
+		thread.session.InboundSend(span, sock.addr)
+	} else {
 		event = "outbound-send"
+		thread.session.OutboundSend(thread.threadID, span, sock.addr)
 	}
 	countlog.Trace(event,
 		"threadID", thread.threadID,
@@ -66,8 +93,11 @@ func (thread *Thread) OnRecv(socketFD SocketFD, span []byte, flags RecvFlags) {
 		return
 	}
 	event := "inbound-recv"
-	if !sock.isServer {
+	if sock.isServer {
+		thread.session.InboundRecv(span, sock.addr)
+	} else {
 		event = "outbound-recv"
+		thread.session.OutboundRecv(thread.threadID, span, sock.addr)
 	}
 	countlog.Trace(event,
 		"threadID", thread.threadID,
@@ -112,4 +142,23 @@ func (thread *Thread) OnConnect(socketFD SocketFD, addr net.TCPAddr) {
 		"threadID", thread.threadID,
 		"socketFD", socketFD,
 		"addr", addr)
+}
+
+type SendToFlags int
+
+func (thread *Thread) OnSendTo(socketFD SocketFD, span []byte, flags SendToFlags, addr net.TCPAddr) {
+	countlog.Debug("sendto",
+		"threadID", thread.threadID,
+		"socketFD", socketFD,
+		"addr", addr,
+		"content", span)
+	if bytes.HasPrefix(span, threadShutdownEvent) {
+		thread.session.OutboundTalks = append(thread.session.OutboundTalks, thread.session.currentOutboundTalk)
+		countlog.Fatal("session-produced",
+			"threadID", thread.threadID,
+			"session", thread.session,
+		)
+		countlog.Debug("thread-shutdown",
+			"threadID", thread.threadID)
+	}
 }

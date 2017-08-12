@@ -18,6 +18,7 @@ type ThreadID int32
 type Thread struct {
 	threadID ThreadID
 	socks    map[SocketFD]*socket
+	session  Session
 }
 
 var globalSocks = map[SocketFD]*socket{}

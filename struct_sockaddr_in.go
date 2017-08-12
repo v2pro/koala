@@ -19,8 +19,8 @@ var in_addr_type = reflect.TypeOf((*C.struct_in_addr)(nil)).Elem()
 var in_addr_s_addr_field = ch.FieldOf(in_addr_type, "s_addr")
 
 func init() {
-	ch.Dump(sockaddr_in_type)
-	ch.Dump(ch.FieldOf(sockaddr_in_type, "sin_addr").Type)
+	//ch.Dump(sockaddr_in_type)
+	//ch.Dump(ch.FieldOf(sockaddr_in_type, "sin_addr").Type)
 }
 
 func sockaddr_in_sin_family_get(ptr *C.struct_sockaddr_in) uint16 {
