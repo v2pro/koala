@@ -12,6 +12,12 @@ func Start() {
 }
 
 func server() {
+	defer func() {
+		recovered := recover()
+		if recovered != nil {
+			countlog.Fatal("panic", "err", recovered)
+		}
+	}()
 	listener, err := net.Listen("tcp", ":9002")
 	if err != nil {
 		countlog.Error("failed to listen outbound", "err", err)
@@ -48,14 +54,25 @@ func handleOutbound(conn *net.TCPConn) {
 		"addr", *tcpAddr,
 		"content", request,
 		"replayingSession", replayingSession)
+	replayedTalk := replaying.ReplayedTalk{
+		ReplayedRequest: request,
+		ReplayedRequestTime: time.Now().UnixNano(),
+	}
 	matchedTalk := replayingSession.MatchOutboundTalk(request)
 	if matchedTalk == nil {
 		countlog.Error("failed to find matching talk", "addr", *tcpAddr)
 		return
 	}
+	replayedTalk.MatchedTalk = matchedTalk
+	replayedTalk.ReplayedResponseTime = time.Now().UnixNano()
 	_, err := conn.Write(matchedTalk.Response)
 	if err != nil {
 		countlog.Error("failed to write back response from outbound", "addr", *tcpAddr)
 		return
+	}
+	select {
+	case replayingSession.ReplayedOutboundTalkCollector <- replayedTalk:
+	default:
+		countlog.Error("ReplayedOutboundTalkCollector is full")
 	}
 }

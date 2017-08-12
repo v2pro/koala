@@ -7,18 +7,27 @@ import (
 	"encoding/json"
 	"net"
 	"time"
-	"github.com/v2pro/koala/st"
 	"github.com/v2pro/koala/replaying"
+	"github.com/v2pro/koala/st"
 )
 
 func Start() {
 	go func() {
+		defer func() {
+			recovered := recover()
+			if recovered != nil {
+				countlog.Fatal("panic", "err", recovered)
+			}
+		}()
 		http.HandleFunc("/", handleInbound)
-		http.ListenAndServe(":9001", nil)
+		countlog.Info("inbound-started")
+		err := http.ListenAndServe(":9001", nil)
+		countlog.Info("inbound-exited", "err", err)
 	}()
 }
 
 func handleInbound(respWriter http.ResponseWriter, req *http.Request) {
+	countlog.Debug("inbound-received", "remoteAddr", req.RemoteAddr)
 	reqBody, err := ioutil.ReadAll(req.Body)
 	if err != nil {
 		countlog.Error("failed to read request", "err", err)
@@ -36,23 +45,47 @@ func handleInbound(respWriter http.ResponseWriter, req *http.Request) {
 		countlog.Error("failed to resolve addresses", "err", err)
 		return
 	}
-	replaying.StoreTmp(*localAddr, &session)
+	replayingSession := replaying.ReplayingSession{
+		Session:                       session,
+		ReplayedOutboundTalkCollector: make(chan replaying.ReplayedTalk, 4096),
+		ReplayedRequestTime:           time.Now().UnixNano(),
+	}
+	replaying.StoreTmp(*localAddr, &replayingSession)
 	conn, err := net.DialTCP("tcp", localAddr, remoteAddr)
 	if err != nil {
 		countlog.Error("failed to connect sut", "err", err)
 		return
 	}
-	_, err = conn.Write(session.InboundTalk.Request)
+	_, err = conn.Write(replayingSession.InboundTalk.Request)
 	if err != nil {
 		countlog.Error("failed to write sut", "err", err)
 		return
 	}
+	response, err := readResponse(conn)
+	if err != nil {
+		return
+	}
+	//fmt.Println(string(response))
+	replayingSession.Finish(response)
+	marshaledReplayingSession, err := json.Marshal(replayingSession)
+	if err != nil {
+		countlog.Error("marshal replaying session failed", "err", err)
+		return
+	}
+	_, err = respWriter.Write(marshaledReplayingSession)
+	if err != nil {
+		countlog.Error("failed to write response", "err", err)
+		return
+	}
+}
+
+func readResponse(conn *net.TCPConn) ([]byte, error) {
 	buf := make([]byte, 1024)
 	conn.SetReadDeadline(time.Now().Add(time.Second * 5))
 	bytesRead, err := conn.Read(buf)
 	if err != nil {
 		countlog.Error("failed to read first packet from sut", "err", err)
-		return
+		return nil, err
 	}
 	response := buf[:bytesRead]
 	for {
@@ -63,5 +96,5 @@ func handleInbound(respWriter http.ResponseWriter, req *http.Request) {
 		}
 		response = append(response, buf[:bytesRead]...)
 	}
-	respWriter.Write(response)
+	return response, nil
 }

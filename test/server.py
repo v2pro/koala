@@ -6,12 +6,11 @@ import urllib2
 
 PORT = 9000
 
+
 class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     def do_GET(self):
         urllib2.urlopen('http://postman-echo.com/get').read()
-        self.send_response(200, 'OK')
-        self.end_headers()
-        self.wfile.write('good day')
+        self.request.sendall('good day')
 
 
 class ThreadingMixIn:

@@ -92,10 +92,12 @@ func (thread *Thread) OnSend(socketFD SocketFD, span []byte, flags SendFlags) {
 	}
 	event := "inbound-send"
 	if sock.isServer {
-		thread.session.InboundSend(thread, span, sock.addr)
+		thread.recordingSession.InboundSend(thread, span, sock.addr)
 	} else {
 		event = "outbound-send"
-		thread.session.OutboundSend(thread, span, sock.addr)
+		if replaying.IsRecording() {
+			thread.recordingSession.OutboundSend(thread, span, sock.addr)
+		}
 	}
 	countlog.Trace(event,
 		"threadID", thread.threadID,
@@ -116,7 +118,7 @@ func (thread *Thread) OnRecv(socketFD SocketFD, span []byte, flags RecvFlags) {
 	}
 	event := "inbound-recv"
 	if sock.isServer {
-		thread.session.InboundRecv(thread, span, sock.addr)
+		thread.recordingSession.InboundRecv(thread, span, sock.addr)
 		thread.replayingSession = replaying.RetrieveTmp(sock.addr)
 		if thread.replayingSession != nil {
 			countlog.Debug("sut-received-replaying-session",
@@ -126,7 +128,7 @@ func (thread *Thread) OnRecv(socketFD SocketFD, span []byte, flags RecvFlags) {
 		}
 	} else {
 		event = "outbound-recv"
-		thread.session.OutboundRecv(thread, span, sock.addr)
+		thread.recordingSession.OutboundRecv(thread, span, sock.addr)
 	}
 	countlog.Trace(event,
 		"threadID", thread.threadID,
@@ -190,7 +192,7 @@ func (thread *Thread) OnSendTo(socketFD SocketFD, span []byte, flags SendToFlags
 		"addr", addr,
 		"content", span)
 	if bytes.HasPrefix(span, threadShutdownEvent) {
-		thread.session.Shutdown(thread)
+		thread.recordingSession.Shutdown(thread)
 		countlog.Debug("thread-shutdown",
 			"threadID", thread.threadID)
 	}

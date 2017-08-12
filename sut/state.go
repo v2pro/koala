@@ -5,6 +5,7 @@ import (
 	"sync"
 	"github.com/v2pro/koala/st"
 	"context"
+	"github.com/v2pro/koala/replaying"
 )
 
 type SocketFD int
@@ -21,8 +22,8 @@ type Thread struct {
 	context.Context
 	threadID         ThreadID
 	socks            map[SocketFD]*socket
-	session          *st.Session
-	replayingSession *st.Session
+	recordingSession *st.Session
+	replayingSession *replaying.ReplayingSession
 }
 
 var globalSocks = map[SocketFD]*socket{}
@@ -48,12 +49,14 @@ func GetThread(threadID ThreadID) *Thread {
 	thread := globalThreads[threadID]
 	if thread == nil {
 		thread = &Thread{
-			Context:  context.WithValue(context.Background(), "threadID", threadID),
-			threadID: threadID,
-			socks:    map[SocketFD]*socket{},
-			session:  &st.Session{},
+			Context:          context.WithValue(context.Background(), "threadID", threadID),
+			threadID:         threadID,
+			socks:            map[SocketFD]*socket{},
 		}
 		globalThreads[threadID] = thread
+	}
+	if replaying.IsRecording() {
+		thread.recordingSession = &st.Session{}
 	}
 	return thread
 }

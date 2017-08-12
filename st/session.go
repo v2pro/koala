@@ -8,12 +8,15 @@ import (
 )
 
 type Session struct {
-	InboundTalk         *Talk
-	OutboundTalks       []*Talk
-	currentOutboundTalk *Talk
+	InboundTalk                   *Talk
+	OutboundTalks                 []*Talk
+	currentOutboundTalk           *Talk
 }
 
 func (session *Session) InboundRecv(ctx context.Context, span []byte, peer net.TCPAddr) {
+	if session == nil {
+		return
+	}
 	if session.InboundTalk == nil {
 		session.InboundTalk = &Talk{Peer: peer}
 	}
@@ -24,6 +27,9 @@ func (session *Session) InboundRecv(ctx context.Context, span []byte, peer net.T
 }
 
 func (session *Session) InboundSend(ctx context.Context, span []byte, peer net.TCPAddr) {
+	if session == nil {
+		return
+	}
 	if session.InboundTalk == nil {
 		session.InboundTalk = &Talk{Peer: peer}
 	}
@@ -34,6 +40,9 @@ func (session *Session) InboundSend(ctx context.Context, span []byte, peer net.T
 }
 
 func (session *Session) OutboundRecv(ctx context.Context, span []byte, peer net.TCPAddr) {
+	if session == nil {
+		return
+	}
 	if session.currentOutboundTalk == nil {
 		session.currentOutboundTalk = &Talk{Peer: peer}
 	}
@@ -44,6 +53,9 @@ func (session *Session) OutboundRecv(ctx context.Context, span []byte, peer net.
 }
 
 func (session *Session) OutboundSend(ctx context.Context, span []byte, peer net.TCPAddr) {
+	if session == nil {
+		return
+	}
 	if session.currentOutboundTalk == nil {
 		session.currentOutboundTalk = &Talk{Peer: peer}
 	}
@@ -63,13 +75,12 @@ func (session *Session) OutboundSend(ctx context.Context, span []byte, peer net.
 }
 
 func (session *Session) Shutdown(ctx context.Context) {
+	if session == nil {
+		return
+	}
 	session.OutboundTalks = append(session.OutboundTalks, session.currentOutboundTalk)
 	countlog.Fatal("session-recorded",
 		"ctx", ctx,
 		"session", session,
 	)
-}
-
-func (session *Session) MatchOutboundTalk(outboundRequest []byte) *Talk {
-	return session.OutboundTalks[0]
 }

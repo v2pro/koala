@@ -16,12 +16,18 @@ import (
 	"github.com/v2pro/koala/sut"
 	"github.com/v2pro/koala/outbound"
 	"github.com/v2pro/koala/countlog"
+	"github.com/v2pro/koala/replaying"
 )
 
 func init() {
 	C.libc_hook_init()
-	inbound.Start()
-	outbound.Start()
+	if replaying.IsReplaying() {
+		inbound.Start()
+		outbound.Start()
+		countlog.Info("koala started", "mode", "replaying")
+	} else {
+		countlog.Info("koala started", "mode", "recording")
+	}
 }
 
 //export on_connect

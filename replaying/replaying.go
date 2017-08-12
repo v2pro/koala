@@ -2,22 +2,36 @@ package replaying
 
 import (
 	"net"
-	"github.com/v2pro/koala/st"
 	"sync"
 	"github.com/v2pro/koala/countlog"
 	"syscall"
+	"os"
 )
 
-var tmp = map[string]*st.Session{}
+var isReplaying = false
+
+func init() {
+	isReplaying = os.Getenv("KOALA_MODE") == "REPLAYING"
+}
+
+func IsReplaying() bool {
+	return isReplaying
+}
+
+func IsRecording() bool {
+	return !isReplaying
+}
+
+var tmp = map[string]*ReplayingSession{}
 var tmpMutex = &sync.Mutex{}
 
-func StoreTmp(inboundAddr net.TCPAddr, session *st.Session) {
+func StoreTmp(inboundAddr net.TCPAddr, session *ReplayingSession) {
 	tmpMutex.Lock()
 	defer tmpMutex.Unlock()
 	tmp[inboundAddr.String()] = session
 }
 
-func RetrieveTmp(inboundAddr net.TCPAddr) *st.Session {
+func RetrieveTmp(inboundAddr net.TCPAddr) *ReplayingSession {
 	tmpMutex.Lock()
 	defer tmpMutex.Unlock()
 	key := inboundAddr.String()
