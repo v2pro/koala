@@ -1,42 +1,25 @@
 package network
 
 import (
-	"fmt"
 	"net"
+	"github.com/v2pro/koala/countlog"
+	"fmt"
 )
 
-type SendFlags int
-
-func (thread *Thread) OnSend(socketFD SocketFD, span []byte, flags SendFlags) {
-	sock := thread.lookupSocket(socketFD)
-	if sock == nil {
-		fmt.Println(fmt.Sprintf("=== [%d] send to unknown ===", thread.threadID))
-		return
+func init() {
+	logWriter := countlog.NewStdoutLogWriter(countlog.DEBUG)
+	logWriter.FormatLog = func(event countlog.Event) string {
+		msg := []byte{}
+		msg = append(msg, fmt.Sprintf(
+			"=== [%d] %s ===\n", event.Get("threadID"), event.Event)...)
+		msg = append(msg, fmt.Sprintf("addr: %v\n", event.Get("addr"))...)
+		content, _ := event.Get("content").([]byte)
+		if content != nil {
+			msg = append(msg, fmt.Sprintf("%v\n", string(content))...)
+		}
+		return string(msg)
 	}
-	if sock.isServer {
-		fmt.Println(fmt.Sprintf("=== [%d] inbound send ===", thread.threadID))
-	} else {
-		fmt.Println(fmt.Sprintf("=== [%d] outbound send ===", thread.threadID))
-	}
-	fmt.Println(sock.addr)
-	fmt.Println(string(span))
-}
-
-type RecvFlags int
-
-func (thread *Thread) OnRecv(socketFD SocketFD, span []byte, flags RecvFlags) {
-	sock := thread.lookupSocket(socketFD)
-	if sock == nil {
-		fmt.Println(fmt.Sprintf("=== [%d] recv from unknown ===", thread.threadID))
-		return
-	}
-	if sock.isServer {
-		fmt.Println(fmt.Sprintf("=== [%d] inbound recv ===", thread.threadID))
-	} else {
-		fmt.Println(fmt.Sprintf("=== [%d] outbound recv ===", thread.threadID))
-	}
-	fmt.Println(sock.addr)
-	fmt.Println(string(span))
+	logWriter.Start()
 }
 
 func (thread *Thread) lookupSocket(socketFD SocketFD) *socket {
@@ -51,6 +34,48 @@ func (thread *Thread) lookupSocket(socketFD SocketFD) *socket {
 	return sock
 }
 
+type SendFlags int
+
+func (thread *Thread) OnSend(socketFD SocketFD, span []byte, flags SendFlags) {
+	sock := thread.lookupSocket(socketFD)
+	if sock == nil {
+		countlog.Warn("unknown-send",
+			"threadID", thread.threadID,
+			"socketFD", socketFD)
+		return
+	}
+	event := "inbound-send"
+	if !sock.isServer {
+		event = "outbound-send"
+	}
+	countlog.Trace(event,
+		"threadID", thread.threadID,
+		"socketFD", socketFD,
+		"addr", sock.addr,
+		"content", span)
+}
+
+type RecvFlags int
+
+func (thread *Thread) OnRecv(socketFD SocketFD, span []byte, flags RecvFlags) {
+	sock := thread.lookupSocket(socketFD)
+	if sock == nil {
+		countlog.Warn("unknown-recv",
+			"threadID", thread.threadID,
+			"socketFD", socketFD)
+		return
+	}
+	event := "inbound-recv"
+	if !sock.isServer {
+		event = "outbound-recv"
+	}
+	countlog.Trace(event,
+		"threadID", thread.threadID,
+		"socketFD", socketFD,
+		"addr", sock.addr,
+		"content", span)
+}
+
 func (thread *Thread) OnAccept(serverSocketFD SocketFD, clientSocketFD SocketFD, addr net.TCPAddr) {
 	thread.socks[clientSocketFD] = &socket{
 		socketFD: clientSocketFD,
@@ -58,8 +83,11 @@ func (thread *Thread) OnAccept(serverSocketFD SocketFD, clientSocketFD SocketFD,
 		addr:     addr,
 	}
 	setGlobalSock(clientSocketFD, thread.socks[clientSocketFD])
-	fmt.Println(fmt.Sprintf("=== [%d] accept ===", thread.threadID))
-	fmt.Println(addr)
+	countlog.Debug("accept",
+		"threadID", thread.threadID,
+		"serverSocketFD", serverSocketFD,
+		"clientSocketFD", clientSocketFD,
+		"addr", addr)
 }
 
 func (thread *Thread) OnBind(socketFD SocketFD, addr net.TCPAddr) {
@@ -68,8 +96,10 @@ func (thread *Thread) OnBind(socketFD SocketFD, addr net.TCPAddr) {
 		isServer: true,
 		addr:     addr,
 	}
-	fmt.Println(fmt.Sprintf("=== [%d] bind ===", thread.threadID))
-	fmt.Println(addr)
+	countlog.Debug("bind",
+		"threadID", thread.threadID,
+		"socketFD", socketFD,
+		"addr", addr)
 }
 
 func (thread *Thread) OnConnect(socketFD SocketFD, addr net.TCPAddr) {
@@ -78,6 +108,8 @@ func (thread *Thread) OnConnect(socketFD SocketFD, addr net.TCPAddr) {
 		isServer: false,
 		addr:     addr,
 	}
-	fmt.Println(fmt.Sprintf("=== [%d] connect ===", thread.threadID))
-	fmt.Println(addr)
+	countlog.Debug("connect",
+		"threadID", thread.threadID,
+		"socketFD", socketFD,
+		"addr", addr)
 }
