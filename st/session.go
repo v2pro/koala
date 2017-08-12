@@ -8,9 +8,9 @@ import (
 )
 
 type Session struct {
-	InboundTalk                   *Talk
-	OutboundTalks                 []*Talk
-	currentOutboundTalk           *Talk
+	InboundTalk         *Talk
+	OutboundTalks       []*Talk
+	currentOutboundTalk *Talk
 }
 
 func (session *Session) InboundRecv(ctx context.Context, span []byte, peer net.TCPAddr) {
