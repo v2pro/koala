@@ -6,16 +6,24 @@ import (
 	"fmt"
 	"bytes"
 	"encoding/json"
+	"context"
+	"github.com/v2pro/koala/replaying"
 )
 
 var threadShutdownEvent = []byte("to-koala:thread-shutdown||")
 
 func init() {
-	logWriter := countlog.NewStdoutLogWriter(countlog.DEBUG)
+	logWriter := countlog.NewStdoutLogWriter(countlog.LEVEL_DEBUG)
 	logWriter.FormatLog = func(event countlog.Event) string {
 		msg := []byte{}
-		msg = append(msg, fmt.Sprintf(
-			"=== [%d] %s ===\n", event.Get("threadID"), event.Event)...)
+		threadId := getThreadId(event)
+		if threadId == nil {
+			msg = append(msg, fmt.Sprintf(
+				"=== %s ===\n", event.Event)...)
+		} else {
+			msg = append(msg, fmt.Sprintf(
+				"=== [%d] %s ===\n", threadId, event.Event)...)
+		}
 		for i := 0; i < len(event.Properties); i += 2 {
 			k, _ := event.Properties[i].(string)
 			if k == "" {
@@ -32,6 +40,8 @@ func init() {
 				continue
 			case "lineNumber":
 				continue
+			case "ctx":
+				continue
 			case "session":
 				b, err := json.MarshalIndent(v, "", "  ")
 				if err != nil {
@@ -44,6 +54,18 @@ func init() {
 		return string(msg)
 	}
 	logWriter.Start()
+}
+
+func getThreadId(event countlog.Event) interface{} {
+	threadID := event.Get("threadID")
+	if threadID != nil {
+		return threadID
+	}
+	ctx, _ := event.Get("ctx").(context.Context)
+	if ctx == nil {
+		return nil
+	}
+	return ctx.Value("threadID")
 }
 
 func (thread *Thread) lookupSocket(socketFD SocketFD) *socket {
@@ -70,10 +92,10 @@ func (thread *Thread) OnSend(socketFD SocketFD, span []byte, flags SendFlags) {
 	}
 	event := "inbound-send"
 	if sock.isServer {
-		thread.session.InboundSend(span, sock.addr)
+		thread.session.InboundSend(thread, span, sock.addr)
 	} else {
 		event = "outbound-send"
-		thread.session.OutboundSend(thread.threadID, span, sock.addr)
+		thread.session.OutboundSend(thread, span, sock.addr)
 	}
 	countlog.Trace(event,
 		"threadID", thread.threadID,
@@ -94,10 +116,17 @@ func (thread *Thread) OnRecv(socketFD SocketFD, span []byte, flags RecvFlags) {
 	}
 	event := "inbound-recv"
 	if sock.isServer {
-		thread.session.InboundRecv(span, sock.addr)
+		thread.session.InboundRecv(thread, span, sock.addr)
+		thread.replayingSession = replaying.RetrieveTmp(sock.addr)
+		if thread.replayingSession != nil {
+			countlog.Debug("sut-received-replaying-session",
+				"threadID", thread.threadID,
+				"replayingSession", thread.replayingSession,
+				"addr", sock.addr)
+		}
 	} else {
 		event = "outbound-recv"
-		thread.session.OutboundRecv(thread.threadID, span, sock.addr)
+		thread.session.OutboundRecv(thread, span, sock.addr)
 	}
 	countlog.Trace(event,
 		"threadID", thread.threadID,
@@ -132,16 +161,24 @@ func (thread *Thread) OnBind(socketFD SocketFD, addr net.TCPAddr) {
 		"addr", addr)
 }
 
-func (thread *Thread) OnConnect(socketFD SocketFD, addr net.TCPAddr) {
+func (thread *Thread) OnConnect(socketFD SocketFD, remoteAddr net.TCPAddr) {
+	if thread.replayingSession != nil {
+		localAddr, err := replaying.BindLocalAddr(int(socketFD), remoteAddr)
+		if err != nil {
+			countlog.Error("failed to bind local addr", "err", err)
+			return
+		}
+		replaying.StoreTmp(*localAddr, thread.replayingSession)
+	}
 	thread.socks[socketFD] = &socket{
 		socketFD: socketFD,
 		isServer: false,
-		addr:     addr,
+		addr:     remoteAddr,
 	}
 	countlog.Debug("connect",
 		"threadID", thread.threadID,
 		"socketFD", socketFD,
-		"addr", addr)
+		"addr", remoteAddr)
 }
 
 type SendToFlags int
@@ -153,11 +190,7 @@ func (thread *Thread) OnSendTo(socketFD SocketFD, span []byte, flags SendToFlags
 		"addr", addr,
 		"content", span)
 	if bytes.HasPrefix(span, threadShutdownEvent) {
-		thread.session.OutboundTalks = append(thread.session.OutboundTalks, thread.session.currentOutboundTalk)
-		countlog.Fatal("session-produced",
-			"threadID", thread.threadID,
-			"session", thread.session,
-		)
+		thread.session.Shutdown(thread)
 		countlog.Debug("thread-shutdown",
 			"threadID", thread.threadID)
 	}

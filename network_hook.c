@@ -102,14 +102,13 @@ ssize_t sendto(int socketFD, const void *buffer, size_t buffer_size, int flags,
     return orig_sendto_func(socketFD, buffer, buffer_size, flags, addr, addr_size);
 }
 
-int connect(int socketFD, const struct sockaddr *addr, socklen_t addrlen) {
-    int errno = orig_connect_func(socketFD, addr, addrlen);
-    if (errno == 0 && addr->sa_family == AF_INET) {
-        struct sockaddr_in *typed_addr = (struct sockaddr_in *)(addr);
+int connect(int socketFD, const struct sockaddr *remote_addr, socklen_t remote_addr_len) {
+    if (remote_addr->sa_family == AF_INET) {
+        struct sockaddr_in *typed_remote_addr = (struct sockaddr_in *)(remote_addr);
         pid_t thread_id = syscall(__NR_gettid);
-        on_connect(thread_id, socketFD, typed_addr);
+        on_connect(thread_id, socketFD, typed_remote_addr);
     }
-    return errno;
+    return orig_connect_func(socketFD, remote_addr, remote_addr_len);
 }
 
 int accept(int serverSocketFD, struct sockaddr *addr, socklen_t *addrlen) {

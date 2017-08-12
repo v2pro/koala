@@ -3,9 +3,13 @@ package sut
 import (
 	"net"
 	"sync"
+	"github.com/v2pro/koala/st"
+	"context"
 )
 
 type SocketFD int
+
+type ThreadID int32
 
 type socket struct {
 	socketFD SocketFD
@@ -13,12 +17,12 @@ type socket struct {
 	addr     net.TCPAddr
 }
 
-type ThreadID int32
-
 type Thread struct {
-	threadID ThreadID
-	socks    map[SocketFD]*socket
-	session  Session
+	context.Context
+	threadID         ThreadID
+	socks            map[SocketFD]*socket
+	session          *st.Session
+	replayingSession *st.Session
 }
 
 var globalSocks = map[SocketFD]*socket{}
@@ -44,8 +48,10 @@ func GetThread(threadID ThreadID) *Thread {
 	thread := globalThreads[threadID]
 	if thread == nil {
 		thread = &Thread{
+			Context:  context.WithValue(context.Background(), "threadID", threadID),
 			threadID: threadID,
 			socks:    map[SocketFD]*socket{},
+			session:  &st.Session{},
 		}
 		globalThreads[threadID] = thread
 	}

@@ -31,7 +31,16 @@ func sockaddr_in_sin_port_get(ptr *C.struct_sockaddr_in) uint16 {
 	return ch.GetUint16(unsafe.Pointer(ptr), sockaddr_in_sin_port_field)
 }
 
+func sockaddr_in_sin_port_set(ptr *C.struct_sockaddr_in, port uint16) {
+	ch.SetUint16(unsafe.Pointer(ptr), sockaddr_in_sin_port_field, port)
+}
+
 func sockaddr_in_sin_addr_get(ptr *C.struct_sockaddr_in) uint32 {
 	sin_addr := ch.GetPtr(unsafe.Pointer(ptr), sockaddr_in_sin_addr_field)
 	return ch.GetUint32(sin_addr, in_addr_s_addr_field)
+}
+
+func sockaddr_in_sin_addr_set(ptr *C.struct_sockaddr_in, ip uint32) {
+	sin_addr := ch.GetPtr(unsafe.Pointer(ptr), sockaddr_in_sin_addr_field)
+	ch.SetUint32(sin_addr, in_addr_s_addr_field, ip)
 }

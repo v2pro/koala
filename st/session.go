@@ -1,9 +1,10 @@
-package sut
+package st
 
 import (
 	"time"
 	"net"
 	"github.com/v2pro/koala/countlog"
+	"context"
 )
 
 type Session struct {
@@ -12,15 +13,7 @@ type Session struct {
 	currentOutboundTalk *Talk
 }
 
-type Talk struct {
-	Peer         net.TCPAddr
-	RequestTime  int64
-	Request      []byte
-	ResponseTime int64
-	Response     []byte
-}
-
-func (session *Session) InboundRecv(span []byte, peer net.TCPAddr) {
+func (session *Session) InboundRecv(ctx context.Context, span []byte, peer net.TCPAddr) {
 	if session.InboundTalk == nil {
 		session.InboundTalk = &Talk{Peer: peer}
 	}
@@ -30,7 +23,7 @@ func (session *Session) InboundRecv(span []byte, peer net.TCPAddr) {
 	session.InboundTalk.Request = append(session.InboundTalk.Request, span...)
 }
 
-func (session *Session) InboundSend(span []byte, peer net.TCPAddr) {
+func (session *Session) InboundSend(ctx context.Context, span []byte, peer net.TCPAddr) {
 	if session.InboundTalk == nil {
 		session.InboundTalk = &Talk{Peer: peer}
 	}
@@ -40,7 +33,7 @@ func (session *Session) InboundSend(span []byte, peer net.TCPAddr) {
 	session.InboundTalk.Response = append(session.InboundTalk.Response, span...)
 }
 
-func (session *Session) OutboundRecv(threadID ThreadID, span []byte, peer net.TCPAddr) {
+func (session *Session) OutboundRecv(ctx context.Context, span []byte, peer net.TCPAddr) {
 	if session.currentOutboundTalk == nil {
 		session.currentOutboundTalk = &Talk{Peer: peer}
 	}
@@ -50,15 +43,16 @@ func (session *Session) OutboundRecv(threadID ThreadID, span []byte, peer net.TC
 	session.currentOutboundTalk.Response = append(session.currentOutboundTalk.Response, span...)
 }
 
-func (session *Session) OutboundSend(threadID ThreadID, span []byte, peer net.TCPAddr) {
+func (session *Session) OutboundSend(ctx context.Context, span []byte, peer net.TCPAddr) {
 	if session.currentOutboundTalk == nil {
 		session.currentOutboundTalk = &Talk{Peer: peer}
 	}
 	if len(session.currentOutboundTalk.Response) > 0 {
-		countlog.Debug("outbound-talk",
+		countlog.Debug("outbound-talk-recorded",
 			"addr", session.currentOutboundTalk.Peer,
 			"request", session.currentOutboundTalk.Request,
-			"response", session.currentOutboundTalk.Response)
+			"response", session.currentOutboundTalk.Response,
+			"ctx", ctx)
 		session.OutboundTalks = append(session.OutboundTalks, session.currentOutboundTalk)
 		session.currentOutboundTalk = &Talk{Peer: peer}
 	}
@@ -66,4 +60,16 @@ func (session *Session) OutboundSend(threadID ThreadID, span []byte, peer net.TC
 		session.currentOutboundTalk.RequestTime = time.Now().UnixNano()
 	}
 	session.currentOutboundTalk.Request = append(session.currentOutboundTalk.Request, span...)
+}
+
+func (session *Session) Shutdown(ctx context.Context) {
+	session.OutboundTalks = append(session.OutboundTalks, session.currentOutboundTalk)
+	countlog.Fatal("session-recorded",
+		"ctx", ctx,
+		"session", session,
+	)
+}
+
+func (session *Session) MatchOutboundTalk(outboundRequest []byte) *Talk {
+	return session.OutboundTalks[0]
 }

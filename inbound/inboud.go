@@ -5,10 +5,10 @@ import (
 	"io/ioutil"
 	"github.com/v2pro/koala/countlog"
 	"encoding/json"
-	"github.com/v2pro/koala/sut"
-	"fmt"
 	"net"
 	"time"
+	"github.com/v2pro/koala/st"
+	"github.com/v2pro/koala/replaying"
 )
 
 func Start() {
@@ -25,35 +25,39 @@ func handleInbound(respWriter http.ResponseWriter, req *http.Request) {
 		return
 	}
 	defer req.Body.Close()
-	session := sut.Session{}
+	session := st.Session{}
 	err = json.Unmarshal(reqBody, &session)
 	if err != nil {
 		countlog.Error("failed to unmarshal session", "err", err)
 		return
 	}
-	conn, err := net.Dial("tcp", ":9000")
+	localAddr, remoteAddr, err := replaying.ResolveAddresses(":9000")
+	if err != nil {
+		countlog.Error("failed to resolve addresses", "err", err)
+		return
+	}
+	replaying.StoreTmp(*localAddr, &session)
+	conn, err := net.DialTCP("tcp", localAddr, remoteAddr)
 	if err != nil {
 		countlog.Error("failed to connect sut", "err", err)
 		return
 	}
-	tcpConn := conn.(*net.TCPConn)
-	fmt.Println(tcpConn.LocalAddr())
-	_, err = tcpConn.Write(session.InboundTalk.Request)
+	_, err = conn.Write(session.InboundTalk.Request)
 	if err != nil {
 		countlog.Error("failed to write sut", "err", err)
 		return
 	}
 	buf := make([]byte, 1024)
-	tcpConn.SetReadDeadline(time.Now().Add(time.Second * 5))
-	bytesRead, err := tcpConn.Read(buf)
+	conn.SetReadDeadline(time.Now().Add(time.Second * 5))
+	bytesRead, err := conn.Read(buf)
 	if err != nil {
 		countlog.Error("failed to read first packet from sut", "err", err)
 		return
 	}
 	response := buf[:bytesRead]
 	for {
-		tcpConn.SetReadDeadline(time.Now().Add(time.Second))
-		bytesRead, err = tcpConn.Read(buf)
+		conn.SetReadDeadline(time.Now().Add(time.Second))
+		bytesRead, err = conn.Read(buf)
 		if err != nil {
 			break
 		}

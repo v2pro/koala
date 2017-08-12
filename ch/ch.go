@@ -33,12 +33,28 @@ func GetUint16(ptr unsafe.Pointer, field *reflect.StructField) uint16 {
 	return *(*uint16)(fieldPtr)
 }
 
+func SetUint16(ptr unsafe.Pointer, field *reflect.StructField, val uint16) {
+	if field.Type.Kind() != reflect.Uint16 {
+		panic("kind mismatch")
+	}
+	fieldPtr := unsafe.Pointer(uintptr(ptr) + field.Offset)
+	*(*uint16)(fieldPtr) = val
+}
+
 func GetUint32(ptr unsafe.Pointer, field *reflect.StructField) uint32 {
 	if field.Type.Kind() != reflect.Uint32 {
 		panic("kind mismatch")
 	}
 	fieldPtr := unsafe.Pointer(uintptr(ptr) + field.Offset)
 	return *(*uint32)(fieldPtr)
+}
+
+func SetUint32(ptr unsafe.Pointer, field *reflect.StructField, val uint32) {
+	if field.Type.Kind() != reflect.Uint32 {
+		panic("kind mismatch")
+	}
+	fieldPtr := unsafe.Pointer(uintptr(ptr) + field.Offset)
+	*(*uint32)(fieldPtr) = val
 }
 
 func GetPtr(ptr unsafe.Pointer, field *reflect.StructField) unsafe.Pointer {
@@ -67,4 +83,8 @@ func Int2ip(nn uint32) net.IP {
 	ip := make(net.IP, 4)
 	binary.LittleEndian.PutUint32(ip, nn)
 	return ip
+}
+
+func Ip2int(ip net.IP) uint32 {
+	return binary.LittleEndian.Uint32(ip)
 }

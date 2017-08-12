@@ -1,12 +1,10 @@
 #!/usr/bin/env python2.7
 
-import subprocess
-import signal
-import urllib2
-import time
-import json
-import threading
 import os
+import signal
+import subprocess
+import time
+import urllib2
 
 
 def main():
@@ -59,6 +57,7 @@ def main():
   ]
 }
     """).read())
+    time.sleep(1)
     print('send SIGTERM')
     server.send_signal(signal.SIGTERM)
     print(server.communicate()[0])

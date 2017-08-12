@@ -14,23 +14,33 @@ import (
 	"net"
 	"github.com/v2pro/koala/inbound"
 	"github.com/v2pro/koala/sut"
+	"github.com/v2pro/koala/outbound"
+	"github.com/v2pro/koala/countlog"
 )
 
 func init() {
 	C.libc_hook_init()
 	inbound.Start()
+	outbound.Start()
 }
 
 //export on_connect
-func on_connect(threadID C.pid_t, socketFD C.int, addr *C.struct_sockaddr_in) {
-	if sockaddr_in_sin_family_get(addr) != syscall.AF_INET {
-		panic("expect ipv4 addr")
+func on_connect(threadID C.pid_t, socketFD C.int, remoteAddr *C.struct_sockaddr_in) {
+	if sockaddr_in_sin_family_get(remoteAddr) != syscall.AF_INET {
+		panic("expect ipv4 remoteAddr")
 	}
 	sut.GetThread(sut.ThreadID(threadID)).
 		OnConnect(sut.SocketFD(socketFD), net.TCPAddr{
-		IP:   ch.Int2ip(sockaddr_in_sin_addr_get(addr)),
-		Port: int(ch.Ntohs(sockaddr_in_sin_port_get(addr))),
+		IP:   ch.Int2ip(sockaddr_in_sin_addr_get(remoteAddr)),
+		Port: int(ch.Ntohs(sockaddr_in_sin_port_get(remoteAddr))),
 	})
+	redirectTo, err := net.ResolveTCPAddr("tcp", "127.0.0.1:9002")
+	if err != nil {
+		countlog.Error("failed to resolve redirect to remoteAddr", "err", err)
+		return
+	}
+	sockaddr_in_sin_addr_set(remoteAddr, ch.Ip2int(redirectTo.IP))
+	sockaddr_in_sin_port_set(remoteAddr, ch.Htons(uint16(redirectTo.Port)))
 }
 
 //export on_bind
