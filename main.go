@@ -11,12 +11,14 @@ import "C"
 import (
 	"github.com/v2pro/koala/ch"
 	"syscall"
-	"github.com/v2pro/koala/network"
 	"net"
+	"github.com/v2pro/koala/inbound"
+	"github.com/v2pro/koala/sut"
 )
 
 func init() {
 	C.libc_hook_init()
+	inbound.Start()
 }
 
 //export on_connect
@@ -24,8 +26,8 @@ func on_connect(threadID C.pid_t, socketFD C.int, addr *C.struct_sockaddr_in) {
 	if sockaddr_in_sin_family_get(addr) != syscall.AF_INET {
 		panic("expect ipv4 addr")
 	}
-	network.GetThread(network.ThreadID(threadID)).
-		OnConnect(network.SocketFD(socketFD), net.TCPAddr{
+	sut.GetThread(sut.ThreadID(threadID)).
+		OnConnect(sut.SocketFD(socketFD), net.TCPAddr{
 		IP:   ch.Int2ip(sockaddr_in_sin_addr_get(addr)),
 		Port: int(ch.Ntohs(sockaddr_in_sin_port_get(addr))),
 	})
@@ -36,8 +38,8 @@ func on_bind(threadID C.pid_t, socketFD C.int, addr *C.struct_sockaddr_in) {
 	if sockaddr_in_sin_family_get(addr) != syscall.AF_INET {
 		panic("expect ipv4 addr")
 	}
-	network.GetThread(network.ThreadID(threadID)).
-		OnBind(network.SocketFD(socketFD), net.TCPAddr{
+	sut.GetThread(sut.ThreadID(threadID)).
+		OnBind(sut.SocketFD(socketFD), net.TCPAddr{
 		IP:   ch.Int2ip(sockaddr_in_sin_addr_get(addr)),
 		Port: int(ch.Ntohs(sockaddr_in_sin_port_get(addr))),
 	})
@@ -48,8 +50,8 @@ func on_accept(threadID C.pid_t, serverSocketFD C.int, clientSocketFD C.int, add
 	if sockaddr_in_sin_family_get(addr) != syscall.AF_INET {
 		panic("expect ipv4 addr")
 	}
-	network.GetThread(network.ThreadID(threadID)).
-		OnAccept(network.SocketFD(serverSocketFD), network.SocketFD(clientSocketFD), net.TCPAddr{
+	sut.GetThread(sut.ThreadID(threadID)).
+		OnAccept(sut.SocketFD(serverSocketFD), sut.SocketFD(clientSocketFD), net.TCPAddr{
 		IP:   ch.Int2ip(sockaddr_in_sin_addr_get(addr)),
 		Port: int(ch.Ntohs(sockaddr_in_sin_port_get(addr))),
 	})
@@ -57,20 +59,20 @@ func on_accept(threadID C.pid_t, serverSocketFD C.int, clientSocketFD C.int, add
 
 //export on_send
 func on_send(threadID C.pid_t, socketFD C.int, span C.struct_ch_span, flags C.int) {
-	network.GetThread(network.ThreadID(threadID)).
-		OnSend(network.SocketFD(socketFD), ch_span_to_bytes(span), network.SendFlags(flags))
+	sut.GetThread(sut.ThreadID(threadID)).
+		OnSend(sut.SocketFD(socketFD), ch_span_to_bytes(span), sut.SendFlags(flags))
 }
 
 //export on_recv
 func on_recv(threadID C.pid_t, socketFD C.int, span C.struct_ch_span, flags C.int) {
-	network.GetThread(network.ThreadID(threadID)).
-		OnRecv(network.SocketFD(socketFD), ch_span_to_bytes(span), network.RecvFlags(flags))
+	sut.GetThread(sut.ThreadID(threadID)).
+		OnRecv(sut.SocketFD(socketFD), ch_span_to_bytes(span), sut.RecvFlags(flags))
 }
 
 //export on_sendto
 func on_sendto(threadID C.pid_t, socketFD C.int, span C.struct_ch_span, flags C.int, addr *C.struct_sockaddr_in) {
-	network.GetThread(network.ThreadID(threadID)).
-		OnSendTo(network.SocketFD(socketFD), ch_span_to_bytes(span), network.SendToFlags(flags), net.TCPAddr{
+	sut.GetThread(sut.ThreadID(threadID)).
+		OnSendTo(sut.SocketFD(socketFD), ch_span_to_bytes(span), sut.SendToFlags(flags), net.TCPAddr{
 		IP:   ch.Int2ip(sockaddr_in_sin_addr_get(addr)),
 		Port: int(ch.Ntohs(sockaddr_in_sin_port_get(addr))),
 	})
