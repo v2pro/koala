@@ -4,6 +4,7 @@ import socket
 import threading
 import requests
 import os
+import datetime
 
 PORT = 2515
 
@@ -11,9 +12,8 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     def do_GET(self):
         s = requests.Session()
         s.get('http://www.baidu.com')
-        print('!!!!')
-        print(s.get('http://www.baidu.com').content)
-        self.request.sendall('good day')
+        s.get('http://www.baidu.com')
+        self.request.sendall(str(datetime.datetime.now()))
 
 
 class ThreadingMixIn:

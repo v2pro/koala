@@ -1,12 +1,13 @@
 package main
 
-// #cgo LDFLAGS: -ldl
+// #cgo LDFLAGS: -ldl -lm -lrt
 // #include <stddef.h>
 // #include <netinet/in.h>
 // #include <sys/types.h>
 // #include <sys/socket.h>
 // #include "span.h"
 // #include "network_hook.h"
+// #include "time_hook.h"
 import "C"
 import (
 	"github.com/v2pro/koala/ch"
@@ -20,7 +21,12 @@ import (
 )
 
 func init() {
-	C.libc_hook_init()
+	C.network_hook_init()
+	C.time_hook_init()
+	sut.SetTimeOffset = func(offset int) {
+		countlog.Debug("set time offset", "offset", offset)
+		C.set_time_offset(C.int(offset))
+	}
 	if replaying.IsReplaying() {
 		inbound.Start()
 		outbound.Start()

@@ -41,7 +41,7 @@ static recv_pfn_t orig_recv_func;
 typedef int (*bind_pfn_t)(int, const struct sockaddr *, socklen_t);
 static bind_pfn_t orig_bind_func;
 
-void libc_hook_init() {
+void network_hook_init() {
     HOOK_SYS_FUNC( socket );
     HOOK_SYS_FUNC( send );
     HOOK_SYS_FUNC( sendto );

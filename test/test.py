@@ -6,6 +6,8 @@ import subprocess
 import threading
 import time
 import urllib2
+import json
+import base64
 
 
 def main():
@@ -19,17 +21,22 @@ def main():
     server = subprocess.Popen(
         [
             # 'strace', '-e', 'trace=network',
+            # 'ltrace',
             'python', 'server.py'
         ],
         env=env, stdout=subprocess.PIPE)
     time.sleep(1)
+    # print('send SIGTERM')
+    # server.send_signal(signal.SIGTERM)
+    # print(server.communicate()[0])
+    # return
 
     def call_server():
         print(urllib2.urlopen('http://127.0.0.1:2515').read())
 
 
     def replay():
-        print("replayed", urllib2.urlopen('http://127.0.0.1:2514', data="""
+        resp = urllib2.urlopen('http://127.0.0.1:2514', data="""
 {
   "InboundTalk": {
     "Peer": {
@@ -67,7 +74,9 @@ def main():
     }
   ]
 }
-        """).read())
+        """).read()
+        print(base64.decodestring(json.loads(resp)['ReplayedResponse']))
+
 
     thread1 = threading.Thread(target=replay)
     thread1.start()

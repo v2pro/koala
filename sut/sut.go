@@ -10,6 +10,7 @@ import (
 	"github.com/v2pro/koala/replaying"
 	"github.com/v2pro/koala/st"
 	"encoding/base64"
+	"time"
 )
 
 var threadShutdownEvent = []byte("to-koala:thread-shutdown||")
@@ -143,8 +144,11 @@ func (thread *Thread) OnRecv(socketFD SocketFD, span []byte, flags RecvFlags) {
 			thread.recordingSession = &st.Session{}
 		}
 		thread.recordingSession.InboundRecv(thread, span, sock.addr)
-		thread.replayingSession = replaying.RetrieveTmp(sock.addr)
-		if thread.replayingSession != nil {
+		replayingSession := replaying.RetrieveTmp(sock.addr)
+		if replayingSession != nil {
+			nanoOffset := replayingSession.InboundTalk.RequestTime - time.Now().UnixNano()
+			SetTimeOffset(int(time.Duration(nanoOffset) / time.Second))
+			thread.replayingSession = replayingSession
 			countlog.Debug("sut-received-replaying-session",
 				"threadID", thread.threadID,
 				"replayingSession", thread.replayingSession,
