@@ -31,7 +31,7 @@ func (replayingSession *ReplayingSession) Finish(response []byte) {
 }
 
 func (replayingSession *ReplayingSession) MatchOutboundTalk(outboundRequest []byte) *st.Talk {
-	unit := 4
+	unit := 16
 	chunks := cutToChunks(outboundRequest, unit)
 	keys := replayingSession.loadKeys()
 	scores := make([]int, len(replayingSession.OutboundTalks))

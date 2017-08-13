@@ -9,6 +9,7 @@ import (
 	"context"
 	"github.com/v2pro/koala/replaying"
 	"github.com/v2pro/koala/st"
+	"encoding/base64"
 )
 
 var threadShutdownEvent = []byte("to-koala:thread-shutdown||")
@@ -32,8 +33,23 @@ func init() {
 			}
 			v := event.Properties[i+1]
 			switch k {
-			case "content":
-				v = string(v.([]byte))
+			case "content", "request", "response", "matchedRequest", "matchedResponse":
+				buf := v.([]byte)
+				isBinary := false
+				for _, b := range buf {
+					if b == '\r' || b == '\n' {
+						continue
+					}
+					if b < 32 || b > 127 {
+						isBinary = true
+						break
+					}
+				}
+				if isBinary {
+					v = base64.StdEncoding.EncodeToString(buf)
+				} else {
+					v = string(buf)
+				}
 			case "addr":
 				addr := v.(net.TCPAddr)
 				v = addr.String()

@@ -39,6 +39,9 @@ func on_connect(threadID C.pid_t, socketFD C.int, remoteAddr *C.struct_sockaddr_
 		IP:   ch.Int2ip(sockaddr_in_sin_addr_get(remoteAddr)),
 		Port: int(ch.Ntohs(sockaddr_in_sin_port_get(remoteAddr))),
 	}
+	if origAddr.String() == "127.0.0.1:18500" {
+		return
+	}
 	sut.GetThread(sut.ThreadID(threadID)).
 		OnConnect(sut.SocketFD(socketFD), origAddr)
 	if replaying.IsReplaying() {
