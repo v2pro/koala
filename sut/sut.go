@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"context"
 	"github.com/v2pro/koala/replaying"
+	"github.com/v2pro/koala/st"
 )
 
 var threadShutdownEvent = []byte("to-koala:thread-shutdown||")
@@ -119,6 +120,10 @@ func (thread *Thread) OnRecv(socketFD SocketFD, span []byte, flags RecvFlags) {
 	}
 	event := "inbound-recv"
 	if sock.isServer {
+		if thread.recordingSession.HasResponded() {
+			thread.recordingSession.Shutdown(thread)
+			thread.recordingSession = &st.Session{}
+		}
 		thread.recordingSession.InboundRecv(thread, span, sock.addr)
 		thread.replayingSession = replaying.RetrieveTmp(sock.addr)
 		if thread.replayingSession != nil {

@@ -13,7 +13,9 @@ def main():
     shell_execute('go build -buildmode=c-shared -o koala-recoder.so github.com/v2pro/koala')
     env = os.environ.copy()
     env['LD_PRELOAD'] = '%s/koala-recoder.so' % os.path.abspath('.')
-    env['KOALA_MODE'] = 'REPLAYING'
+    # env['KOALA_MODE'] = 'REPLAYING'
+    env['KOALA_MODE'] = 'RECORDING'
+    env['SERVER_MODE'] = 'SINGLE_THREAD'
     server = subprocess.Popen(
         [
             # 'strace', '-e', 'trace=network',
@@ -68,10 +70,10 @@ def main():
         """).read())
 
     thread1 = threading.Thread(target=call_server)
-    # thread1.start()
-    thread2 = threading.Thread(target=replay)
+    thread1.start()
+    thread1.join()
+    thread2 = threading.Thread(target=call_server)
     thread2.start()
-    # thread1.join()
     thread2.join()
     time.sleep(1)
     print('send SIGTERM')

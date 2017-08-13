@@ -53,7 +53,7 @@ func handleOutbound(conn *net.TCPConn) {
 			break
 		}
 		for {
-			conn.SetReadDeadline(time.Now().Add(time.Second))
+			conn.SetReadDeadline(time.Now().Add(time.Millisecond * 100))
 			bytesRead, err := conn.Read(buf)
 			if err != nil {
 				break

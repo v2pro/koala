@@ -60,7 +60,7 @@ func (session *Session) OutboundSend(ctx context.Context, span []byte, peer net.
 		session.currentOutboundTalk = &Talk{Peer: peer}
 	}
 	if len(session.currentOutboundTalk.Response) > 0 {
-		countlog.Debug("outbound-talk-recorded",
+		countlog.Trace("outbound-talk-recorded",
 			"addr", session.currentOutboundTalk.Peer,
 			"request", session.currentOutboundTalk.Request,
 			"response", session.currentOutboundTalk.Response,
@@ -72,6 +72,13 @@ func (session *Session) OutboundSend(ctx context.Context, span []byte, peer net.
 		session.currentOutboundTalk.RequestTime = time.Now().UnixNano()
 	}
 	session.currentOutboundTalk.Request = append(session.currentOutboundTalk.Request, span...)
+}
+
+func (session *Session) HasResponded() bool {
+	if session.InboundTalk == nil {
+		return false
+	}
+	return len(session.InboundTalk.Response) > 0
 }
 
 func (session *Session) Shutdown(ctx context.Context) {

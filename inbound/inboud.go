@@ -94,7 +94,7 @@ func readResponse(conn *net.TCPConn) ([]byte, error) {
 	}
 	response := buf[:bytesRead]
 	for {
-		conn.SetReadDeadline(time.Now().Add(time.Second))
+		conn.SetReadDeadline(time.Now().Add(time.Millisecond * 100))
 		bytesRead, err = conn.Read(buf)
 		if err != nil {
 			break

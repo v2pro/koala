@@ -3,6 +3,7 @@ import SocketServer
 import socket
 import threading
 import requests
+import os
 
 PORT = 9000
 
@@ -53,7 +54,10 @@ class ThreadedTCPServer(ThreadingMixIn, SocketServer.TCPServer):
 
 
 SocketServer.TCPServer.allow_reuse_address = True
-httpd = ThreadedTCPServer(("", PORT), MyHandler)
+if os.getenv('SERVER_MODE') == 'MULTI_THREADS':
+    httpd = ThreadedTCPServer(("", PORT), MyHandler)
+else:
+    httpd = SocketServer.TCPServer(("", PORT), MyHandler)
 
 print "serving at port", PORT
 httpd.serve_forever()
