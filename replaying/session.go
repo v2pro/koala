@@ -22,7 +22,7 @@ func (replayingSession *ReplayingSession) Finish(response []byte) {
 	done := false
 	for !done {
 		select {
-		case replayedTalk := <- replayingSession.ReplayedOutboundTalkCollector:
+		case replayedTalk := <-replayingSession.ReplayedOutboundTalkCollector:
 			replayingSession.ReplayedOutboundTalks = append(replayingSession.ReplayedOutboundTalks, replayedTalk)
 		default:
 			done = true
@@ -30,7 +30,7 @@ func (replayingSession *ReplayingSession) Finish(response []byte) {
 	}
 }
 
-func (replayingSession *ReplayingSession) MatchOutboundTalk(outboundRequest []byte) *st.Talk {
+func (replayingSession *ReplayingSession) MatchOutboundTalk(lastMatchedIndex int, outboundRequest []byte) (int, *st.Talk) {
 	unit := 16
 	chunks := cutToChunks(outboundRequest, unit)
 	keys := replayingSession.loadKeys()
@@ -39,6 +39,9 @@ func (replayingSession *ReplayingSession) MatchOutboundTalk(outboundRequest []by
 	maxScoreIndex := 0
 	for _, chunk := range chunks {
 		for j, key := range keys {
+			if j <= lastMatchedIndex {
+				continue
+			}
 			if len(key) < len(chunk) {
 				continue
 			}
@@ -56,9 +59,9 @@ func (replayingSession *ReplayingSession) MatchOutboundTalk(outboundRequest []by
 		}
 	}
 	if maxScore == 0 {
-		return nil
+		return 0, nil
 	}
-	return replayingSession.OutboundTalks[maxScoreIndex]
+	return maxScoreIndex, replayingSession.OutboundTalks[maxScoreIndex]
 
 }
 
@@ -70,14 +73,13 @@ func (replayingSession *ReplayingSession) loadKeys() [][]byte {
 	return keys
 }
 
-
 func cutToChunks(key []byte, unit int) [][]byte {
 	chunks := [][]byte{}
 	chunkCount := len(key) / unit
-	for i := 0; i < len(key) / unit; i++ {
-		chunks = append(chunks, key[i * unit:(i + 1) * unit])
+	for i := 0; i < len(key)/unit; i++ {
+		chunks = append(chunks, key[i*unit:(i+1)*unit])
 	}
-	lastChunk := key[chunkCount * unit:]
+	lastChunk := key[chunkCount*unit:]
 	if len(lastChunk) > 0 {
 		chunks = append(chunks, lastChunk)
 	}

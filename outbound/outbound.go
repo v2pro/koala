@@ -6,6 +6,7 @@ import (
 	"time"
 	"github.com/v2pro/koala/replaying"
 	"io"
+	"github.com/v2pro/koala/st"
 )
 
 var mysqlGreeting = []byte{53, 0, 0, 0, 10, 53, 46, 48, 46, 53, 49, 98, 0, 1, 0, 0, 0, 47, 85, 62, 116, 80, 114, 109, 75, 0, 12, 162, 33, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 86, 76, 87, 84, 124, 52, 47, 46, 55, 107, 55, 110, 0}
@@ -49,6 +50,7 @@ func handleOutbound(conn *net.TCPConn) {
 	countlog.Debug("outbound-new-conn",
 		"addr", *tcpAddr, )
 	buf := make([]byte, 1024)
+	lastMatchedIndex := -1
 	for i := 0; i < 1024; i++ {
 		request := []byte{}
 		conn.SetReadDeadline(time.Now().Add(time.Millisecond * 5))
@@ -99,14 +101,18 @@ func handleOutbound(conn *net.TCPConn) {
 			ReplayedRequest:     request,
 			ReplayedRequestTime: time.Now().UnixNano(),
 		}
-		matchedTalk := replayingSession.MatchOutboundTalk(request)
+		var matchedTalk *st.Talk
+		lastMatchedIndex, matchedTalk = replayingSession.MatchOutboundTalk(lastMatchedIndex, request)
+		if matchedTalk == nil && lastMatchedIndex != 0 {
+			lastMatchedIndex, matchedTalk = replayingSession.MatchOutboundTalk(-1, request)
+		}
 		if matchedTalk == nil {
 			countlog.Error("failed to find matching talk", "addr", *tcpAddr)
 			return
 		}
 		replayedTalk.MatchedTalk = matchedTalk
 		replayedTalk.ReplayedResponseTime = time.Now().UnixNano()
-		size, err := conn.Write(matchedTalk.Response)
+		_, err = conn.Write(matchedTalk.Response)
 		if err != nil {
 			countlog.Error("failed to write back response from outbound", "addr", *tcpAddr, "err", err)
 			return
@@ -116,7 +122,7 @@ func handleOutbound(conn *net.TCPConn) {
 			"matchedRequest", matchedTalk.Request,
 			"matchedResponse", matchedTalk.Response,
 			"replayingSession", replayingSession,
-			"size", size)
+			"lastMatchedIndex", lastMatchedIndex)
 		select {
 		case replayingSession.ReplayedOutboundTalkCollector <- replayedTalk:
 		default:
