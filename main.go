@@ -1,6 +1,12 @@
 package main
 
+import (
+	"github.com/v2pro/koala/sut"
+	"github.com/v2pro/koala/countlog"
+)
+
 // #cgo LDFLAGS: -ldl -lm -lrt
+// #cgo CFLAGS: -DPTHREAD -DPTHREAD_SINGLETHREADED_TIME
 // #include <stddef.h>
 // #include <netinet/in.h>
 // #include <sys/types.h>
@@ -14,9 +20,7 @@ import (
 	"syscall"
 	"net"
 	"github.com/v2pro/koala/inbound"
-	"github.com/v2pro/koala/sut"
 	"github.com/v2pro/koala/outbound"
-	"github.com/v2pro/koala/countlog"
 	"github.com/v2pro/koala/replaying"
 )
 

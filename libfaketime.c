@@ -23,6 +23,7 @@
 
 #define _GNU_SOURCE             /* required to get RTLD_NEXT defined */
 
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -253,7 +254,7 @@ static bool user_per_tick_inc_set = false;
 enum ft_mode_t {FT_FREEZE, FT_START_AT, FT_NOOP} ft_mode = FT_FREEZE;
 
 /* Time to fake is not provided through FAKETIME env. var. */
-static bool parse_config_file = true;
+static bool parse_config_file = false;
 
 void ft_cleanup (void) __attribute__ ((destructor));
 void ftpl_init (void) __attribute__ ((constructor));
@@ -1537,7 +1538,7 @@ int clock_gettime(clockid_t clk_id, struct timespec *tp)
  *      =======================================================================
  */
 
-static void parse_ft_string(const char *user_faked_time)
+void parse_ft_string(const char *user_faked_time)
 {
   struct tm user_faked_time_tm;
   char * tmp_time_fmt;
@@ -2066,7 +2067,7 @@ int fake_clock_gettime(clockid_t clk_id, struct timespec *tp)
     cache_expired = 1;
   }
 
-  if (cache_expired == 1)
+  if (false)
   {
     static char user_faked_time[BUFFERLEN]; /* changed to static for caching in v0.6 */
     /* initialize with default or env. variable */
