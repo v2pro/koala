@@ -95,8 +95,9 @@ func (thread *Thread) OnSend(socketFD SocketFD, span []byte, flags SendFlags) {
 		thread.recordingSession.InboundSend(thread, span, sock.addr)
 	} else {
 		event = "outbound-send"
-		if replaying.IsRecording() {
-			thread.recordingSession.OutboundSend(thread, span, sock.addr)
+		thread.recordingSession.OutboundSend(thread, span, sock.addr)
+		if sock.localAddr != nil {
+			replaying.StoreTmp(*sock.localAddr, thread.replayingSession)
 		}
 	}
 	countlog.Trace(event,
@@ -164,18 +165,18 @@ func (thread *Thread) OnBind(socketFD SocketFD, addr net.TCPAddr) {
 }
 
 func (thread *Thread) OnConnect(socketFD SocketFD, remoteAddr net.TCPAddr) {
+	thread.socks[socketFD] = &socket{
+		socketFD: socketFD,
+		isServer: false,
+		addr:     remoteAddr,
+	}
 	if thread.replayingSession != nil {
 		localAddr, err := replaying.BindLocalAddr(int(socketFD), remoteAddr)
 		if err != nil {
 			countlog.Error("failed to bind local addr", "err", err)
 			return
 		}
-		replaying.StoreTmp(*localAddr, thread.replayingSession)
-	}
-	thread.socks[socketFD] = &socket{
-		socketFD: socketFD,
-		isServer: false,
-		addr:     remoteAddr,
+		thread.socks[socketFD].localAddr = localAddr
 	}
 	countlog.Debug("connect",
 		"threadID", thread.threadID,

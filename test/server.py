@@ -2,14 +2,16 @@ import BaseHTTPServer
 import SocketServer
 import socket
 import threading
-import urllib2
+import requests
 
 PORT = 9000
 
 
 class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     def do_GET(self):
-        urllib2.urlopen('http://postman-echo.com/get').read()
+        s = requests.Session()
+        s.get('http://www.baidu.com')
+        s.get('http://www.baidu.com')
         self.request.sendall('good day')
 
 

@@ -16,6 +16,7 @@ type socket struct {
 	socketFD SocketFD
 	isServer bool
 	addr     net.TCPAddr
+	localAddr *net.TCPAddr
 }
 
 type Thread struct {
@@ -53,10 +54,10 @@ func GetThread(threadID ThreadID) *Thread {
 			threadID:         threadID,
 			socks:            map[SocketFD]*socket{},
 		}
+		if replaying.IsRecording() {
+			thread.recordingSession = &st.Session{}
+		}
 		globalThreads[threadID] = thread
-	}
-	if replaying.IsRecording() {
-		thread.recordingSession = &st.Session{}
 	}
 	return thread
 }

@@ -27,6 +27,12 @@ func Start() {
 }
 
 func handleInbound(respWriter http.ResponseWriter, req *http.Request) {
+	defer func() {
+		recovered := recover()
+		if recovered != nil {
+			countlog.Fatal("panic", "err", recovered)
+		}
+	}()
 	countlog.Debug("inbound-received", "remoteAddr", req.RemoteAddr)
 	reqBody, err := ioutil.ReadAll(req.Body)
 	if err != nil {
@@ -65,7 +71,6 @@ func handleInbound(respWriter http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		return
 	}
-	//fmt.Println(string(response))
 	replayingSession.Finish(response)
 	marshaledReplayingSession, err := json.Marshal(replayingSession)
 	if err != nil {
