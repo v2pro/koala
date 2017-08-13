@@ -43,6 +43,8 @@ func init() {
 				continue
 			case "ctx":
 				continue
+			case "replayingSession":
+				continue
 			case "session":
 				b, err := json.MarshalIndent(v, "", "  ")
 				if err != nil {
@@ -176,7 +178,7 @@ func (thread *Thread) OnConnect(socketFD SocketFD, remoteAddr net.TCPAddr) {
 		addr:     remoteAddr,
 	}
 	if thread.replayingSession != nil {
-		localAddr, err := replaying.BindLocalAddr(int(socketFD), remoteAddr)
+		localAddr, err := replaying.BindLocalAddr(int(socketFD))
 		if err != nil {
 			countlog.Error("failed to bind local addr", "err", err)
 			return
@@ -186,7 +188,8 @@ func (thread *Thread) OnConnect(socketFD SocketFD, remoteAddr net.TCPAddr) {
 	countlog.Debug("connect",
 		"threadID", thread.threadID,
 		"socketFD", socketFD,
-		"addr", remoteAddr)
+		"addr", remoteAddr,
+		"localAddr", thread.socks[socketFD].localAddr)
 }
 
 type SendToFlags int

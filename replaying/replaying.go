@@ -41,17 +41,7 @@ func RetrieveTmp(inboundAddr net.TCPAddr) *ReplayingSession {
 }
 
 func ResolveAddresses(targetIpPort string) (*net.TCPAddr, *net.TCPAddr, error) {
-	conn, err := net.Dial("udp", targetIpPort)
-	if err != nil {
-		countlog.Error("failed to check route", "err", err)
-		return nil, nil, err
-	}
-	localIp := conn.LocalAddr().(*net.UDPAddr).IP.String()
-	if err != nil {
-		countlog.Error("failed to resolve local tcp addr", "err", err)
-		return nil, nil, err
-	}
-	listener, err := net.Listen("tcp", localIp+":0") // ask for new port
+	listener, err := net.Listen("tcp", "127.0.0.1:0") // ask for new port
 	if err != nil {
 		countlog.Error("failed to resolve local tcp addr port", "err", err)
 		return nil, nil, err
@@ -62,7 +52,7 @@ func ResolveAddresses(targetIpPort string) (*net.TCPAddr, *net.TCPAddr, error) {
 		countlog.Error("failed to close", "err", err)
 		return nil, nil, err
 	}
-	remoteAddr, err := net.ResolveTCPAddr("tcp", ":9000")
+	remoteAddr, err := net.ResolveTCPAddr("tcp", targetIpPort)
 	if err != nil {
 		countlog.Error("failed to resolve remote tcp addr", "err", err)
 		return nil, nil, err
@@ -70,7 +60,7 @@ func ResolveAddresses(targetIpPort string) (*net.TCPAddr, *net.TCPAddr, error) {
 	return localAddr, remoteAddr, nil
 }
 
-func BindLocalAddr(socketFD int, targetAddr net.TCPAddr) (*net.TCPAddr, error) {
+func BindLocalAddr(socketFD int) (*net.TCPAddr, error) {
 	localAddr, err := syscall.Getsockname(int(socketFD))
 	if err != nil {
 		return nil, err
@@ -82,16 +72,20 @@ func BindLocalAddr(socketFD int, targetAddr net.TCPAddr) (*net.TCPAddr, error) {
 			Port: localInet4Addr.Port,
 		}, nil
 	}
-	localTcpAddr, _, err := ResolveAddresses(targetAddr.String())
-	if err != nil {
-		return nil, err
-	}
 	err = syscall.Bind(socketFD, &syscall.SockaddrInet4{
-		Addr: [4]byte{localTcpAddr.IP[0], localTcpAddr.IP[1], localTcpAddr.IP[2], localTcpAddr.IP[3]},
-		Port: localTcpAddr.Port,
+		Addr: [4]byte{127, 0, 0, 1},
+		Port: 0,
 	})
 	if err != nil {
 		return nil, err
 	}
-	return localTcpAddr, nil
+	localAddr, err = syscall.Getsockname(int(socketFD))
+	if err != nil {
+		return nil, err
+	}
+	localInet4Addr = localAddr.(*syscall.SockaddrInet4)
+	return &net.TCPAddr{
+		IP:   localInet4Addr.Addr[:],
+		Port: localInet4Addr.Port,
+	}, nil
 }

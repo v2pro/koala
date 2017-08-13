@@ -35,17 +35,19 @@ func on_connect(threadID C.pid_t, socketFD C.int, remoteAddr *C.struct_sockaddr_
 	if sockaddr_in_sin_family_get(remoteAddr) != syscall.AF_INET {
 		panic("expect ipv4 remoteAddr")
 	}
-	sut.GetThread(sut.ThreadID(threadID)).
-		OnConnect(sut.SocketFD(socketFD), net.TCPAddr{
+	origAddr := net.TCPAddr{
 		IP:   ch.Int2ip(sockaddr_in_sin_addr_get(remoteAddr)),
 		Port: int(ch.Ntohs(sockaddr_in_sin_port_get(remoteAddr))),
-	})
+	}
+	sut.GetThread(sut.ThreadID(threadID)).
+		OnConnect(sut.SocketFD(socketFD), origAddr)
 	if replaying.IsReplaying() {
 		redirectTo, err := net.ResolveTCPAddr("tcp", "127.0.0.1:9002")
 		if err != nil {
 			countlog.Error("failed to resolve redirect to remoteAddr", "err", err)
 			return
 		}
+		countlog.Debug("rewrite connect target", "origAddr", origAddr, "redirectTo", redirectTo)
 		sockaddr_in_sin_addr_set(remoteAddr, ch.Ip2int(redirectTo.IP))
 		sockaddr_in_sin_port_set(remoteAddr, ch.Htons(uint16(redirectTo.Port)))
 	}

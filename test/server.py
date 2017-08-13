@@ -12,7 +12,8 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     def do_GET(self):
         s = requests.Session()
         s.get('http://www.baidu.com')
-        s.get('http://www.baidu.com')
+        print('!!!!')
+        print(s.get('http://www.baidu.com').content)
         self.request.sendall('good day')
 
 

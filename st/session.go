@@ -75,6 +75,9 @@ func (session *Session) OutboundSend(ctx context.Context, span []byte, peer net.
 }
 
 func (session *Session) HasResponded() bool {
+	if session == nil {
+		return false
+	}
 	if session.InboundTalk == nil {
 		return false
 	}
