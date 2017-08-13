@@ -51,7 +51,8 @@ func (replayingSession *ReplayingSession) MatchOutboundTalk(lastMatchedIndex int
 			if pos >= 0 {
 				keys[j] = key[pos:]
 				scores[j]++
-				if scores[j] > maxScore {
+				hasBetterScore := scores[j] > maxScore
+				if hasBetterScore {
 					maxScore = scores[j]
 					maxScoreIndex = j
 				}
