@@ -21,7 +21,7 @@ func Start() {
 		}()
 		http.HandleFunc("/", handleInbound)
 		countlog.Info("inbound-started")
-		err := http.ListenAndServe("127.0.0.1:9001", nil)
+		err := http.ListenAndServe(":2514", nil)
 		countlog.Info("inbound-exited", "err", err)
 	}()
 }
@@ -46,7 +46,7 @@ func handleInbound(respWriter http.ResponseWriter, req *http.Request) {
 		countlog.Error("failed to unmarshal session", "err", err)
 		return
 	}
-	localAddr, remoteAddr, err := replaying.ResolveAddresses("127.0.0.1:9000")
+	localAddr, remoteAddr, err := replaying.ResolveAddresses("127.0.0.1:2515")
 	if err != nil {
 		countlog.Error("failed to resolve addresses", "err", err)
 		return
@@ -92,7 +92,8 @@ func readResponse(conn *net.TCPConn) ([]byte, error) {
 		countlog.Error("failed to read first packet from sut", "err", err)
 		return nil, err
 	}
-	response := buf[:bytesRead]
+	response := []byte{}
+	response = append(response, buf[:bytesRead]...)
 	for {
 		conn.SetReadDeadline(time.Now().Add(time.Millisecond * 100))
 		bytesRead, err = conn.Read(buf)

@@ -22,7 +22,7 @@ func server() {
 			countlog.Fatal("panic", "err", recovered)
 		}
 	}()
-	listener, err := net.Listen("tcp", "127.0.0.1:9002")
+	listener, err := net.Listen("tcp", "127.0.0.1:2516")
 	if err != nil {
 		countlog.Error("failed to listen outbound", "err", err)
 		return
@@ -51,7 +51,7 @@ func handleOutbound(conn *net.TCPConn) {
 	buf := make([]byte, 1024)
 	for i := 0; i < 1024; i++ {
 		request := []byte{}
-		conn.SetReadDeadline(time.Now().Add(time.Millisecond * 1))
+		conn.SetReadDeadline(time.Now().Add(time.Millisecond * 5))
 		bytesRead, err := conn.Read(buf)
 		if err != nil {
 			if i == 0 {
@@ -79,7 +79,7 @@ func handleOutbound(conn *net.TCPConn) {
 			request = append(request, buf[:bytesRead]...)
 		}
 		for {
-			conn.SetReadDeadline(time.Now().Add(time.Millisecond * 1))
+			conn.SetReadDeadline(time.Now().Add(time.Millisecond * 5))
 			bytesRead, err := conn.Read(buf)
 			if err != nil {
 				break

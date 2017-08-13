@@ -200,6 +200,7 @@ func (thread *Thread) OnConnect(socketFD SocketFD, remoteAddr net.TCPAddr) {
 			return
 		}
 		thread.socks[socketFD].localAddr = localAddr
+		replaying.StoreTmp(*localAddr, thread.replayingSession)
 	}
 	countlog.Debug("connect",
 		"threadID", thread.threadID,
@@ -211,6 +212,9 @@ func (thread *Thread) OnConnect(socketFD SocketFD, remoteAddr net.TCPAddr) {
 type SendToFlags int
 
 func (thread *Thread) OnSendTo(socketFD SocketFD, span []byte, flags SendToFlags, addr net.TCPAddr) {
+	if addr.String() != "127.127.127.127:127" {
+		return
+	}
 	countlog.Debug("sendto",
 		"threadID", thread.threadID,
 		"socketFD", socketFD,

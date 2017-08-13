@@ -45,7 +45,7 @@ func on_connect(threadID C.pid_t, socketFD C.int, remoteAddr *C.struct_sockaddr_
 	sut.GetThread(sut.ThreadID(threadID)).
 		OnConnect(sut.SocketFD(socketFD), origAddr)
 	if replaying.IsReplaying() {
-		redirectTo, err := net.ResolveTCPAddr("tcp", "127.0.0.1:9002")
+		redirectTo, err := net.ResolveTCPAddr("tcp", "127.0.0.1:2516")
 		if err != nil {
 			countlog.Error("failed to resolve redirect to remoteAddr", "err", err)
 			return

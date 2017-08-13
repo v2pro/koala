@@ -25,11 +25,11 @@ def main():
     time.sleep(1)
 
     def call_server():
-        print(urllib2.urlopen('http://127.0.0.1:9000').read())
+        print(urllib2.urlopen('http://127.0.0.1:2515').read())
 
 
     def replay():
-        print("replayed", urllib2.urlopen('http://127.0.0.1:9001', data="""
+        print("replayed", urllib2.urlopen('http://127.0.0.1:2514', data="""
 {
   "InboundTalk": {
     "Peer": {
