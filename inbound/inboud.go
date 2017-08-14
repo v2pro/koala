@@ -17,13 +17,14 @@ func Start() {
 		defer func() {
 			recovered := recover()
 			if recovered != nil {
-				countlog.Fatal("panic", "err", recovered)
+				countlog.Fatal("event!inbound.panic", "err", recovered)
 			}
 		}()
 		http.HandleFunc("/", handleInbound)
-		countlog.Info("inbound-started")
+		countlog.Info("event!inbound.started",
+			"inboundAddr", envarg.InboundAddr())
 		err := http.ListenAndServe(envarg.InboundAddr().String(), nil)
-		countlog.Info("inbound-exited", "err", err)
+		countlog.Info("event!inbound.exited", "err", err)
 	}()
 }
 
@@ -31,25 +32,25 @@ func handleInbound(respWriter http.ResponseWriter, req *http.Request) {
 	defer func() {
 		recovered := recover()
 		if recovered != nil {
-			countlog.Fatal("panic", "err", recovered)
+			countlog.Fatal("event!inbound.panic", "err", recovered)
 		}
 	}()
-	countlog.Debug("inbound-received", "remoteAddr", req.RemoteAddr)
+	countlog.Debug("event!inbound.received_request", "remoteAddr", req.RemoteAddr)
 	reqBody, err := ioutil.ReadAll(req.Body)
 	if err != nil {
-		countlog.Error("failed to read request", "err", err)
+		countlog.Error("event!inbound.failed to read request", "err", err)
 		return
 	}
 	defer req.Body.Close()
 	session := recording.Session{}
 	err = json.Unmarshal(reqBody, &session)
 	if err != nil {
-		countlog.Error("failed to unmarshal session", "err", err)
+		countlog.Error("event!inbound.failed to unmarshal session", "err", err)
 		return
 	}
 	localAddr, err := replaying.AssignLocalAddr()
 	if err != nil {
-		countlog.Error("failed to assign local addresses", "err", err)
+		countlog.Error("event!inbound.failed to assign local addresses", "err", err)
 		return
 	}
 	replayingSession := replaying.ReplayingSession{
@@ -60,12 +61,12 @@ func handleInbound(respWriter http.ResponseWriter, req *http.Request) {
 	replaying.StoreTmp(*localAddr, &replayingSession)
 	conn, err := net.DialTCP("tcp", localAddr, envarg.SutAddr())
 	if err != nil {
-		countlog.Error("failed to connect sut", "err", err)
+		countlog.Error("event!inbound.failed to connect sut", "err", err)
 		return
 	}
 	_, err = conn.Write(replayingSession.InboundTalk.Request)
 	if err != nil {
-		countlog.Error("failed to write sut", "err", err)
+		countlog.Error("event!inbound.failed to write sut", "err", err)
 		return
 	}
 	response, err := readResponse(conn)
@@ -75,12 +76,12 @@ func handleInbound(respWriter http.ResponseWriter, req *http.Request) {
 	replayingSession.Finish(response)
 	marshaledReplayingSession, err := json.Marshal(replayingSession)
 	if err != nil {
-		countlog.Error("marshal replaying session failed", "err", err)
+		countlog.Error("event!inbound.marshal replaying session failed", "err", err)
 		return
 	}
 	_, err = respWriter.Write(marshaledReplayingSession)
 	if err != nil {
-		countlog.Error("failed to write response", "err", err)
+		countlog.Error("event!inbound.failed to write response", "err", err)
 		return
 	}
 }
@@ -90,7 +91,7 @@ func readResponse(conn *net.TCPConn) ([]byte, error) {
 	conn.SetReadDeadline(time.Now().Add(time.Second * 30))
 	bytesRead, err := conn.Read(buf)
 	if err != nil {
-		countlog.Error("failed to read first packet from sut", "err", err)
+		countlog.Error("event!inbound.failed to read first packet from sut", "err", err)
 		return nil, err
 	}
 	response := []byte{}

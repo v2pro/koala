@@ -110,11 +110,11 @@ func (thread *Thread) OnSend(socketFD SocketFD, span []byte, flags SendFlags) {
 			"socketFD", socketFD)
 		return
 	}
-	event := "inbound-send"
+	event := "event!sut.inbound_send"
 	if sock.isServer {
 		thread.recordingSession.InboundSend(thread, span, sock.addr)
 	} else {
-		event = "outbound-send"
+		event = "event!sut.outbound_send"
 		thread.recordingSession.OutboundSend(thread, span, sock.addr)
 		if sock.localAddr != nil {
 			replaying.StoreTmp(*sock.localAddr, thread.replayingSession)
@@ -137,7 +137,7 @@ func (thread *Thread) OnRecv(socketFD SocketFD, span []byte, flags RecvFlags) {
 			"socketFD", socketFD)
 		return
 	}
-	event := "inbound-recv"
+	event := "event!sut.inbound_recv"
 	if sock.isServer {
 		if thread.recordingSession.HasResponded() {
 			thread.recordingSession.Shutdown(thread)
@@ -149,13 +149,13 @@ func (thread *Thread) OnRecv(socketFD SocketFD, span []byte, flags RecvFlags) {
 			nanoOffset := replayingSession.InboundTalk.RequestTime - time.Now().UnixNano()
 			SetTimeOffset(int(time.Duration(nanoOffset) / time.Second))
 			thread.replayingSession = replayingSession
-			countlog.Debug("sut-received-replaying-session",
+			countlog.Trace("event!sut.received_replaying_session",
 				"threadID", thread.threadID,
 				"replayingSession", thread.replayingSession,
 				"addr", sock.addr)
 		}
 	} else {
-		event = "outbound-recv"
+		event = "event!sut.outbound_recv"
 		thread.recordingSession.OutboundRecv(thread, span, sock.addr)
 	}
 	countlog.Trace(event,
@@ -172,7 +172,7 @@ func (thread *Thread) OnAccept(serverSocketFD SocketFD, clientSocketFD SocketFD,
 		addr:     addr,
 	}
 	setGlobalSock(clientSocketFD, thread.socks[clientSocketFD])
-	countlog.Debug("accept",
+	countlog.Debug("event!sut.accept",
 		"threadID", thread.threadID,
 		"serverSocketFD", serverSocketFD,
 		"clientSocketFD", clientSocketFD,
@@ -185,7 +185,7 @@ func (thread *Thread) OnBind(socketFD SocketFD, addr net.TCPAddr) {
 		isServer: true,
 		addr:     addr,
 	}
-	countlog.Debug("bind",
+	countlog.Debug("event!sut.bind",
 		"threadID", thread.threadID,
 		"socketFD", socketFD,
 		"addr", addr)
@@ -200,13 +200,13 @@ func (thread *Thread) OnConnect(socketFD SocketFD, remoteAddr net.TCPAddr) {
 	if thread.replayingSession != nil {
 		localAddr, err := replaying.BindFDToLocalAddr(int(socketFD))
 		if err != nil {
-			countlog.Error("failed to bind local addr", "err", err)
+			countlog.Error("event!sut.failed to bind local addr", "err", err)
 			return
 		}
 		thread.socks[socketFD].localAddr = localAddr
 		replaying.StoreTmp(*localAddr, thread.replayingSession)
 	}
-	countlog.Debug("connect",
+	countlog.Debug("event!sut.connect",
 		"threadID", thread.threadID,
 		"socketFD", socketFD,
 		"addr", remoteAddr,
@@ -219,14 +219,15 @@ func (thread *Thread) OnSendTo(socketFD SocketFD, span []byte, flags SendToFlags
 	if addr.String() != "127.127.127.127:127" {
 		return
 	}
-	countlog.Debug("sendto",
+	helperInfo := span
+	countlog.Debug("event!sut.received_helper_info",
 		"threadID", thread.threadID,
 		"socketFD", socketFD,
 		"addr", addr,
-		"content", span)
-	if bytes.HasPrefix(span, threadShutdownEvent) {
+		"content", helperInfo)
+	if bytes.HasPrefix(helperInfo, threadShutdownEvent) {
 		thread.recordingSession.Shutdown(thread)
-		countlog.Debug("thread-shutdown",
+		countlog.Debug("event!sut.thread_shutdown",
 			"threadID", thread.threadID)
 	}
 }

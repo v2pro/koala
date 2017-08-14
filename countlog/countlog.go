@@ -1,9 +1,10 @@
 package countlog
 
-
 import (
 	"runtime"
 	"fmt"
+	"strings"
+	"os"
 )
 
 const LEVEL_TRACE = 10
@@ -41,21 +42,30 @@ func log(level int, event string, properties []interface{}) {
 			continue
 		}
 		if expandedProperties == nil {
-			expandedProperties = []interface{}{}
-			for _, prop := range properties {
-				propProvider, _ := prop.(func() interface{})
-				if propProvider == nil {
-					expandedProperties = append(expandedProperties, prop)
-				} else {
-					expandedProperties = append(expandedProperties, propProvider())
-				}
-			}
-		}
-		_, file, line, ok := runtime.Caller(1)
-		if ok {
-			expandedProperties = append(expandedProperties, "lineNumber")
-			expandedProperties = append(expandedProperties, fmt.Sprintf("%s:%d", file, line))
+			expandedProperties = expand(event, properties)
 		}
 		logWriter.WriteLog(level, event, expandedProperties)
 	}
+}
+func expand(event string, properties []interface{}) []interface{} {
+	expandedProperties := []interface{}{}
+	for _, prop := range properties {
+		propProvider, _ := prop.(func() interface{})
+		if propProvider == nil {
+			expandedProperties = append(expandedProperties, prop)
+		} else {
+			expandedProperties = append(expandedProperties, propProvider())
+		}
+	}
+	_, file, line, ok := runtime.Caller(3)
+	if ok {
+		expandedProperties = append(expandedProperties, "lineNumber")
+		lineNumber := fmt.Sprintf("%s:%d", file, line)
+		expandedProperties = append(expandedProperties, lineNumber)
+		if !strings.HasPrefix(event, "event!") {
+			os.Stderr.Write([]byte("countlog event must starts with event! prefix:" + lineNumber + "\n"))
+			os.Stderr.Sync()
+		}
+	}
+	return expandedProperties
 }

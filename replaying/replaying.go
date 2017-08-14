@@ -30,13 +30,13 @@ func AssignLocalAddr() (*net.TCPAddr, error) {
 	// this is a hack to assign 127.0.0.1:0 to pre-determine a local port
 	listener, err := net.Listen("tcp", "127.0.0.1:0") // ask for new port
 	if err != nil {
-		countlog.Error("failed to resolve local tcp addr port", "err", err)
+		countlog.Error("event!replaying.failed to resolve local tcp addr port", "err", err)
 		return nil, err
 	}
 	localAddr := listener.Addr().(*net.TCPAddr)
 	err = listener.Close()
 	if err != nil {
-		countlog.Error("failed to close", "err", err)
+		countlog.Error("event!replaying.failed to close", "err", err)
 		return nil, err
 	}
 	return localAddr, nil

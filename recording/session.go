@@ -60,7 +60,7 @@ func (session *Session) OutboundSend(ctx context.Context, span []byte, peer net.
 		session.currentOutboundTalk = &Talk{Peer: peer}
 	}
 	if len(session.currentOutboundTalk.Response) > 0 {
-		countlog.Trace("outbound-talk-recorded",
+		countlog.Trace("event!recording.outbound_talk_recorded",
 			"addr", session.currentOutboundTalk.Peer,
 			"request", session.currentOutboundTalk.Request,
 			"response", session.currentOutboundTalk.Response,
@@ -89,7 +89,7 @@ func (session *Session) Shutdown(ctx context.Context) {
 		return
 	}
 	session.OutboundTalks = append(session.OutboundTalks, session.currentOutboundTalk)
-	countlog.Fatal("session-recorded",
+	countlog.Fatal("event!recording.session_recorded",
 		"ctx", ctx,
 		"session", session,
 	)

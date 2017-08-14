@@ -20,18 +20,19 @@ func server() {
 	defer func() {
 		recovered := recover()
 		if recovered != nil {
-			countlog.Fatal("panic", "err", recovered)
+			countlog.Fatal("event!outbound.panic", "err", recovered)
 		}
 	}()
 	listener, err := net.Listen("tcp", envarg.OutboundAddr().String())
 	if err != nil {
-		countlog.Error("failed to listen outbound", "err", err)
+		countlog.Error("event!outbound.failed to listen outbound", "err", err)
 		return
 	}
+	countlog.Info("event!outbound.started", "outboundAddr", envarg.OutboundAddr())
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			countlog.Error("failed to accept outbound", "err", err)
+			countlog.Error("event!outbound.failed to accept outbound", "err", err)
 			return
 		}
 		go handleOutbound(conn.(*net.TCPConn))
@@ -42,12 +43,12 @@ func handleOutbound(conn *net.TCPConn) {
 	defer func() {
 		recovered := recover()
 		if recovered != nil {
-			countlog.Fatal("panic", "err", recovered)
+			countlog.Fatal("event!outbound.panic", "err", recovered)
 		}
 	}()
 	defer conn.Close()
 	tcpAddr := conn.RemoteAddr().(*net.TCPAddr)
-	countlog.Debug("outbound-new-conn",
+	countlog.Trace("event!outbound.new_conn",
 		"addr", *tcpAddr, )
 	buf := make([]byte, 1024)
 	lastMatchedIndex := -1
@@ -59,7 +60,7 @@ func handleOutbound(conn *net.TCPConn) {
 			if i == 0 {
 				_, err := conn.Write(mysqlGreeting)
 				if err != nil {
-					countlog.Error("failed to write mysql greeting", "addr", *tcpAddr, "err", err)
+					countlog.Error("event!outbound.failed to write mysql greeting", "addr", *tcpAddr, "err", err)
 					return
 				}
 			} else {
@@ -70,7 +71,7 @@ func handleOutbound(conn *net.TCPConn) {
 						return
 					}
 					if err != nil {
-						countlog.Error("outbound wait for follow up timed out", "err", err)
+						countlog.Error("event!outbound.outbound wait for follow up timed out", "err", err)
 						continue
 					}
 					request = append(request, buf[:bytesRead]...)
@@ -90,10 +91,10 @@ func handleOutbound(conn *net.TCPConn) {
 		}
 		replayingSession := replaying.RetrieveTmp(*tcpAddr)
 		if replayingSession == nil {
-			countlog.Error("outbound can not find replaying session", "addr", *tcpAddr)
+			countlog.Error("event!outbound.outbound can not find replaying session", "addr", *tcpAddr)
 			return
 		}
-		countlog.Debug("outbound-request",
+		countlog.Debug("event!outbound.request",
 			"addr", *tcpAddr,
 			"content", request,
 			"replayingSession", replayingSession)
@@ -107,17 +108,17 @@ func handleOutbound(conn *net.TCPConn) {
 			lastMatchedIndex, matchedTalk = replayingSession.MatchOutboundTalk(-1, request)
 		}
 		if matchedTalk == nil {
-			countlog.Error("failed to find matching talk", "addr", *tcpAddr)
+			countlog.Error("event!outbound.failed to find matching talk", "addr", *tcpAddr)
 			return
 		}
 		replayedTalk.MatchedTalk = matchedTalk
 		replayedTalk.ReplayedResponseTime = time.Now().UnixNano()
 		_, err = conn.Write(matchedTalk.Response)
 		if err != nil {
-			countlog.Error("failed to write back response from outbound", "addr", *tcpAddr, "err", err)
+			countlog.Error("event!outbound.failed to write back response from outbound", "addr", *tcpAddr, "err", err)
 			return
 		}
-		countlog.Debug("outbound-response",
+		countlog.Debug("event!oubound.response",
 			"addr", *tcpAddr,
 			"matchedRequest", matchedTalk.Request,
 			"matchedResponse", matchedTalk.Response,
@@ -126,7 +127,7 @@ func handleOutbound(conn *net.TCPConn) {
 		select {
 		case replayingSession.ReplayedOutboundTalkCollector <- replayedTalk:
 		default:
-			countlog.Error("ReplayedOutboundTalkCollector is full")
+			countlog.Error("event!outbound.ReplayedOutboundTalkCollector is full")
 		}
 	}
 }

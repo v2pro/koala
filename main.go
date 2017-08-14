@@ -28,15 +28,20 @@ func init() {
 	C.network_hook_init()
 	C.time_hook_init()
 	sut.SetTimeOffset = func(offset int) {
-		countlog.Debug("set time offset", "offset", offset)
+		countlog.Debug("event!main.set_time_offset", "offset", offset)
 		C.set_time_offset(C.int(offset))
 	}
 	if envarg.IsReplaying() {
 		inbound.Start()
 		outbound.Start()
-		countlog.Info("koala started", "mode", "replaying")
+		countlog.Info("event!main.koala_started",
+			"mode", "replaying",
+		"inboundAddr", envarg.InboundAddr(),
+		"sutAddr", envarg.SutAddr(),
+		"outboundAddr", envarg.OutboundAddr())
 	} else {
-		countlog.Info("koala started", "mode", "recording")
+		countlog.Info("event!main.koala_started",
+			"mode", "recording")
 	}
 }
 
@@ -55,7 +60,7 @@ func on_connect(threadID C.pid_t, socketFD C.int, remoteAddr *C.struct_sockaddr_
 	sut.GetThread(sut.ThreadID(threadID)).
 		OnConnect(sut.SocketFD(socketFD), origAddr)
 	if envarg.IsReplaying() {
-		countlog.Debug("rewrite connect target",
+		countlog.Debug("event!main.rewrite_connect_target",
 			"origAddr", origAddr,
 			"redirectTo", envarg.OutboundAddr())
 		sockaddr_in_sin_addr_set(remoteAddr, ch.Ip2int(envarg.OutboundAddr().IP))
