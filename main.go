@@ -49,9 +49,10 @@ func init() {
 func startLogging() {
 	logWriter := countlog.NewFileLogWriter(envarg.LogLevel(), envarg.LogFile())
 	logWriter.LogFormatter = &countlog.HumanReadableFormat{
-		ContextPropertyNames: []string{"threadID"},
+		ContextPropertyNames: []string{"threadID", "outboundSrc"},
 		StringLengthCap: 512,
 	}
+	logWriter.EventWhitelist["event!replaying.talks_scored"] = true
 	logWriter.Start()
 }
 

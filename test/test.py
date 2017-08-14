@@ -18,6 +18,7 @@ def main():
     env['KOALA_MODE'] = 'REPLAYING'
     # env['KOALA_MODE'] = 'RECORDING'
     env['SERVER_MODE'] = 'SINGLE_THREAD'
+    env['GOTRACEBACK'] = 'all'
     server = subprocess.Popen(
         [
             # 'strace', '-e', 'trace=network',

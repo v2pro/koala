@@ -1,7 +1,6 @@
 package countlog
 
 import (
-	"fmt"
 	"os"
 	"unsafe"
 	"path/filepath"
@@ -10,6 +9,7 @@ import (
 
 type FileLogWriter struct {
 	MinLevel            int
+	EventWhitelist      map[string]bool
 	msgChan             chan Event
 	LogFormatter        LogFormatter
 	writeLog            func(timestamp int64, formattedEvent []byte)
@@ -19,6 +19,9 @@ type FileLogWriter struct {
 }
 
 func (logWriter *FileLogWriter) ShouldLog(level int, event string, properties []interface{}) bool {
+	if logWriter.EventWhitelist[event] {
+		return true
+	}
 	return level >= logWriter.MinLevel
 }
 
@@ -40,13 +43,6 @@ func (logWriter *FileLogWriter) Close() {
 func (logWriter *FileLogWriter) Start() {
 	LogWriters = append(LogWriters, logWriter)
 	go func() {
-		defer func() {
-			recovered := recover()
-			if recovered != nil {
-				os.Stderr.Write([]byte(fmt.Sprintf("countlog FileLogWriter panic: %v\n", recovered)))
-				os.Stderr.Sync()
-			}
-		}()
 		for {
 			select {
 			case event := <-logWriter.msgChan:
@@ -85,12 +81,13 @@ func (logWriter *FileLogWriter) archiveLogFile(logFile string) {
 
 func NewFileLogWriter(minLevel int, logFile string) *FileLogWriter {
 	writer := &FileLogWriter{
-		MinLevel: minLevel,
-		msgChan:  make(chan Event, 1024),
+		MinLevel:     minLevel,
+		msgChan:      make(chan Event, 1024),
 		LogFormatter: &HumanReadableFormat{},
 		writeLog: func(timestamp int64, formattedEvent []byte) {
 			os.Stdout.Write(formattedEvent)
 		},
+		EventWhitelist: map[string]bool{},
 	}
 	switch logFile {
 	case "STDOUT":

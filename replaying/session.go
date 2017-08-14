@@ -5,6 +5,9 @@ import (
 	"unsafe"
 	"strings"
 	"github.com/v2pro/koala/recording"
+	"fmt"
+	"github.com/v2pro/koala/countlog"
+	"context"
 )
 
 type ReplayingSession struct {
@@ -32,14 +35,15 @@ func (replayingSession *ReplayingSession) Finish(response []byte) {
 	}
 }
 
-func (replayingSession *ReplayingSession) MatchOutboundTalk(lastMatchedIndex int, outboundRequest []byte) (int, *recording.Talk) {
+func (replayingSession *ReplayingSession) MatchOutboundTalk(
+	ctx context.Context, lastMatchedIndex int, request []byte) (int, *recording.Talk) {
 	unit := 16
-	chunks := cutToChunks(outboundRequest, unit)
+	chunks := cutToChunks(request, unit)
 	keys := replayingSession.loadKeys()
 	scores := make([]int, len(replayingSession.OutboundTalks))
 	maxScore := 0
 	maxScoreIndex := 0
-	for _, chunk := range chunks {
+	for chunkIndex, chunk := range chunks {
 		for j, key := range keys {
 			if j <= lastMatchedIndex {
 				continue
@@ -52,7 +56,11 @@ func (replayingSession *ReplayingSession) MatchOutboundTalk(lastMatchedIndex int
 			pos := strings.Index(keyAsString, chunkAsString)
 			if pos >= 0 {
 				keys[j] = key[pos:]
-				scores[j]++
+				if chunkIndex == 0 {
+					scores[j] += 3 // first chunk has more weight
+				} else {
+					scores[j]++
+				}
 				hasBetterScore := scores[j] > maxScore
 				if hasBetterScore {
 					maxScore = scores[j]
@@ -61,6 +69,11 @@ func (replayingSession *ReplayingSession) MatchOutboundTalk(lastMatchedIndex int
 			}
 		}
 	}
+	countlog.Trace("event!replaying.talks_scored",
+		"ctx", ctx,
+		"scores", func() interface{} {
+			return fmt.Sprintf("%v", scores)
+		})
 	if maxScore == 0 {
 		return -1, nil
 	}

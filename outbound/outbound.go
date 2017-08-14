@@ -8,6 +8,7 @@ import (
 	"io"
 	"github.com/v2pro/koala/recording"
 	"github.com/v2pro/koala/envarg"
+	"context"
 )
 
 var mysqlGreeting = []byte{53, 0, 0, 0, 10, 53, 46, 48, 46, 53, 49, 98, 0, 1, 0, 0, 0, 47, 85, 62, 116, 80, 114, 109, 75, 0, 12, 162, 33, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 86, 76, 87, 84, 124, 52, 47, 46, 55, 107, 55, 110, 0}
@@ -17,12 +18,6 @@ func Start() {
 }
 
 func server() {
-	defer func() {
-		recovered := recover()
-		if recovered != nil {
-			countlog.Fatal("event!outbound.panic", "err", recovered)
-		}
-	}()
 	listener, err := net.Listen("tcp", envarg.OutboundAddr().String())
 	if err != nil {
 		countlog.Error("event!outbound.failed to listen outbound", "err", err)
@@ -40,18 +35,13 @@ func server() {
 }
 
 func handleOutbound(conn *net.TCPConn) {
-	defer func() {
-		recovered := recover()
-		if recovered != nil {
-			countlog.Fatal("event!outbound.panic", "err", recovered)
-		}
-	}()
 	defer conn.Close()
 	tcpAddr := conn.RemoteAddr().(*net.TCPAddr)
 	countlog.Trace("event!outbound.new_conn",
 		"addr", *tcpAddr, )
 	buf := make([]byte, 1024)
 	lastMatchedIndex := -1
+	ctx := context.WithValue(context.Background(), "outboundSrc", tcpAddr.String())
 	for i := 0; i < 1024; i++ {
 		request := []byte{}
 		conn.SetReadDeadline(time.Now().Add(time.Millisecond * 5))
@@ -60,7 +50,9 @@ func handleOutbound(conn *net.TCPConn) {
 			if i == 0 {
 				_, err := conn.Write(mysqlGreeting)
 				if err != nil {
-					countlog.Error("event!outbound.failed to write mysql greeting", "addr", *tcpAddr, "err", err)
+					countlog.Error("event!outbound.failed to write mysql greeting",
+						"ctx", ctx,
+						"err", err)
 					return
 				}
 			} else {
@@ -71,7 +63,9 @@ func handleOutbound(conn *net.TCPConn) {
 						return
 					}
 					if err != nil {
-						countlog.Error("event!outbound.outbound wait for follow up timed out", "err", err)
+						countlog.Error("event!outbound.outbound wait for follow up timed out",
+							"ctx", ctx,
+							"err", err)
 						continue
 					}
 					request = append(request, buf[:bytesRead]...)
@@ -91,11 +85,13 @@ func handleOutbound(conn *net.TCPConn) {
 		}
 		replayingSession := replaying.RetrieveTmp(*tcpAddr)
 		if replayingSession == nil {
-			countlog.Error("event!outbound.outbound can not find replaying session", "addr", *tcpAddr)
+			countlog.Error("event!outbound.outbound can not find replaying session",
+				"ctx", ctx,
+				"addr", *tcpAddr)
 			return
 		}
 		countlog.Debug("event!outbound.request",
-			"addr", *tcpAddr,
+			"ctx", ctx,
 			"content", request,
 			"replayingSession", replayingSession)
 		replayedTalk := replaying.ReplayedTalk{
@@ -103,9 +99,9 @@ func handleOutbound(conn *net.TCPConn) {
 			ReplayedRequestTime: time.Now().UnixNano(),
 		}
 		var matchedTalk *recording.Talk
-		lastMatchedIndex, matchedTalk = replayingSession.MatchOutboundTalk(lastMatchedIndex, request)
+		lastMatchedIndex, matchedTalk = replayingSession.MatchOutboundTalk(ctx, lastMatchedIndex, request)
 		if matchedTalk == nil && lastMatchedIndex != 0 {
-			lastMatchedIndex, matchedTalk = replayingSession.MatchOutboundTalk(-1, request)
+			lastMatchedIndex, matchedTalk = replayingSession.MatchOutboundTalk(ctx,-1, request)
 		}
 		replayedTalk.MatchedTalk = matchedTalk
 		replayedTalk.MatchedTalkIndex = lastMatchedIndex
@@ -113,15 +109,16 @@ func handleOutbound(conn *net.TCPConn) {
 		select {
 		case replayingSession.ReplayedOutboundTalkCollector <- replayedTalk:
 		default:
-			countlog.Error("event!outbound.ReplayedOutboundTalkCollector is full")
+			countlog.Error("event!outbound.ReplayedOutboundTalkCollector is full", "ctx", ctx)
 		}
 		if matchedTalk == nil {
-			countlog.Error("event!outbound.failed to find matching talk", "addr", *tcpAddr)
+			countlog.Error("event!outbound.failed to find matching talk", "ctx", ctx)
 			return
 		}
 		_, err = conn.Write(matchedTalk.Response)
 		if err != nil {
-			countlog.Error("event!outbound.failed to write back response from outbound", "addr", *tcpAddr, "err", err)
+			countlog.Error("event!outbound.failed to write back response from outbound",
+				"ctx", ctx, "err", err)
 			return
 		}
 		countlog.Debug("event!outbound.response",

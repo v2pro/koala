@@ -9,7 +9,7 @@ import (
 
 type HumanReadableFormat struct {
 	ContextPropertyNames []string
-	StringLengthCap int
+	StringLengthCap      int
 }
 
 func (hrf *HumanReadableFormat) FormatLog(event Event) string {
