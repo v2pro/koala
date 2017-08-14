@@ -14,12 +14,6 @@ import (
 
 func Start() {
 	go func() {
-		defer func() {
-			recovered := recover()
-			if recovered != nil {
-				countlog.Fatal("event!inbound.panic", "err", recovered)
-			}
-		}()
 		http.HandleFunc("/", handleInbound)
 		countlog.Info("event!inbound.started",
 			"inboundAddr", envarg.InboundAddr())
@@ -29,12 +23,6 @@ func Start() {
 }
 
 func handleInbound(respWriter http.ResponseWriter, req *http.Request) {
-	defer func() {
-		recovered := recover()
-		if recovered != nil {
-			countlog.Fatal("event!inbound.panic", "err", recovered)
-		}
-	}()
 	countlog.Debug("event!inbound.received_request", "remoteAddr", req.RemoteAddr)
 	reqBody, err := ioutil.ReadAll(req.Body)
 	if err != nil {
