@@ -11,7 +11,7 @@ import (
 type FileLogWriter struct {
 	MinLevel            int
 	msgChan             chan Event
-	FormatLog           func(event Event) string
+	LogFormatter        LogFormatter
 	writeLog            func(timestamp int64, formattedEvent []byte)
 	openedFile          *os.File
 	openedFileArchiveTo string
@@ -50,7 +50,7 @@ func (logWriter *FileLogWriter) Start() {
 		for {
 			select {
 			case event := <-logWriter.msgChan:
-				formattedEvent := logWriter.FormatLog(event)
+				formattedEvent := logWriter.LogFormatter.FormatLog(event)
 				logWriter.writeLog(
 					event.Properties[1].(int64),
 					*(*[]byte)(unsafe.Pointer(&formattedEvent)))
@@ -87,9 +87,7 @@ func NewFileLogWriter(minLevel int, logFile string) *FileLogWriter {
 	writer := &FileLogWriter{
 		MinLevel: minLevel,
 		msgChan:  make(chan Event, 1024),
-		FormatLog: func(event Event) string {
-			return fmt.Sprintf("=== %s ====\n%v\n", event.Event[len("event!"):], event.Properties)
-		},
+		LogFormatter: &HumanReadableFormat{},
 		writeLog: func(timestamp int64, formattedEvent []byte) {
 			os.Stdout.Write(formattedEvent)
 		},
