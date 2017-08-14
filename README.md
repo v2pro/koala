@@ -9,6 +9,7 @@
 * KOALA_SUT_ADDR: ip:port, the address inbound will call
 * KOALA_OUTBOUND_ADDR: ip:port, the address all outgoing traffic will be redirected to
 * KOALA_LOG_FILE: STDOUT/STDERR/filepath, if using filepath, the log will rotate every hour
+* KOALA_LOG_LEVEL: TRACE/DEBUG/INFO/ERROR/FATAL
 
 # Recording
 

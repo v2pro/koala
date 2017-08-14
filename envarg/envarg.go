@@ -3,6 +3,8 @@ package envarg
 import (
 	"os"
 	"net"
+	"strings"
+	"github.com/v2pro/koala/countlog"
 )
 
 var isReplaying = false
@@ -10,6 +12,7 @@ var inboundAddr *net.TCPAddr
 var outboundAddr *net.TCPAddr
 var sutAddr *net.TCPAddr
 var logFile string
+var logLevel = countlog.LEVEL_DEBUG
 
 func init() {
 	isReplaying = os.Getenv("KOALA_MODE") == "REPLAYING"
@@ -19,6 +22,24 @@ func init() {
 	logFile = os.Getenv("KOALA_LOG_FILE")
 	if logFile == "" {
 		logFile = "STDOUT"
+	}
+	initLogLevel()
+}
+func initLogLevel() {
+	logLevelStr := strings.ToUpper(os.Getenv("KOALA_LOG_LEVEL"))
+	switch logLevelStr {
+	case "TRACE":
+		logLevel = countlog.LEVEL_TRACE
+	case "DEBUG":
+		logLevel = countlog.LEVEL_DEBUG
+	case "INFO":
+		logLevel = countlog.LEVEL_INFO
+	case "WARN":
+		logLevel = countlog.LEVEL_WARN
+	case "ERROR":
+		logLevel = countlog.LEVEL_ERROR
+	case "FATAL":
+		logLevel = countlog.LEVEL_FATAL
 	}
 }
 func initInboundAddr() {
@@ -79,4 +100,8 @@ func OutboundAddr() *net.TCPAddr {
 
 func LogFile() string {
 	return logFile
+}
+
+func LogLevel() int {
+	return logLevel
 }

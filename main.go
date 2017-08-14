@@ -47,7 +47,7 @@ func init() {
 }
 
 func startLogging() {
-	logWriter := countlog.NewFileLogWriter(countlog.LEVEL_DEBUG, envarg.LogFile())
+	logWriter := countlog.NewFileLogWriter(envarg.LogLevel(), envarg.LogFile())
 	logWriter.LogFormatter = &countlog.HumanReadableFormat{
 		ContextPropertyNames: []string{"threadID"},
 	}
