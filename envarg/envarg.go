@@ -9,12 +9,17 @@ var isReplaying = false
 var inboundAddr *net.TCPAddr
 var outboundAddr *net.TCPAddr
 var sutAddr *net.TCPAddr
+var logFile string
 
 func init() {
 	isReplaying = os.Getenv("KOALA_MODE") == "REPLAYING"
 	initInboundAddr()
 	initOutboundAddr()
 	initSutAddr()
+	logFile = os.Getenv("KOALA_LOG_FILE")
+	if logFile == "" {
+		logFile = "STDOUT"
+	}
 }
 func initInboundAddr() {
 	addrStr := os.Getenv("KOALA_INBOUND_ADDR")
@@ -70,4 +75,8 @@ func SutAddr() *net.TCPAddr {
 
 func OutboundAddr() *net.TCPAddr {
 	return outboundAddr
+}
+
+func LogFile() string {
+	return logFile
 }

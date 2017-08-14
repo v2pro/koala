@@ -3,90 +3,13 @@ package sut
 import (
 	"net"
 	"github.com/v2pro/koala/countlog"
-	"fmt"
 	"bytes"
-	"encoding/json"
-	"context"
 	"github.com/v2pro/koala/replaying"
-	"encoding/base64"
 	"time"
 	"github.com/v2pro/koala/recording"
 )
 
 var threadShutdownEvent = []byte("to-koala:thread-shutdown||")
-
-func init() {
-	logWriter := countlog.NewStdoutLogWriter(countlog.LEVEL_DEBUG)
-	logWriter.FormatLog = func(event countlog.Event) string {
-		msg := []byte{}
-		threadId := getThreadId(event)
-		if threadId == nil {
-			msg = append(msg, fmt.Sprintf(
-				"=== %s ===\n", event.Event)...)
-		} else {
-			msg = append(msg, fmt.Sprintf(
-				"=== [%d] %s ===\n", threadId, event.Event)...)
-		}
-		for i := 0; i < len(event.Properties); i += 2 {
-			k, _ := event.Properties[i].(string)
-			if k == "" {
-				continue
-			}
-			v := event.Properties[i+1]
-			switch k {
-			case "content", "request", "response", "matchedRequest", "matchedResponse":
-				buf := v.([]byte)
-				isBinary := false
-				for _, b := range buf {
-					if b == '\r' || b == '\n' {
-						continue
-					}
-					if b < 32 || b > 127 {
-						isBinary = true
-						break
-					}
-				}
-				if isBinary {
-					v = base64.StdEncoding.EncodeToString(buf)
-				} else {
-					v = string(buf)
-				}
-			case "addr":
-				addr := v.(net.TCPAddr)
-				v = addr.String()
-			case "threadID":
-				continue
-			case "lineNumber":
-				continue
-			case "ctx":
-				continue
-			case "replayingSession":
-				continue
-			case "session":
-				b, err := json.MarshalIndent(v, "", "  ")
-				if err != nil {
-					panic(err)
-				}
-				v = string(b)
-			}
-			msg = append(msg, fmt.Sprintf("%s: %v\n", k, v)...)
-		}
-		return string(msg)
-	}
-	logWriter.Start()
-}
-
-func getThreadId(event countlog.Event) interface{} {
-	threadID := event.Get("threadID")
-	if threadID != nil {
-		return threadID
-	}
-	ctx, _ := event.Get("ctx").(context.Context)
-	if ctx == nil {
-		return nil
-	}
-	return ctx.Value("threadID")
-}
 
 func (thread *Thread) lookupSocket(socketFD SocketFD) *socket {
 	sock := thread.socks[socketFD]

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"os"
+	"time"
 )
 
 const LEVEL_TRACE = 10
@@ -48,14 +49,8 @@ func log(level int, event string, properties []interface{}) {
 	}
 }
 func expand(event string, properties []interface{}) []interface{} {
-	expandedProperties := []interface{}{}
-	for _, prop := range properties {
-		propProvider, _ := prop.(func() interface{})
-		if propProvider == nil {
-			expandedProperties = append(expandedProperties, prop)
-		} else {
-			expandedProperties = append(expandedProperties, propProvider())
-		}
+	expandedProperties := []interface{}{
+		"timestamp", time.Now().UnixNano(),
 	}
 	_, file, line, ok := runtime.Caller(3)
 	if ok {
@@ -65,6 +60,14 @@ func expand(event string, properties []interface{}) []interface{} {
 		if !strings.HasPrefix(event, "event!") {
 			os.Stderr.Write([]byte("countlog event must starts with event! prefix:" + lineNumber + "\n"))
 			os.Stderr.Sync()
+		}
+	}
+	for _, prop := range properties {
+		propProvider, _ := prop.(func() interface{})
+		if propProvider == nil {
+			expandedProperties = append(expandedProperties, prop)
+		} else {
+			expandedProperties = append(expandedProperties, propProvider())
 		}
 	}
 	return expandedProperties
