@@ -55,14 +55,11 @@ func on_connect(threadID C.pid_t, socketFD C.int, remoteAddr *C.struct_sockaddr_
 	sut.GetThread(sut.ThreadID(threadID)).
 		OnConnect(sut.SocketFD(socketFD), origAddr)
 	if envarg.IsReplaying() {
-		redirectTo, err := net.ResolveTCPAddr("tcp", "127.0.0.1:2516")
-		if err != nil {
-			countlog.Error("failed to resolve redirect to remoteAddr", "err", err)
-			return
-		}
-		countlog.Debug("rewrite connect target", "origAddr", origAddr, "redirectTo", redirectTo)
-		sockaddr_in_sin_addr_set(remoteAddr, ch.Ip2int(redirectTo.IP))
-		sockaddr_in_sin_port_set(remoteAddr, ch.Htons(uint16(redirectTo.Port)))
+		countlog.Debug("rewrite connect target",
+			"origAddr", origAddr,
+			"redirectTo", envarg.OutboundAddr())
+		sockaddr_in_sin_addr_set(remoteAddr, ch.Ip2int(envarg.OutboundAddr().IP))
+		sockaddr_in_sin_port_set(remoteAddr, ch.Htons(uint16(envarg.OutboundAddr().Port)))
 	}
 }
 

@@ -25,27 +25,24 @@ func RetrieveTmp(inboundAddr net.TCPAddr) *ReplayingSession {
 	return session
 }
 
-func ResolveAddresses(targetIpPort string) (*net.TCPAddr, *net.TCPAddr, error) {
+func AssignLocalAddr() (*net.TCPAddr, error) {
+	// golang does not provide api to bind before connect
+	// this is a hack to assign 127.0.0.1:0 to pre-determine a local port
 	listener, err := net.Listen("tcp", "127.0.0.1:0") // ask for new port
 	if err != nil {
 		countlog.Error("failed to resolve local tcp addr port", "err", err)
-		return nil, nil, err
+		return nil, err
 	}
 	localAddr := listener.Addr().(*net.TCPAddr)
 	err = listener.Close()
 	if err != nil {
 		countlog.Error("failed to close", "err", err)
-		return nil, nil, err
+		return nil, err
 	}
-	remoteAddr, err := net.ResolveTCPAddr("tcp", targetIpPort)
-	if err != nil {
-		countlog.Error("failed to resolve remote tcp addr", "err", err)
-		return nil, nil, err
-	}
-	return localAddr, remoteAddr, nil
+	return localAddr, nil
 }
 
-func BindLocalAddr(socketFD int) (*net.TCPAddr, error) {
+func BindFDToLocalAddr(socketFD int) (*net.TCPAddr, error) {
 	localAddr, err := syscall.Getsockname(int(socketFD))
 	if err != nil {
 		return nil, err

@@ -7,10 +7,10 @@ import (
 	"github.com/v2pro/koala/replaying"
 	"io"
 	"github.com/v2pro/koala/recording"
+	"github.com/v2pro/koala/envarg"
 )
 
 var mysqlGreeting = []byte{53, 0, 0, 0, 10, 53, 46, 48, 46, 53, 49, 98, 0, 1, 0, 0, 0, 47, 85, 62, 116, 80, 114, 109, 75, 0, 12, 162, 33, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 86, 76, 87, 84, 124, 52, 47, 46, 55, 107, 55, 110, 0}
-
 
 func Start() {
 	go server()
@@ -23,7 +23,7 @@ func server() {
 			countlog.Fatal("panic", "err", recovered)
 		}
 	}()
-	listener, err := net.Listen("tcp", "127.0.0.1:2516")
+	listener, err := net.Listen("tcp", envarg.OutboundAddr().String())
 	if err != nil {
 		countlog.Error("failed to listen outbound", "err", err)
 		return

@@ -5,6 +5,9 @@
 # Parameters
 
 * KOALA_MODE: REPLAYING/RECORDING
+* KOALA_INBOUND_ADDR: ip:port, the address inbound server will bind to
+* KOALA_SUT_ADDR: ip:port, the address inbound will call
+* KOALA_OUTBOUND_ADDR: ip:port, the address all outgoing traffic will be redirected to
 
 # Recording
 

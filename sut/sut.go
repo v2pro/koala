@@ -198,7 +198,7 @@ func (thread *Thread) OnConnect(socketFD SocketFD, remoteAddr net.TCPAddr) {
 		addr:     remoteAddr,
 	}
 	if thread.replayingSession != nil {
-		localAddr, err := replaying.BindLocalAddr(int(socketFD))
+		localAddr, err := replaying.BindFDToLocalAddr(int(socketFD))
 		if err != nil {
 			countlog.Error("failed to bind local addr", "err", err)
 			return

@@ -9,6 +9,7 @@ import (
 	"time"
 	"github.com/v2pro/koala/replaying"
 	"github.com/v2pro/koala/recording"
+	"github.com/v2pro/koala/envarg"
 )
 
 func Start() {
@@ -21,7 +22,7 @@ func Start() {
 		}()
 		http.HandleFunc("/", handleInbound)
 		countlog.Info("inbound-started")
-		err := http.ListenAndServe(":2514", nil)
+		err := http.ListenAndServe(envarg.InboundAddr().String(), nil)
 		countlog.Info("inbound-exited", "err", err)
 	}()
 }
@@ -46,9 +47,9 @@ func handleInbound(respWriter http.ResponseWriter, req *http.Request) {
 		countlog.Error("failed to unmarshal session", "err", err)
 		return
 	}
-	localAddr, remoteAddr, err := replaying.ResolveAddresses("127.0.0.1:2515")
+	localAddr, err := replaying.AssignLocalAddr()
 	if err != nil {
-		countlog.Error("failed to resolve addresses", "err", err)
+		countlog.Error("failed to assign local addresses", "err", err)
 		return
 	}
 	replayingSession := replaying.ReplayingSession{
@@ -57,7 +58,7 @@ func handleInbound(respWriter http.ResponseWriter, req *http.Request) {
 		ReplayedRequestTime:           time.Now().UnixNano(),
 	}
 	replaying.StoreTmp(*localAddr, &replayingSession)
-	conn, err := net.DialTCP("tcp", localAddr, remoteAddr)
+	conn, err := net.DialTCP("tcp", localAddr, envarg.SutAddr())
 	if err != nil {
 		countlog.Error("failed to connect sut", "err", err)
 		return
