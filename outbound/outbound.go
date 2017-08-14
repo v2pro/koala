@@ -18,6 +18,13 @@ func Start() {
 }
 
 func server() {
+	defer func() {
+		recovered := recover()
+		if recovered != nil {
+			countlog.Fatal("event!outbound.panic", "err", recovered,
+				"stacktrace", countlog.ProvideStacktrace)
+		}
+	}()
 	listener, err := net.Listen("tcp", envarg.OutboundAddr().String())
 	if err != nil {
 		countlog.Error("event!outbound.failed to listen outbound", "err", err)
@@ -35,6 +42,13 @@ func server() {
 }
 
 func handleOutbound(conn *net.TCPConn) {
+	defer func() {
+		recovered := recover()
+		if recovered != nil {
+			countlog.Fatal("event!outbound.panic", "err", recovered,
+				"stacktrace", countlog.ProvideStacktrace)
+		}
+	}()
 	defer conn.Close()
 	tcpAddr := conn.RemoteAddr().(*net.TCPAddr)
 	countlog.Trace("event!outbound.new_conn",

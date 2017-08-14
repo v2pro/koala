@@ -13,16 +13,32 @@ import (
 )
 
 func Start() {
-	go func() {
-		http.HandleFunc("/", handleInbound)
-		countlog.Info("event!inbound.started",
-			"inboundAddr", envarg.InboundAddr())
-		err := http.ListenAndServe(envarg.InboundAddr().String(), nil)
-		countlog.Info("event!inbound.exited", "err", err)
+	go server()
+}
+
+func server() {
+	defer func() {
+		recovered := recover()
+		if recovered != nil {
+			countlog.Fatal("event!inbound.panic", "err", recovered,
+				"stacktrace", countlog.ProvideStacktrace)
+		}
 	}()
+	http.HandleFunc("/", handleInbound)
+	countlog.Info("event!inbound.started",
+		"inboundAddr", envarg.InboundAddr())
+	err := http.ListenAndServe(envarg.InboundAddr().String(), nil)
+	countlog.Info("event!inbound.exited", "err", err)
 }
 
 func handleInbound(respWriter http.ResponseWriter, req *http.Request) {
+	defer func() {
+		recovered := recover()
+		if recovered != nil {
+			countlog.Fatal("event!inbound.panic", "err", recovered,
+				"stacktrace", countlog.ProvideStacktrace)
+		}
+	}()
 	countlog.Debug("event!inbound.received_request", "remoteAddr", req.RemoteAddr)
 	reqBody, err := ioutil.ReadAll(req.Body)
 	if err != nil {
