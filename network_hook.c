@@ -20,9 +20,6 @@
 
 #define HOOK_SYS_FUNC(name) if( !orig_##name##_func ) { orig_##name##_func = (name##_pfn_t)dlsym(RTLD_NEXT,#name); }
 
-typedef int (*socket_pfn_t)(int, int, int);
-static socket_pfn_t orig_socket_func;
-
 typedef ssize_t (*send_pfn_t)(int, const void *, size_t, int);
 static send_pfn_t orig_send_func;
 
@@ -42,17 +39,12 @@ typedef int (*bind_pfn_t)(int, const struct sockaddr *, socklen_t);
 static bind_pfn_t orig_bind_func;
 
 void network_hook_init() {
-    HOOK_SYS_FUNC( socket );
     HOOK_SYS_FUNC( send );
     HOOK_SYS_FUNC( sendto );
     HOOK_SYS_FUNC( connect );
     HOOK_SYS_FUNC( accept );
     HOOK_SYS_FUNC( recv );
     HOOK_SYS_FUNC( bind );
-}
-
-int socket(int domain, int type, int protocol) {
-    return orig_socket_func(domain, type, protocol);
 }
 
 int bind (int socketFD, const struct sockaddr *addr, socklen_t length) {

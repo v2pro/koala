@@ -1,3 +1,4 @@
+#ifdef USE_LIB_FAKETIME
 /*
  *  This file is part of libfaketime, version 0.9.6
  *
@@ -2408,4 +2409,10 @@ int __ftime(struct timeb *tb)
  * :indentSize=2:tabSize=2:noTabs=true:
  */
 
+#else // USE_LIB_FAKETIME
+void ftpl_init(void) {
+}
+void parse_ft_string(const char *user_faked_time) {
+}
+#endif // USE_LIB_FAKETIME
 /* eof */

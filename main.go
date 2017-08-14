@@ -6,7 +6,6 @@ import (
 )
 
 // #cgo LDFLAGS: -ldl -lm -lrt
-// #cgo CFLAGS: -DPTHREAD -DPTHREAD_SINGLETHREADED_TIME
 // #include <stddef.h>
 // #include <netinet/in.h>
 // #include <sys/types.h>

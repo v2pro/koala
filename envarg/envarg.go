@@ -7,7 +7,6 @@ import (
 	"github.com/v2pro/koala/countlog"
 )
 
-var isReplaying = false
 var inboundAddr *net.TCPAddr
 var outboundAddr *net.TCPAddr
 var sutAddr *net.TCPAddr
@@ -15,7 +14,6 @@ var logFile string
 var logLevel = countlog.LEVEL_DEBUG
 
 func init() {
-	isReplaying = os.Getenv("KOALA_MODE") == "REPLAYING"
 	initInboundAddr()
 	initOutboundAddr()
 	initSutAddr()
@@ -83,7 +81,7 @@ func IsReplaying() bool {
 }
 
 func IsRecording() bool {
-	return !isReplaying
+	return isRecording
 }
 
 func InboundAddr() *net.TCPAddr {

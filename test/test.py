@@ -11,8 +11,8 @@ import base64
 
 
 def main():
-    shell_execute('go install -buildmode=c-shared github.com/v2pro/koala')
-    shell_execute('go build -buildmode=c-shared -o koala-replayer.so github.com/v2pro/koala')
+    shell_execute('go install -tags="koala_replayer koala_recorder" -buildmode=c-shared github.com/v2pro/koala')
+    shell_execute('go build -tags="koala_replayer koala_recorder" -buildmode=c-shared -o koala-replayer.so github.com/v2pro/koala')
     env = os.environ.copy()
     env['LD_PRELOAD'] = '%s/koala-replayer.so' % os.path.abspath('.')
     env['KOALA_MODE'] = 'REPLAYING'
