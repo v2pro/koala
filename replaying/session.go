@@ -1,14 +1,14 @@
 package replaying
 
 import (
-	"github.com/v2pro/koala/st"
 	"time"
 	"unsafe"
 	"strings"
+	"github.com/v2pro/koala/recording"
 )
 
 type ReplayingSession struct {
-	st.Session `json:"-"`
+	recording.Session `json:"-"`
 	ReplayedOutboundTalkCollector chan ReplayedTalk `json:"-"`
 	ReplayedRequestTime           int64
 	ReplayedResponse              []byte
@@ -30,7 +30,7 @@ func (replayingSession *ReplayingSession) Finish(response []byte) {
 	}
 }
 
-func (replayingSession *ReplayingSession) MatchOutboundTalk(lastMatchedIndex int, outboundRequest []byte) (int, *st.Talk) {
+func (replayingSession *ReplayingSession) MatchOutboundTalk(lastMatchedIndex int, outboundRequest []byte) (int, *recording.Talk) {
 	unit := 16
 	chunks := cutToChunks(outboundRequest, unit)
 	keys := replayingSession.loadKeys()

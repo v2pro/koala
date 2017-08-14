@@ -8,7 +8,7 @@ import (
 	"net"
 	"time"
 	"github.com/v2pro/koala/replaying"
-	"github.com/v2pro/koala/st"
+	"github.com/v2pro/koala/recording"
 )
 
 func Start() {
@@ -40,7 +40,7 @@ func handleInbound(respWriter http.ResponseWriter, req *http.Request) {
 		return
 	}
 	defer req.Body.Close()
-	session := st.Session{}
+	session := recording.Session{}
 	err = json.Unmarshal(reqBody, &session)
 	if err != nil {
 		countlog.Error("failed to unmarshal session", "err", err)

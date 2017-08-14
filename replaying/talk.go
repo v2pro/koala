@@ -1,9 +1,11 @@
 package replaying
 
-import "github.com/v2pro/koala/st"
+import (
+	"github.com/v2pro/koala/recording"
+)
 
 type ReplayedTalk struct {
-	MatchedTalk   *st.Talk
+	MatchedTalk   *recording.Talk
 	ReplayedRequestTime int64
 	ReplayedRequest []byte
 	ReplayedResponseTime int64

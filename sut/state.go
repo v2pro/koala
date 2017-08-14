@@ -3,9 +3,9 @@ package sut
 import (
 	"net"
 	"sync"
-	"github.com/v2pro/koala/st"
 	"context"
 	"github.com/v2pro/koala/replaying"
+	"github.com/v2pro/koala/recording"
 )
 
 type SocketFD int
@@ -23,7 +23,7 @@ type Thread struct {
 	context.Context
 	threadID         ThreadID
 	socks            map[SocketFD]*socket
-	recordingSession *st.Session
+	recordingSession *recording.Session
 	replayingSession *replaying.ReplayingSession
 }
 
@@ -55,7 +55,7 @@ func GetThread(threadID ThreadID) *Thread {
 			socks:            map[SocketFD]*socket{},
 		}
 		if replaying.IsRecording() {
-			thread.recordingSession = &st.Session{}
+			thread.recordingSession = &recording.Session{}
 		}
 		globalThreads[threadID] = thread
 	}
