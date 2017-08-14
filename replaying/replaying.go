@@ -5,22 +5,7 @@ import (
 	"sync"
 	"github.com/v2pro/koala/countlog"
 	"syscall"
-	"os"
 )
-
-var isReplaying = false
-
-func init() {
-	isReplaying = os.Getenv("KOALA_MODE") == "REPLAYING"
-}
-
-func IsReplaying() bool {
-	return isReplaying
-}
-
-func IsRecording() bool {
-	return !isReplaying
-}
 
 var tmp = map[string]*ReplayingSession{}
 var tmpMutex = &sync.Mutex{}

@@ -6,6 +6,7 @@ import (
 	"context"
 	"github.com/v2pro/koala/replaying"
 	"github.com/v2pro/koala/recording"
+	"github.com/v2pro/koala/envarg"
 )
 
 type SocketFD int
@@ -13,9 +14,9 @@ type SocketFD int
 type ThreadID int32
 
 type socket struct {
-	socketFD SocketFD
-	isServer bool
-	addr     net.TCPAddr
+	socketFD  SocketFD
+	isServer  bool
+	addr      net.TCPAddr
 	localAddr *net.TCPAddr
 }
 
@@ -50,11 +51,11 @@ func GetThread(threadID ThreadID) *Thread {
 	thread := globalThreads[threadID]
 	if thread == nil {
 		thread = &Thread{
-			Context:          context.WithValue(context.Background(), "threadID", threadID),
-			threadID:         threadID,
-			socks:            map[SocketFD]*socket{},
+			Context:  context.WithValue(context.Background(), "threadID", threadID),
+			threadID: threadID,
+			socks:    map[SocketFD]*socket{},
 		}
-		if replaying.IsRecording() {
+		if envarg.IsRecording() {
 			thread.recordingSession = &recording.Session{}
 		}
 		globalThreads[threadID] = thread

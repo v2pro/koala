@@ -21,7 +21,7 @@ import (
 	"net"
 	"github.com/v2pro/koala/inbound"
 	"github.com/v2pro/koala/outbound"
-	"github.com/v2pro/koala/replaying"
+	"github.com/v2pro/koala/envarg"
 )
 
 func init() {
@@ -31,7 +31,7 @@ func init() {
 		countlog.Debug("set time offset", "offset", offset)
 		C.set_time_offset(C.int(offset))
 	}
-	if replaying.IsReplaying() {
+	if envarg.IsReplaying() {
 		inbound.Start()
 		outbound.Start()
 		countlog.Info("koala started", "mode", "replaying")
@@ -54,7 +54,7 @@ func on_connect(threadID C.pid_t, socketFD C.int, remoteAddr *C.struct_sockaddr_
 	}
 	sut.GetThread(sut.ThreadID(threadID)).
 		OnConnect(sut.SocketFD(socketFD), origAddr)
-	if replaying.IsReplaying() {
+	if envarg.IsReplaying() {
 		redirectTo, err := net.ResolveTCPAddr("tcp", "127.0.0.1:2516")
 		if err != nil {
 			countlog.Error("failed to resolve redirect to remoteAddr", "err", err)

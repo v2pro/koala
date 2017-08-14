@@ -2,6 +2,10 @@
 
 人生如戏，全凭演技
 
+# Parameters
+
+* KOALA_MODE: REPLAYING/RECORDING
+
 # Recording
 
 ![recording](https://docs.google.com/drawings/d/1IRmc6LH4tLq9l8ELF2XaGouzqr51Hb-0n2QN25zpiEg/pub?w=669&h=471)
