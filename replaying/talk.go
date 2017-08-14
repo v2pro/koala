@@ -6,6 +6,7 @@ import (
 
 type ReplayedTalk struct {
 	MatchedTalk   *recording.Talk
+	MatchedTalkIndex int
 	ReplayedRequestTime int64
 	ReplayedRequest []byte
 	ReplayedResponseTime int64

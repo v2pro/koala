@@ -9,6 +9,8 @@ import (
 
 type ReplayingSession struct {
 	recording.Session `json:"-"`
+	OriginalRequestTime           int64
+	OriginalRequest               []byte
 	ReplayedOutboundTalkCollector chan ReplayedTalk `json:"-"`
 	ReplayedRequestTime           int64
 	ReplayedResponse              []byte
@@ -60,7 +62,7 @@ func (replayingSession *ReplayingSession) MatchOutboundTalk(lastMatchedIndex int
 		}
 	}
 	if maxScore == 0 {
-		return 0, nil
+		return -1, nil
 	}
 	return maxScoreIndex, replayingSession.OutboundTalks[maxScoreIndex]
 

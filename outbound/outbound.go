@@ -107,27 +107,28 @@ func handleOutbound(conn *net.TCPConn) {
 		if matchedTalk == nil && lastMatchedIndex != 0 {
 			lastMatchedIndex, matchedTalk = replayingSession.MatchOutboundTalk(-1, request)
 		}
-		if matchedTalk == nil {
-			countlog.Error("event!outbound.failed to find matching talk", "addr", *tcpAddr)
-			return
-		}
 		replayedTalk.MatchedTalk = matchedTalk
+		replayedTalk.MatchedTalkIndex = lastMatchedIndex
 		replayedTalk.ReplayedResponseTime = time.Now().UnixNano()
-		_, err = conn.Write(matchedTalk.Response)
-		if err != nil {
-			countlog.Error("event!outbound.failed to write back response from outbound", "addr", *tcpAddr, "err", err)
-			return
-		}
-		countlog.Debug("event!oubound.response",
-			"addr", *tcpAddr,
-			"matchedRequest", matchedTalk.Request,
-			"matchedResponse", matchedTalk.Response,
-			"replayingSession", replayingSession,
-			"lastMatchedIndex", lastMatchedIndex)
 		select {
 		case replayingSession.ReplayedOutboundTalkCollector <- replayedTalk:
 		default:
 			countlog.Error("event!outbound.ReplayedOutboundTalkCollector is full")
 		}
+		if matchedTalk == nil {
+			countlog.Error("event!outbound.failed to find matching talk", "addr", *tcpAddr)
+			return
+		}
+		_, err = conn.Write(matchedTalk.Response)
+		if err != nil {
+			countlog.Error("event!outbound.failed to write back response from outbound", "addr", *tcpAddr, "err", err)
+			return
+		}
+		countlog.Debug("event!outbound.response",
+			"addr", *tcpAddr,
+			"matchedIndex", lastMatchedIndex,
+			"matchedRequest", matchedTalk.Request,
+			"matchedResponse", matchedTalk.Response,
+			"replayingSession", replayingSession)
 	}
 }

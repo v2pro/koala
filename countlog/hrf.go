@@ -2,13 +2,14 @@ package countlog
 
 import (
 	"fmt"
-	"net"
 	"encoding/base64"
 	"context"
+	"reflect"
 )
 
 type HumanReadableFormat struct {
 	ContextPropertyNames []string
+	StringLengthCap int
 }
 
 func (hrf *HumanReadableFormat) FormatLog(event Event) string {
@@ -16,10 +17,10 @@ func (hrf *HumanReadableFormat) FormatLog(event Event) string {
 	ctx := hrf.describeContext(event)
 	if len(ctx) == 0 {
 		msg = append(msg, fmt.Sprintf(
-			"=== %s ===\n", event.Event)...)
+			"=== %s ===\n", event.Event[len("event!"):])...)
 	} else {
 		msg = append(msg, fmt.Sprintf(
-			"=== [%s] %s ===\n", string(ctx), event.Event)...)
+			"=== [%s] %s ===\n", string(ctx), event.Event[len("event!"):])...)
 	}
 	for i := 0; i < len(event.Properties); i += 2 {
 		k, _ := event.Properties[i].(string)
@@ -28,21 +29,16 @@ func (hrf *HumanReadableFormat) FormatLog(event Event) string {
 			continue
 		}
 		v := event.Properties[i+1]
-		formattedV := ""
-		switch typedV := v.(type) {
-		case []byte:
-			buf := typedV
-			if isBinary(buf) {
-				formattedV = base64.StdEncoding.EncodeToString(buf)
-			} else {
-				formattedV = string(buf)
+		formattedV := formatV(v)
+		if formattedV == "" {
+			continue
+		}
+		if hrf.StringLengthCap > 0 {
+			lenCap := len(formattedV)
+			if hrf.StringLengthCap < lenCap {
+				lenCap = hrf.StringLengthCap
+				formattedV = formattedV[:lenCap] + "...more, capped"
 			}
-		case net.TCPAddr:
-			formattedV = typedV.String()
-		case *net.TCPAddr:
-			formattedV = typedV.String()
-		default:
-			formattedV = fmt.Sprintf("%v", typedV)
 		}
 		msg = append(msg, k...)
 		msg = append(msg, ": "...)
@@ -50,6 +46,37 @@ func (hrf *HumanReadableFormat) FormatLog(event Event) string {
 		msg = append(msg, '\n')
 	}
 	return string(msg)
+}
+
+func formatV(v interface{}) string {
+	if v == nil {
+		return "<nil>"
+	}
+	switch typedV := v.(type) {
+	case []byte:
+		buf := typedV
+		if isBinary(buf) {
+			return base64.StdEncoding.EncodeToString(buf)
+		} else {
+			return string(buf)
+		}
+	case string:
+		return typedV
+	default:
+		stringer, _ := v.(fmt.Stringer)
+		if stringer != nil {
+			return stringer.String()
+		}
+		goStringer, _ := v.(fmt.GoStringer)
+		if goStringer != nil {
+			return goStringer.GoString()
+		}
+		switch reflect.TypeOf(v).Kind() {
+		case reflect.Chan, reflect.Struct, reflect.Interface, reflect.Func, reflect.Array, reflect.Slice, reflect.Ptr:
+			return ""
+		}
+		return fmt.Sprintf("%v", typedV)
+	}
 }
 
 func (hrf *HumanReadableFormat) describeContext(event Event) []byte {

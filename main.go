@@ -50,6 +50,7 @@ func startLogging() {
 	logWriter := countlog.NewFileLogWriter(envarg.LogLevel(), envarg.LogFile())
 	logWriter.LogFormatter = &countlog.HumanReadableFormat{
 		ContextPropertyNames: []string{"threadID"},
+		StringLengthCap: 512,
 	}
 	logWriter.Start()
 }
