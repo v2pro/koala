@@ -11,12 +11,38 @@ import base64
 
 
 def main():
+    # test_koala_go()
+    test_ld_preload()
+
+
+def test_koala_go():
+    GOBIN = os.path.abspath(os.curdir) + '/bin'
+    env = os.environ.copy()
+    env['GOBIN'] = GOBIN
+    shell_execute(
+        'koala-go.sh install -tags="koala_go koala_replayer koala_recorder" '
+        'github.com/v2pro/koala/test/server', env=env)
+    env = os.environ.copy()
+    env['GOTRACEBACK'] = 'all'
+    server = subprocess.Popen(
+        [
+            GOBIN + '/server'
+        ],
+        env=env, stdout=subprocess.PIPE)
+    time.sleep(1)
+    replay()
+    time.sleep(1)
+    print('send SIGTERM')
+    server.send_signal(signal.SIGTERM)
+    print(server.communicate()[0])
+
+
+def test_ld_preload():
     shell_execute('go install -tags="koala_replayer koala_recorder" -buildmode=c-shared github.com/v2pro/koala')
-    shell_execute('go build -tags="koala_replayer koala_recorder" -buildmode=c-shared -o koala-replayer.so github.com/v2pro/koala')
+    shell_execute(
+        'go build -tags="koala_replayer koala_recorder" -buildmode=c-shared -o koala-replayer.so github.com/v2pro/koala')
     env = os.environ.copy()
     env['LD_PRELOAD'] = '%s/koala-replayer.so' % os.path.abspath('.')
-    env['KOALA_MODE'] = 'REPLAYING'
-    # env['KOALA_MODE'] = 'RECORDING'
     env['SERVER_MODE'] = 'SINGLE_THREAD'
     env['GOTRACEBACK'] = 'all'
     server = subprocess.Popen(
@@ -27,17 +53,35 @@ def main():
         ],
         env=env, stdout=subprocess.PIPE)
     time.sleep(1)
+
     # print('send SIGTERM')
     # server.send_signal(signal.SIGTERM)
     # print(server.communicate()[0])
     # return
 
-    def call_server():
-        print(urllib2.urlopen('http://127.0.0.1:2515').read())
+    thread1 = threading.Thread(target=replay)
+    thread1.start()
+    thread1.join()
+    thread2 = threading.Thread(target=replay)
+    thread2.start()
+    thread2.join()
+    time.sleep(1)
+    print('send SIGTERM')
+    server.send_signal(signal.SIGTERM)
+    print(server.communicate()[0])
 
 
-    def replay():
-        resp = urllib2.urlopen('http://127.0.0.1:2514', data="""
+def shell_execute(cmd, **kwargs):
+    print(cmd)
+    subprocess.check_call(cmd, shell=True, **kwargs)
+
+
+def call_server():
+    print(urllib2.urlopen('http://127.0.0.1:2515').read())
+
+
+def replay():
+    resp = urllib2.urlopen('http://127.0.0.1:2514/json', data="""
 {
   "InboundTalk": {
     "Peer": {
@@ -76,23 +120,7 @@ def main():
   ]
 }
         """).read()
-        print(base64.decodestring(json.loads(resp)['ReplayedResponse']))
-
-
-    thread1 = threading.Thread(target=replay)
-    thread1.start()
-    thread1.join()
-    thread2 = threading.Thread(target=replay)
-    thread2.start()
-    thread2.join()
-    time.sleep(1)
-    print('send SIGTERM')
-    server.send_signal(signal.SIGTERM)
-    print(server.communicate()[0])
-
-def shell_execute(cmd):
-    print(cmd)
-    subprocess.check_call(cmd, shell=True)
+    print(base64.decodestring(json.loads(resp)['ReplayedResponse']))
 
 
 main()

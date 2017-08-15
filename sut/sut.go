@@ -7,6 +7,7 @@ import (
 	"github.com/v2pro/koala/replaying"
 	"time"
 	"github.com/v2pro/koala/recording"
+	"syscall"
 )
 
 var threadShutdownEvent = []byte("to-koala:thread-shutdown||")
@@ -28,10 +29,39 @@ type SendFlags int
 func (thread *Thread) OnSend(socketFD SocketFD, span []byte, flags SendFlags) {
 	sock := thread.lookupSocket(socketFD)
 	if sock == nil {
-		countlog.Warn("unknown-send",
+		localAddr, err := syscall.Getsockname(int(socketFD))
+		if err != nil {
+			countlog.Error("event!sut.failed to find local address of new socket",
+				"ctx", thread, "err", err)
+			return
+		}
+		localAddr4, _ := localAddr.(*syscall.SockaddrInet4)
+		remoteAddr, err := syscall.Getpeername(int(socketFD))
+		if err != nil {
+			countlog.Error("event!sut.failed to find remote address of new socket",
+				"ctx", thread, "err", err)
+			return
+		}
+		remoteAddr4, _ := remoteAddr.(*syscall.SockaddrInet4)
+		if remoteAddr4 == nil {
+			return
+		}
+		countlog.Debug("event!sut.found_new_socket_on_send",
 			"threadID", thread.threadID,
 			"socketFD", socketFD)
-		return
+		sock = &socket{
+			socketFD: socketFD,
+			isServer: false,
+			addr: net.TCPAddr{
+				IP:   remoteAddr4.Addr[:],
+				Port: remoteAddr4.Port,
+			},
+			localAddr: &net.TCPAddr{
+				IP:   localAddr4.Addr[:],
+				Port: localAddr4.Port,
+			},
+		}
+		thread.socks[socketFD] = sock
 	}
 	event := "event!sut.inbound_send"
 	if sock.isServer {
@@ -55,7 +85,7 @@ type RecvFlags int
 func (thread *Thread) OnRecv(socketFD SocketFD, span []byte, flags RecvFlags) {
 	sock := thread.lookupSocket(socketFD)
 	if sock == nil {
-		countlog.Warn("unknown-recv",
+		countlog.Warn("event!sut.unknown-recv",
 			"threadID", thread.threadID,
 			"socketFD", socketFD)
 		return
@@ -105,13 +135,13 @@ func (thread *Thread) OnAccept(serverSocketFD SocketFD, clientSocketFD SocketFD,
 func (thread *Thread) OnBind(socketFD SocketFD, addr net.TCPAddr) {
 	thread.socks[socketFD] = &socket{
 		socketFD: socketFD,
-		isServer: true,
+		isServer: false,
 		addr:     addr,
 	}
 	countlog.Debug("event!sut.bind",
 		"threadID", thread.threadID,
 		"socketFD", socketFD,
-		"addr", addr)
+		"addr", &addr)
 }
 
 func (thread *Thread) OnConnect(socketFD SocketFD, remoteAddr net.TCPAddr) {
@@ -120,15 +150,12 @@ func (thread *Thread) OnConnect(socketFD SocketFD, remoteAddr net.TCPAddr) {
 		isServer: false,
 		addr:     remoteAddr,
 	}
-	if thread.replayingSession != nil {
-		localAddr, err := replaying.BindFDToLocalAddr(int(socketFD))
-		if err != nil {
-			countlog.Error("event!sut.failed to bind local addr", "err", err)
-			return
-		}
-		thread.socks[socketFD].localAddr = localAddr
-		replaying.StoreTmp(*localAddr, thread.replayingSession)
+	localAddr, err := replaying.BindFDToLocalAddr(int(socketFD))
+	if err != nil {
+		countlog.Error("event!sut.failed to bind local addr", "err", err)
+		return
 	}
+	thread.socks[socketFD].localAddr = localAddr
 	countlog.Debug("event!sut.connect",
 		"threadID", thread.threadID,
 		"socketFD", socketFD,

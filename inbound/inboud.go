@@ -10,6 +10,7 @@ import (
 	"github.com/v2pro/koala/recording"
 	"github.com/v2pro/koala/envarg"
 	"encoding/json"
+	"github.com/v2pro/koala/internal"
 )
 
 func Start() {
@@ -17,6 +18,7 @@ func Start() {
 }
 
 func server() {
+	internal.SetCurrentGoRoutineIsKoala()
 	defer func() {
 		recovered := recover()
 		if recovered != nil {
@@ -24,7 +26,7 @@ func server() {
 				"stacktrace", countlog.ProvideStacktrace)
 		}
 	}()
-	http.HandleFunc("/", handleInbound)
+	http.HandleFunc("/json", handleInbound)
 	countlog.Info("event!inbound.started",
 		"inboundAddr", envarg.InboundAddr())
 	err := http.ListenAndServe(envarg.InboundAddr().String(), nil)
@@ -32,6 +34,7 @@ func server() {
 }
 
 func handleInbound(respWriter http.ResponseWriter, req *http.Request) {
+	internal.SetCurrentGoRoutineIsKoala()
 	defer func() {
 		recovered := recover()
 		if recovered != nil {
@@ -63,7 +66,7 @@ func handleInbound(respWriter http.ResponseWriter, req *http.Request) {
 		ReplayedRequestTime:           time.Now().UnixNano(),
 	}
 	replaying.StoreTmp(*localAddr, &replayingSession)
-	conn, err := net.DialTCP("tcp", localAddr, envarg.SutAddr())
+	conn, err := net.DialTCP("tcp4", localAddr, envarg.SutAddr())
 	if err != nil {
 		countlog.Error("event!inbound.failed to connect sut", "err", err)
 		return

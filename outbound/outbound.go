@@ -9,6 +9,7 @@ import (
 	"github.com/v2pro/koala/recording"
 	"github.com/v2pro/koala/envarg"
 	"context"
+	"github.com/v2pro/koala/internal"
 )
 
 var mysqlGreeting = []byte{53, 0, 0, 0, 10, 53, 46, 48, 46, 53, 49, 98, 0, 1, 0, 0, 0, 47, 85, 62, 116, 80, 114, 109, 75, 0, 12, 162, 33, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 86, 76, 87, 84, 124, 52, 47, 46, 55, 107, 55, 110, 0}
@@ -18,6 +19,7 @@ func Start() {
 }
 
 func server() {
+	internal.SetCurrentGoRoutineIsKoala()
 	defer func() {
 		recovered := recover()
 		if recovered != nil {
@@ -42,6 +44,7 @@ func server() {
 }
 
 func handleOutbound(conn *net.TCPConn) {
+	internal.SetCurrentGoRoutineIsKoala()
 	defer func() {
 		recovered := recover()
 		if recovered != nil {

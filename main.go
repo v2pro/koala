@@ -18,9 +18,8 @@ import (
 	"github.com/v2pro/koala/ch"
 	"syscall"
 	"net"
-	"github.com/v2pro/koala/inbound"
-	"github.com/v2pro/koala/outbound"
 	"github.com/v2pro/koala/envarg"
+	"github.com/v2pro/koala/koala"
 )
 
 func init() {
@@ -31,35 +30,13 @@ func init() {
 				"stacktrace", countlog.ProvideStacktrace)
 		}
 	}()
-	startLogging()
 	C.network_hook_init()
 	C.time_hook_init()
 	sut.SetTimeOffset = func(offset int) {
 		countlog.Debug("event!main.set_time_offset", "offset", offset)
 		C.set_time_offset(C.int(offset))
 	}
-	if envarg.IsReplaying() {
-		inbound.Start()
-		outbound.Start()
-		countlog.Info("event!main.koala_started",
-			"mode", "replaying",
-			"inboundAddr", envarg.InboundAddr(),
-			"sutAddr", envarg.SutAddr(),
-			"outboundAddr", envarg.OutboundAddr())
-	} else {
-		countlog.Info("event!main.koala_started",
-			"mode", "recording")
-	}
-}
-
-func startLogging() {
-	logWriter := countlog.NewFileLogWriter(envarg.LogLevel(), envarg.LogFile())
-	logWriter.LogFormatter = &countlog.HumanReadableFormat{
-		ContextPropertyNames: []string{"threadID", "outboundSrc"},
-		StringLengthCap:      512,
-	}
-	logWriter.EventWhitelist["event!replaying.talks_scored"] = true
-	logWriter.Start()
+	koala.Start()
 }
 
 //export on_connect
