@@ -156,6 +156,9 @@ func (thread *Thread) OnConnect(socketFD SocketFD, remoteAddr net.TCPAddr) {
 		return
 	}
 	thread.socks[socketFD].localAddr = localAddr
+	if thread.replayingSession != nil {
+		replaying.StoreTmp(*localAddr, thread.replayingSession)
+	}
 	countlog.Debug("event!sut.connect",
 		"threadID", thread.threadID,
 		"socketFD", socketFD,

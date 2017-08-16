@@ -64,6 +64,8 @@ func handleInbound(respWriter http.ResponseWriter, req *http.Request) {
 		Session:                       session,
 		ReplayedOutboundTalkCollector: make(chan replaying.ReplayedTalk, 4096),
 		ReplayedRequestTime:           time.Now().UnixNano(),
+		OriginalRequestTime:           session.InboundTalk.RequestTime,
+		OriginalResponse:              session.InboundTalk.Response,
 	}
 	replaying.StoreTmp(*localAddr, &replayingSession)
 	conn, err := net.DialTCP("tcp4", localAddr, envarg.SutAddr())

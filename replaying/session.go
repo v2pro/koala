@@ -13,7 +13,7 @@ import (
 type ReplayingSession struct {
 	recording.Session `json:"-"`
 	OriginalRequestTime           int64
-	OriginalRequest               []byte
+	OriginalResponse              []byte
 	ReplayedOutboundTalkCollector chan ReplayedTalk `json:"-"`
 	ReplayedRequestTime           int64
 	ReplayedResponse              []byte
