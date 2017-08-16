@@ -2,12 +2,11 @@ package replaying
 
 import (
 	"time"
-	"unsafe"
-	"strings"
 	"github.com/v2pro/koala/recording"
 	"fmt"
 	"github.com/v2pro/koala/countlog"
 	"context"
+	"bytes"
 )
 
 type ReplayingSession struct {
@@ -51,9 +50,7 @@ func (replayingSession *ReplayingSession) MatchOutboundTalk(
 			if len(key) < len(chunk) {
 				continue
 			}
-			keyAsString := *(*string)(unsafe.Pointer(&key))
-			chunkAsString := *(*string)(unsafe.Pointer(&chunk))
-			pos := strings.Index(keyAsString, chunkAsString)
+			pos := bytes.Index(key, chunk)
 			if pos >= 0 {
 				keys[j] = key[pos:]
 				if chunkIndex == 0 {
@@ -71,11 +68,19 @@ func (replayingSession *ReplayingSession) MatchOutboundTalk(
 	}
 	countlog.Trace("event!replaying.talks_scored",
 		"ctx", ctx,
+		"lastMatchedIndex", lastMatchedIndex,
 		"scores", func() interface{} {
 			return fmt.Sprintf("%v", scores)
 		})
 	if maxScore == 0 {
 		return -1, nil
+	}
+	if lastMatchedIndex != -1 {
+		// not starting from beginning, should have minimal score
+		minimalScore := int(float64(len(chunks)) * 0.8)
+		if maxScore < minimalScore {
+			return -1, nil
+		}
 	}
 	return maxScoreIndex, replayingSession.OutboundTalks[maxScoreIndex]
 
