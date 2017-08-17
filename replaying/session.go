@@ -54,11 +54,7 @@ func (replayingSession *ReplayingSession) MatchOutboundTalk(
 			if pos >= 0 {
 				keys[j] = key[pos:]
 				if chunkIndex == 0 {
-					if string(chunks[0]) == "wanliu_order_new" {
-						scores[j] += 1000
-					} else {
-						scores[j] += 3 // first chunk has more weight
-					}
+					scores[j] += 3 // first chunk has more weight
 				} else {
 					scores[j]++
 				}
@@ -101,25 +97,25 @@ func (replayingSession *ReplayingSession) loadKeys() [][]byte {
 
 func cutToChunks(key []byte, unit int) [][]byte {
 	chunks := [][]byte{}
-	if len(key) > 512 {
-		offset := 0
-		for {
-			strikeStart, strikeLen := findReadableChunk(key[offset:])
-			if strikeStart == -1 {
-				break
-			}
-			if strikeLen > 8 {
-				firstChunkLen := strikeLen
-				if firstChunkLen > 16 {
-					firstChunkLen = 16
-				}
-				chunks = append(chunks, key[offset+strikeStart:offset+strikeStart+firstChunkLen])
-				key = key[offset+strikeStart+firstChunkLen:]
-				break
-			}
-			offset += strikeStart + strikeLen
-		}
-	}
+	//if len(key) > 512 {
+	//	offset := 0
+	//	for {
+	//		strikeStart, strikeLen := findReadableChunk(key[offset:])
+	//		if strikeStart == -1 {
+	//			break
+	//		}
+	//		if strikeLen > 8 {
+	//			firstChunkLen := strikeLen
+	//			if firstChunkLen > 16 {
+	//				firstChunkLen = 16
+	//			}
+	//			chunks = append(chunks, key[offset+strikeStart:offset+strikeStart+firstChunkLen])
+	//			key = key[offset+strikeStart+firstChunkLen:]
+	//			break
+	//		}
+	//		offset += strikeStart + strikeLen
+	//	}
+	//}
 	chunkCount := len(key) / unit
 	for i := 0; i < len(key)/unit; i++ {
 		chunks = append(chunks, key[i*unit:(i+1)*unit])
