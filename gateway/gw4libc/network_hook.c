@@ -16,6 +16,8 @@
 #include "span.h"
 #include "_cgo_export.h"
 
+char* library_version = { "KOALA-VERSION: 1.0.0" };
+
 #define RTLD_NEXT	((void *) -1l)
 
 #define HOOK_SYS_FUNC(name) if( !orig_##name##_func ) { orig_##name##_func = (name##_pfn_t)dlsym(RTLD_NEXT,#name); }
