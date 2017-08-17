@@ -28,7 +28,8 @@ func server() {
 	}()
 	http.HandleFunc("/json", handleInbound)
 	countlog.Info("event!inbound.started",
-		"inboundAddr", envarg.InboundAddr())
+		"inboundAddr", envarg.InboundAddr(),
+		"sutAddr", envarg.SutAddr())
 	err := http.ListenAndServe(envarg.InboundAddr().String(), nil)
 	countlog.Info("event!inbound.exited", "err", err)
 }

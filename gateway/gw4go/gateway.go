@@ -21,11 +21,12 @@ func Start() {
 	if envarg.IsReplaying() {
 		inbound.Start()
 		outbound.Start()
+		mode := "replaying"
+		if envarg.IsRecording() {
+			mode += " & recording"
+		}
 		countlog.Info("event!main.koala_started",
-			"mode", "replaying",
-			"inboundAddr", envarg.InboundAddr(),
-			"sutAddr", envarg.SutAddr(),
-			"outboundAddr", envarg.OutboundAddr())
+			"mode", mode)
 	} else {
 		countlog.Info("event!main.koala_started",
 			"mode", "recording")
