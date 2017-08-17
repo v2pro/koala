@@ -1,6 +1,7 @@
 package gw4go
 
 import (
+	_ "github.com/v2pro/koala/extension"
 	"github.com/v2pro/koala/countlog"
 	"github.com/v2pro/koala/envarg"
 	"github.com/v2pro/koala/inbound"
