@@ -38,6 +38,13 @@ func Log(level int, event string, properties ...interface{}) {
 }
 func log(level int, event string, properties []interface{}) {
 	var expandedProperties []interface{}
+	if len(LogWriters) == 0 {
+		if expandedProperties == nil {
+			expandedProperties = expand(event, properties)
+		}
+		defaultLogWriter.WriteLog(level, event, expandedProperties)
+		return
+	}
 	for _, logWriter := range LogWriters {
 		if !logWriter.ShouldLog(level, event, properties) {
 			continue
