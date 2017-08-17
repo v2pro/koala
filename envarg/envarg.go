@@ -1,10 +1,12 @@
 package envarg
 
+// #include <stdlib.h>
+import "C"
 import (
-	"os"
 	"net"
 	"strings"
 	"github.com/v2pro/koala/countlog"
+	"unsafe"
 )
 
 var inboundAddr *net.TCPAddr
@@ -14,17 +16,18 @@ var logFile string
 var logLevel = countlog.LEVEL_DEBUG
 
 func init() {
+
 	initInboundAddr()
 	initOutboundAddr()
 	initSutAddr()
-	logFile = os.Getenv("KOALA_LOG_FILE")
+	logFile = getenvFromC("KOALA_LOG_FILE")
 	if logFile == "" {
 		logFile = "STDOUT"
 	}
 	initLogLevel()
 }
 func initLogLevel() {
-	logLevelStr := strings.ToUpper(os.Getenv("KOALA_LOG_LEVEL"))
+	logLevelStr := strings.ToUpper(getenvFromC("KOALA_LOG_LEVEL"))
 	switch logLevelStr {
 	case "TRACE":
 		logLevel = countlog.LEVEL_TRACE
@@ -41,7 +44,7 @@ func initLogLevel() {
 	}
 }
 func initInboundAddr() {
-	addrStr := os.Getenv("KOALA_INBOUND_ADDR")
+	addrStr := getenvFromC("KOALA_INBOUND_ADDR")
 	if addrStr == "" {
 		addrStr = ":2514"
 	}
@@ -53,7 +56,7 @@ func initInboundAddr() {
 }
 
 func initOutboundAddr() {
-	addrStr := os.Getenv("KOALA_OUTBOUND_ADDR")
+	addrStr := getenvFromC("KOALA_OUTBOUND_ADDR")
 	if addrStr == "" {
 		addrStr = "127.0.0.1:2516"
 	}
@@ -65,7 +68,7 @@ func initOutboundAddr() {
 }
 
 func initSutAddr() {
-	addrStr := os.Getenv("KOALA_SUT_ADDR")
+	addrStr := getenvFromC("KOALA_SUT_ADDR")
 	if addrStr == "" {
 		addrStr = "127.0.0.1:2515"
 	}
@@ -102,4 +105,15 @@ func LogFile() string {
 
 func LogLevel() int {
 	return logLevel
+}
+
+// getenvFromC to make getenv work in php-fpm child process
+func getenvFromC(key string) string {
+	keyc := C.CString(key)
+	defer C.free(unsafe.Pointer(keyc))
+	v := C.getenv(keyc)
+	if uintptr(unsafe.Pointer(v)) != 0 {
+		return C.GoString(v)
+	}
+	return ""
 }
