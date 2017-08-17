@@ -14,6 +14,12 @@ func SetCurrentGoRoutineIsKoala() {
 	runtime.SetCurrentGoRoutineIsKoala()
 }
 
+func SetDelegatedFromGoRoutineId(goid int64) {
+	countlog.Debug("event!internal.set_delegated_from",
+		"from", goid, "to", GetCurrentGoRoutineId())
+	runtime.SetDelegatedFromGoRoutineId(goid)
+}
+
 func GetCurrentGoRoutineIsKoala() bool {
 	return runtime.GetCurrentGoRoutineIsKoala()
 }

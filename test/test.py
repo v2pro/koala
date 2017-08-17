@@ -38,9 +38,12 @@ def test_koala_go():
 
 
 def test_ld_preload():
-    shell_execute('go install -tags="koala_replayer koala_recorder" -buildmode=c-shared github.com/v2pro/koala')
     shell_execute(
-        'go build -tags="koala_replayer koala_recorder" -buildmode=c-shared -o koala-replayer.so github.com/v2pro/koala')
+        'go install -tags="koala_replayer koala_recorder" -buildmode=c-shared '
+        'github.com/v2pro/koala/gateway/gw4libc')
+    shell_execute(
+        'go build -tags="koala_replayer koala_recorder" -buildmode=c-shared -o koala-replayer.so '
+        'github.com/v2pro/koala/gateway/gw4libc')
     env = os.environ.copy()
     env['LD_PRELOAD'] = '%s/koala-replayer.so' % os.path.abspath('.')
     env['SERVER_MODE'] = 'SINGLE_THREAD'

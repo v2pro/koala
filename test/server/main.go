@@ -2,16 +2,15 @@ package main
 
 import (
 	"net/http"
-	"github.com/v2pro/koala/koala"
+	"github.com/v2pro/koala"
 	"github.com/v2pro/koala/countlog"
-	"github.com/v2pro/koala/internal"
 )
 
 func main() {
 	koala.Start()
 	http.HandleFunc("/", func(respWriter http.ResponseWriter, req *http.Request) {
 		countlog.Info("event!test_server.enter_handler",
-			"threadID", internal.GetCurrentGoRoutineId(),
+			"threadID", koala.GetCurrentGoRoutineId(),
 			"url", req.URL.String())
 		_, err := http.Get("http://127.0.0.1:1/not-exist")
 		if err != nil {

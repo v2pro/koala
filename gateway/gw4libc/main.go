@@ -19,7 +19,7 @@ import (
 	"syscall"
 	"net"
 	"github.com/v2pro/koala/envarg"
-	"github.com/v2pro/koala/koala"
+	"github.com/v2pro/koala/gateway/gw4go"
 )
 
 func init() {
@@ -36,7 +36,7 @@ func init() {
 		countlog.Debug("event!main.set_time_offset", "offset", offset)
 		C.set_time_offset(C.int(offset))
 	}
-	koala.Start()
+	gw4go.Start()
 }
 
 //export on_connect

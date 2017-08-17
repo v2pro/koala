@@ -7,6 +7,9 @@ import "syscall"
 func SetCurrentGoRoutineIsKoala() {
 }
 
+func SetDelegatedFromGoRoutineId(goid int64) {
+}
+
 func GetCurrentGoRoutineIsKoala() bool {
 	return false
 }

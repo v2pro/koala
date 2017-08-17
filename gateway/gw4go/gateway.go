@@ -1,4 +1,4 @@
-package koala
+package gw4go
 
 import (
 	"github.com/v2pro/koala/countlog"
