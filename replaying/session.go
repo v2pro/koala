@@ -35,7 +35,7 @@ func (replayingSession *ReplayingSession) Finish(response []byte) {
 }
 
 func (replayingSession *ReplayingSession) MatchOutboundTalk(
-	ctx context.Context, lastMatchedIndex int, request []byte) (int, *recording.Talk) {
+	ctx context.Context, lastMatchedIndex int, request []byte) (int, float64, *recording.Talk) {
 	unit := 16
 	chunks := cutToChunks(request, unit)
 	keys := replayingSession.loadKeys()
@@ -54,7 +54,11 @@ func (replayingSession *ReplayingSession) MatchOutboundTalk(
 			if pos >= 0 {
 				keys[j] = key[pos:]
 				if chunkIndex == 0 {
-					scores[j] += 3 // first chunk has more weight
+					if string(chunks[0]) == "wanliu_order_new" {
+						scores[j] += 1000
+					} else {
+						scores[j] += 3 // first chunk has more weight
+					}
 				} else {
 					scores[j]++
 				}
@@ -69,20 +73,21 @@ func (replayingSession *ReplayingSession) MatchOutboundTalk(
 	countlog.Trace("event!replaying.talks_scored",
 		"ctx", ctx,
 		"lastMatchedIndex", lastMatchedIndex,
+		"totalScore", len(chunks),
 		"scores", func() interface{} {
 			return fmt.Sprintf("%v", scores)
 		})
 	if maxScore == 0 {
-		return -1, nil
+		return -1, 0, nil
 	}
+	mark := float64(maxScore) / float64(len(chunks))
 	if lastMatchedIndex != -1 {
 		// not starting from beginning, should have minimal score
-		minimalScore := int(float64(len(chunks)) * 0.8)
-		if maxScore < minimalScore {
-			return -1, nil
+		if mark < 0.85 {
+			return -1, 0, nil
 		}
 	}
-	return maxScoreIndex, replayingSession.OutboundTalks[maxScoreIndex]
+	return maxScoreIndex, mark, replayingSession.OutboundTalks[maxScoreIndex]
 
 }
 
@@ -96,6 +101,25 @@ func (replayingSession *ReplayingSession) loadKeys() [][]byte {
 
 func cutToChunks(key []byte, unit int) [][]byte {
 	chunks := [][]byte{}
+	if len(key) > 512 {
+		offset := 0
+		for {
+			strikeStart, strikeLen := findReadableChunk(key[offset:])
+			if strikeStart == -1 {
+				break
+			}
+			if strikeLen > 8 {
+				firstChunkLen := strikeLen
+				if firstChunkLen > 16 {
+					firstChunkLen = 16
+				}
+				chunks = append(chunks, key[offset+strikeStart:offset+strikeStart+firstChunkLen])
+				key = key[offset+strikeStart+firstChunkLen:]
+				break
+			}
+			offset += strikeStart + strikeLen
+		}
+	}
 	chunkCount := len(key) / unit
 	for i := 0; i < len(key)/unit; i++ {
 		chunks = append(chunks, key[i*unit:(i+1)*unit])
@@ -105,4 +129,20 @@ func cutToChunks(key []byte, unit int) [][]byte {
 		chunks = append(chunks, lastChunk)
 	}
 	return chunks
+}
+
+func findReadableChunk(key []byte) (int, int) {
+	start := bytes.IndexFunc(key, func(r rune) bool {
+		return r > 31 && r < 127
+	})
+	if start == -1 {
+		return -1, -1
+	}
+	end := bytes.IndexFunc(key[start:], func(r rune) bool {
+		return r <= 31 || r >= 127
+	})
+	if end == -1 {
+		return start, len(key) - start
+	}
+	return start, end
 }

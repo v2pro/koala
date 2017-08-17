@@ -6,6 +6,7 @@ import (
 	"github.com/v2pro/koala/recording"
 	"io/ioutil"
 	"encoding/json"
+	"fmt"
 )
 
 func Test_match_best_score(t *testing.T) {
@@ -17,7 +18,7 @@ func Test_match_best_score(t *testing.T) {
 			OutboundTalks: []*recording.Talk{&talk1, &talk2},
 		},
 	}
-	_, matched := replayingSession.MatchOutboundTalk(nil, -1, []byte{1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, })
+	_, _, matched := replayingSession.MatchOutboundTalk(nil, -1, []byte{1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, })
 	should.Equal(&talk1, matched)
 }
 
@@ -31,21 +32,31 @@ func Test_match_not_matched(t *testing.T) {
 			OutboundTalks: []*recording.Talk{&talk1, &talk2, &talk3},
 		},
 	}
-	index, _ := replayingSession.MatchOutboundTalk(nil, -1, []byte{1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, })
+	index, _, _ := replayingSession.MatchOutboundTalk(nil, -1, []byte{1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, })
 	should.Equal(0, index)
-	index, _ = replayingSession.MatchOutboundTalk(nil, 0, []byte{1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, })
+	index, _, _ = replayingSession.MatchOutboundTalk(nil, 0, []byte{1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, })
 	should.Equal(1, index)
 }
 
 func Test_bad_case(t *testing.T) {
 	should := require.New(t)
-	bytes, err := ioutil.ReadFile("/tmp/session.json")
+	bytes, err := ioutil.ReadFile("/tmp/koala-orig.json")
 	should.Nil(err)
-	replayingSession := ReplayingSession{
+	origSession := ReplayingSession{
 	}
-	err = json.Unmarshal(bytes, &replayingSession.Session)
+	err = json.Unmarshal(bytes, &origSession.Session)
+	bytes, err = ioutil.ReadFile("/tmp/koala-1.json")
 	should.Nil(err)
-	index, matched := replayingSession.MatchOutboundTalk(nil, 1, []byte(``))
+	replayedSession := ReplayingSession{
+	}
+	err = json.Unmarshal(bytes, &replayedSession)
+	should.Nil(err)
+
+	req := replayedSession.ReplayedOutboundTalks[94].ReplayedRequest
+	fmt.Println(string(req))
+	fmt.Println(req)
+	index, _, matched := origSession.MatchOutboundTalk(nil, -1,
+		req)
+	fmt.Println(string(matched.Request))
 	should.Equal(1, index)
-	should.Equal("", string(matched.Request))
 }

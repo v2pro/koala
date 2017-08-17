@@ -116,12 +116,14 @@ func handleOutbound(conn *net.TCPConn) {
 			ReplayedRequestTime: time.Now().UnixNano(),
 		}
 		var matchedTalk *recording.Talk
-		lastMatchedIndex, matchedTalk = replayingSession.MatchOutboundTalk(ctx, lastMatchedIndex, request)
+		var mark float64
+		lastMatchedIndex, mark, matchedTalk = replayingSession.MatchOutboundTalk(ctx, lastMatchedIndex, request)
 		if matchedTalk == nil && lastMatchedIndex != 0 {
-			lastMatchedIndex, matchedTalk = replayingSession.MatchOutboundTalk(ctx,-1, request)
+			lastMatchedIndex, mark, matchedTalk = replayingSession.MatchOutboundTalk(ctx,-1, request)
 		}
 		replayedTalk.MatchedTalk = matchedTalk
 		replayedTalk.MatchedTalkIndex = lastMatchedIndex
+		replayedTalk.MatchedTalkMark = mark
 		replayedTalk.ReplayedResponseTime = time.Now().UnixNano()
 		select {
 		case replayingSession.ReplayedOutboundTalkCollector <- replayedTalk:
@@ -140,6 +142,7 @@ func handleOutbound(conn *net.TCPConn) {
 		}
 		countlog.Debug("event!outbound.response",
 			"addr", *tcpAddr,
+			"matchedMark", mark,
 			"matchedIndex", lastMatchedIndex,
 			"matchedRequest", matchedTalk.Request,
 			"matchedResponse", matchedTalk.Response,
