@@ -4,12 +4,19 @@
 
 # Parameters
 
-* KOALA_MODE: REPLAYING/RECORDING
 * KOALA_INBOUND_ADDR: ip:port, the address inbound server will bind to
 * KOALA_SUT_ADDR: ip:port, the address inbound will call
 * KOALA_OUTBOUND_ADDR: ip:port, the address all outgoing traffic will be redirected to
 * KOALA_LOG_FILE: STDOUT/STDERR/filepath, if using filepath, the log will rotate every hour
 * KOALA_LOG_LEVEL: TRACE/DEBUG/INFO/ERROR/FATAL
+
+# Build tags
+
+* koala_go: for go application compiled with koala-go
+* koala_replayer: enable replaying mode
+* koala_recorder: enable recording mode
+
+koala_replayer and koala_recorder can be enabled at the same time, to benchmark recording with replaying.
 
 # Recording
 
@@ -34,6 +41,15 @@ They are two tcp servers started by the .so loaded via LD_PRELOAD.
 * "replayer inbound server" call the "system under test" via tcp connection, store the "session id <=> inbound socket" mapping.
 * "system under test" call external dependencies, which is intercepted to "replayer outbound server", store the "inbound socket <=> outbound socket" mapping
 * "replayer outbound server" use its own socket to lookup the mapping, to find which session to replay
+
+# Gateways
+
+koala support two modes by different gateways (https://github.com/v2pro/koala/tree/master/gateway)
+
+* libc: for application built with libc (c/c++/python/java)
+* go: need to compile with https://github.com/v2pro/koala-go
+
+![gateway](https://docs.google.com/drawings/d/1vhdY_RTws99Iy0UgKYmTW6vGYUymHarG1zcDsmbwLOQ/pub?w=1214&h=988)
 
 # Real World Scenarios
 
