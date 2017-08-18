@@ -12,15 +12,15 @@ type HumanReadableFormat struct {
 	StringLengthCap      int
 }
 
-func (hrf *HumanReadableFormat) FormatLog(event Event) string {
+func (format *HumanReadableFormat) FormatLog(event Event) string {
 	msg := []byte{}
-	ctx := hrf.describeContext(event)
+	ctx := format.describeContext(event)
 	if len(ctx) == 0 {
 		msg = append(msg, fmt.Sprintf(
-			"=== %s ===\n", event.Event[len("event!"):])...)
+			"=== %s ===\n", event.Event)...)
 	} else {
 		msg = append(msg, fmt.Sprintf(
-			"=== [%s] %s ===\n", string(ctx), event.Event[len("event!"):])...)
+			"=== [%s] %s ===\n", string(ctx), event.Event)...)
 	}
 	for i := 0; i < len(event.Properties); i += 2 {
 		k, _ := event.Properties[i].(string)
@@ -33,10 +33,10 @@ func (hrf *HumanReadableFormat) FormatLog(event Event) string {
 		if formattedV == "" {
 			continue
 		}
-		if hrf.StringLengthCap > 0 {
+		if format.StringLengthCap > 0 {
 			lenCap := len(formattedV)
-			if hrf.StringLengthCap < lenCap {
-				lenCap = hrf.StringLengthCap
+			if format.StringLengthCap < lenCap {
+				lenCap = format.StringLengthCap
 				formattedV = formattedV[:lenCap] + "...more, capped"
 			}
 		}
@@ -79,10 +79,10 @@ func formatV(v interface{}) string {
 	}
 }
 
-func (hrf *HumanReadableFormat) describeContext(event Event) []byte {
+func (format *HumanReadableFormat) describeContext(event Event) []byte {
 	msg := []byte{}
 	ctx, _ := event.Get("ctx").(context.Context)
-	for _, propName := range hrf.ContextPropertyNames {
+	for _, propName := range format.ContextPropertyNames {
 		propValue := event.Get(propName)
 		if propValue == nil && ctx != nil {
 			propValue = ctx.Value(propName)

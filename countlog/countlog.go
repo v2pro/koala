@@ -40,7 +40,7 @@ func log(level int, event string, properties []interface{}) {
 	var expandedProperties []interface{}
 	if len(LogWriters) == 0 {
 		if expandedProperties == nil {
-			expandedProperties = expand(event, properties)
+			event, expandedProperties = expand(event, properties)
 		}
 		defaultLogWriter.WriteLog(level, event, expandedProperties)
 		return
@@ -50,12 +50,12 @@ func log(level int, event string, properties []interface{}) {
 			continue
 		}
 		if expandedProperties == nil {
-			expandedProperties = expand(event, properties)
+			event, expandedProperties = expand(event, properties)
 		}
 		logWriter.WriteLog(level, event, expandedProperties)
 	}
 }
-func expand(event string, properties []interface{}) []interface{} {
+func expand(event string, properties []interface{}) (string, []interface{}) {
 	expandedProperties := []interface{}{
 		"timestamp", time.Now().UnixNano(),
 	}
@@ -64,7 +64,9 @@ func expand(event string, properties []interface{}) []interface{} {
 		expandedProperties = append(expandedProperties, "lineNumber")
 		lineNumber := fmt.Sprintf("%s:%d", file, line)
 		expandedProperties = append(expandedProperties, lineNumber)
-		if !strings.HasPrefix(event, "event!") {
+		if strings.HasPrefix(event, "event!") {
+			event = event[len("event!"):]
+		} else {
 			os.Stderr.Write([]byte("countlog event must starts with event! prefix:" + lineNumber + "\n"))
 			os.Stderr.Sync()
 		}
@@ -77,5 +79,5 @@ func expand(event string, properties []interface{}) []interface{} {
 			expandedProperties = append(expandedProperties, propProvider())
 		}
 	}
-	return expandedProperties
+	return event, expandedProperties
 }

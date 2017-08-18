@@ -134,6 +134,10 @@ func setupSendHook() {
 }
 
 func startLogging() {
+	if len(countlog.LogWriters) != 0 {
+		// extension already setup alternative log writers
+		return
+	}
 	logWriter := countlog.NewFileLogWriter(envarg.LogLevel(), envarg.LogFile())
 	logWriter.LogFormatter = &countlog.HumanReadableFormat{
 		ContextPropertyNames: []string{"threadID", "outboundSrc"},

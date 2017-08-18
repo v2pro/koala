@@ -16,7 +16,6 @@ var logFile string
 var logLevel = countlog.LEVEL_DEBUG
 
 func init() {
-
 	initInboundAddr()
 	initOutboundAddr()
 	initSutAddr()
