@@ -138,7 +138,7 @@ func startLogging() {
 		// extension already setup alternative log writers
 		return
 	}
-	logWriter := countlog.NewFileLogWriter(envarg.LogLevel(), envarg.LogFile())
+	logWriter := countlog.NewAsyncLogWriter(envarg.LogLevel(), countlog.NewFileLogOutput(envarg.LogFile()))
 	logWriter.LogFormatter = &countlog.HumanReadableFormat{
 		ContextPropertyNames: []string{"threadID", "outboundSrc"},
 		StringLengthCap:      512,

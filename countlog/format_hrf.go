@@ -12,7 +12,7 @@ type HumanReadableFormat struct {
 	StringLengthCap      int
 }
 
-func (format *HumanReadableFormat) FormatLog(event Event) string {
+func (format *HumanReadableFormat) FormatLog(event Event) []byte {
 	msg := []byte{}
 	ctx := format.describeContext(event)
 	if len(ctx) == 0 {
@@ -45,7 +45,7 @@ func (format *HumanReadableFormat) FormatLog(event Event) string {
 		msg = append(msg, formattedV...)
 		msg = append(msg, '\n')
 	}
-	return string(msg)
+	return msg
 }
 
 func formatV(v interface{}) string {

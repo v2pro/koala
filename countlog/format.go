@@ -1,5 +1,5 @@
 package countlog
 
 type LogFormatter interface {
-	FormatLog(event Event) string
+	FormatLog(event Event) []byte
 }

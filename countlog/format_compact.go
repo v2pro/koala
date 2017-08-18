@@ -5,7 +5,7 @@ import "strings"
 type CompactFormat struct {
 }
 
-func (format *CompactFormat) FormatLog(event Event) string {
+func (format *CompactFormat) FormatLog(event Event) []byte {
 	line := []byte{}
 	line = append(line, event.Event...)
 	for i := 0; i < len(event.Properties); i += 2 {
@@ -26,5 +26,5 @@ func (format *CompactFormat) FormatLog(event Event) string {
 		line = append(line, v...)
 	}
 	line = append(line, '\n')
-	return string(line)
+	return line
 }
