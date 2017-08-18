@@ -13,9 +13,6 @@ type Session struct {
 	currentOutboundTalk *Talk
 }
 
-var OnRecord = func(session *Session) {
-}
-
 func (session *Session) InboundRecv(ctx context.Context, span []byte, peer net.TCPAddr) {
 	if session == nil {
 		return
@@ -92,7 +89,9 @@ func (session *Session) Shutdown(ctx context.Context) {
 		return
 	}
 	session.OutboundTalks = append(session.OutboundTalks, session.currentOutboundTalk)
-	OnRecord(session)
+	for _, recorder := range Recorders {
+		recorder.Record(session)
+	}
 	countlog.Debug("event!recording.session_recorded",
 		"ctx", ctx,
 		"session", session,
