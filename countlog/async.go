@@ -38,7 +38,6 @@ func (logWriter *AsyncLogWriter) Close() {
 }
 
 func (logWriter *AsyncLogWriter) Start() {
-	LogWriters = append(LogWriters, logWriter)
 	go func() {
 		defer func() {
 			recovered := recover()

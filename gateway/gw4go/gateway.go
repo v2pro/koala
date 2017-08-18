@@ -145,4 +145,5 @@ func startLogging() {
 	}
 	logWriter.EventWhitelist["event!replaying.talks_scored"] = true
 	logWriter.Start()
+	countlog.LogWriters = append(countlog.LogWriters, logWriter)
 }
