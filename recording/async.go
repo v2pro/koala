@@ -26,7 +26,7 @@ func (recorder *AsyncRecorder) backgroundRecord() {
 	defer func() {
 		recovered := recover()
 		if recovered != nil {
-			countlog.Error("event!boss_recorder.panic",
+			countlog.Error("event!recording.panic",
 				"err", recovered,
 				"ctx", recorder.Context,
 				"stacktrace", countlog.ProvideStacktrace)
@@ -34,9 +34,18 @@ func (recorder *AsyncRecorder) backgroundRecord() {
 	}()
 	for {
 		session := <-recorder.recordChan
-		countlog.Debug("event!boss_recorder.record_session",
+		countlog.Debug("event!recording.record_session",
 			"ctx", recorder.Context,
 			"session", session)
 		recorder.realRecorder.Record(session)
+	}
+}
+
+func (recorder *AsyncRecorder) Record(session *Session) {
+	select {
+	case recorder.recordChan <- session:
+	default:
+		countlog.Error("event!recording.record_chan_overflow",
+			"ctx", recorder.Context)
 	}
 }
