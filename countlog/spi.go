@@ -5,6 +5,15 @@ type LogWriter interface {
 	WriteLog(level int, event string, properties []interface{})
 }
 
+type LogFormatter interface {
+	FormatLog(event Event) []byte
+}
+
+type LogOutput interface {
+	OutputLog(timestamp int64, formattedEvent []byte)
+	Close()
+}
+
 type Event struct {
 	Event      string
 	Properties []interface{}
@@ -21,6 +30,3 @@ func (event Event) Get(target string) interface{} {
 }
 
 var LogWriters = []LogWriter{}
-
-type AggregationLogWriter struct {
-}
