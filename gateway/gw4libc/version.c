@@ -1,0 +1,1 @@
+char* library_version = { "KOALA-VERSION: 1.1.0" };

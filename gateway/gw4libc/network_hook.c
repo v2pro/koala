@@ -1,3 +1,5 @@
+#define _GNU_SOURCE
+
 #include <dlfcn.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -8,15 +10,12 @@
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <arpa/inet.h>
-#define _GNU_SOURCE
-#include <unistd.h>
 #include <sys/types.h>
 #include <sys/syscall.h>
-#include "network_hook.h"
 #include "span.h"
 #include "_cgo_export.h"
 
-char* library_version = { "KOALA-VERSION: 1.0.0" };
+extern long syscall(long number, ...);
 
 #define RTLD_NEXT	((void *) -1l)
 
@@ -40,6 +39,7 @@ static recv_pfn_t orig_recv_func;
 typedef int (*bind_pfn_t)(int, const struct sockaddr *, socklen_t);
 static bind_pfn_t orig_bind_func;
 
+void network_hook_init (void) __attribute__ ((constructor));
 void network_hook_init() {
     HOOK_SYS_FUNC( send );
     HOOK_SYS_FUNC( sendto );

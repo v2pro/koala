@@ -51,10 +51,11 @@ def test_ld_preload():
     server = subprocess.Popen(
         [
             # 'strace', '-e', 'trace=network',
-            # 'ltrace',
             'python', 'server.py'
         ],
-        env=env, stdout=subprocess.PIPE)
+        env=env,
+        stdout=subprocess.PIPE
+    )
     time.sleep(1)
 
     # print('send SIGTERM')

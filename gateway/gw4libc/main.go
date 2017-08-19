@@ -11,7 +11,7 @@ import (
 // #include <sys/types.h>
 // #include <sys/socket.h>
 // #include "span.h"
-// #include "network_hook.h"
+// #include "allocated_string.h"
 // #include "time_hook.h"
 import "C"
 import (
@@ -20,18 +20,17 @@ import (
 	"net"
 	"github.com/v2pro/koala/envarg"
 	"github.com/v2pro/koala/gateway/gw4go"
+	"unsafe"
 )
 
 func init() {
 	defer func() {
 		recovered := recover()
 		if recovered != nil {
-			countlog.Fatal("event!main.panic", "err", recovered,
+			countlog.Fatal("event!gw4libc.init.panic", "err", recovered,
 				"stacktrace", countlog.ProvideStacktrace)
 		}
 	}()
-	C.network_hook_init()
-	C.time_hook_init()
 	sut.SetTimeOffset = func(offset int) {
 		countlog.Debug("event!main.set_time_offset", "offset", offset)
 		C.set_time_offset(C.int(offset))
@@ -44,7 +43,7 @@ func on_connect(threadID C.pid_t, socketFD C.int, remoteAddr *C.struct_sockaddr_
 	defer func() {
 		recovered := recover()
 		if recovered != nil {
-			countlog.Fatal("event!connect.panic", "err", recovered,
+			countlog.Fatal("event!gw4libc.connect.panic", "err", recovered,
 				"stacktrace", countlog.ProvideStacktrace)
 		}
 	}()
@@ -58,7 +57,7 @@ func on_connect(threadID C.pid_t, socketFD C.int, remoteAddr *C.struct_sockaddr_
 	sut.GetThread(sut.ThreadID(threadID)).
 		OnConnect(sut.SocketFD(socketFD), origAddr)
 	if envarg.IsReplaying() {
-		countlog.Debug("event!main.rewrite_connect_target",
+		countlog.Debug("event!gw4libc.redirect_connect_target",
 			"origAddr", origAddr,
 			"redirectTo", envarg.OutboundAddr())
 		sockaddr_in_sin_addr_set(remoteAddr, ch.Ip2int(envarg.OutboundAddr().IP))
@@ -71,7 +70,7 @@ func on_bind(threadID C.pid_t, socketFD C.int, addr *C.struct_sockaddr_in) {
 	defer func() {
 		recovered := recover()
 		if recovered != nil {
-			countlog.Fatal("event!bind.panic", "err", recovered,
+			countlog.Fatal("event!gw4libc.bind.panic", "err", recovered,
 				"stacktrace", countlog.ProvideStacktrace)
 		}
 	}()
@@ -87,7 +86,7 @@ func on_accept(threadID C.pid_t, serverSocketFD C.int, clientSocketFD C.int, add
 	defer func() {
 		recovered := recover()
 		if recovered != nil {
-			countlog.Fatal("event!accept.panic", "err", recovered,
+			countlog.Fatal("event!gw4libc.accept.panic", "err", recovered,
 				"stacktrace", countlog.ProvideStacktrace)
 		}
 	}()
@@ -106,7 +105,7 @@ func on_send(threadID C.pid_t, socketFD C.int, span C.struct_ch_span, flags C.in
 	defer func() {
 		recovered := recover()
 		if recovered != nil {
-			countlog.Fatal("event!send.panic", "err", recovered,
+			countlog.Fatal("event!gw4libc.send.panic", "err", recovered,
 				"stacktrace", countlog.ProvideStacktrace)
 		}
 	}()
@@ -119,7 +118,7 @@ func on_recv(threadID C.pid_t, socketFD C.int, span C.struct_ch_span, flags C.in
 	defer func() {
 		recovered := recover()
 		if recovered != nil {
-			countlog.Fatal("event!recv.panic", "err", recovered,
+			countlog.Fatal("event!gw4libc.recv.panic", "err", recovered,
 				"stacktrace", countlog.ProvideStacktrace)
 		}
 	}()
@@ -132,7 +131,7 @@ func on_sendto(threadID C.pid_t, socketFD C.int, span C.struct_ch_span, flags C.
 	defer func() {
 		recovered := recover()
 		if recovered != nil {
-			countlog.Fatal("event!sendto.panic", "err", recovered,
+			countlog.Fatal("event!gw4libc.sendto.panic", "err", recovered,
 				"stacktrace", countlog.ProvideStacktrace)
 		}
 	}()
@@ -141,6 +140,43 @@ func on_sendto(threadID C.pid_t, socketFD C.int, span C.struct_ch_span, flags C.
 		IP:   ch.Int2ip(sockaddr_in_sin_addr_get(addr)),
 		Port: int(ch.Ntohs(sockaddr_in_sin_port_get(addr))),
 	})
+}
+
+//export on_opening_file
+func on_opening_file(threadID C.pid_t,
+	filename C.struct_ch_span,
+	opentype C.struct_ch_span) C.struct_ch_allocated_string {
+	defer func() {
+		recovered := recover()
+		if recovered != nil {
+			countlog.Fatal("event!gw4libc.opening_file.panic", "err", recovered,
+				"stacktrace", countlog.ProvideStacktrace)
+		}
+	}()
+	redirectTo := sut.GetThread(sut.ThreadID(threadID)).
+		OnOpeningFile(ch_span_to_string(filename), ch_span_to_string(opentype))
+	if redirectTo != "" {
+		return C.struct_ch_allocated_string{C.CString(redirectTo)}
+	}
+	return C.struct_ch_allocated_string{nil}
+}
+
+type FileHandle unsafe.Pointer
+
+//export on_opened_file
+func on_opened_file(threadID C.pid_t,
+	file FileHandle,
+	filename C.struct_ch_span,
+	opentype C.struct_ch_span) {
+	defer func() {
+		recovered := recover()
+		if recovered != nil {
+			countlog.Fatal("event!gw4libc.opened_file.panic", "err", recovered,
+				"stacktrace", countlog.ProvideStacktrace)
+		}
+	}()
+	sut.GetThread(sut.ThreadID(threadID)).
+		OnOpenedFile(sut.FileHandle(file), ch_span_to_string(filename), ch_span_to_string(opentype))
 }
 
 func main() {
