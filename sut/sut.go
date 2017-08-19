@@ -8,7 +8,6 @@ import (
 	"time"
 	"github.com/v2pro/koala/recording"
 	"syscall"
-	"unsafe"
 )
 
 var threadShutdownEvent = []byte("to-koala:thread-shutdown||")
@@ -186,11 +185,13 @@ func (thread *Thread) OnSendTo(socketFD SocketFD, span []byte, flags SendToFlags
 	}
 }
 
-func (thread *Thread) OnOpeningFile(filename string, opentype string) string {
+func (thread *Thread) OnOpeningFile(filename string, flags int) string {
+	countlog.Trace("event!sut.opening_file",
+		"threadID", thread.threadID,
+		"filename", filename,
+		"flags", flags)
 	return ""
 }
 
-type FileHandle unsafe.Pointer
-
-func (thread *Thread) OnOpenedFile(file FileHandle, filename string, opentype string) {
+func (thread *Thread) OnOpenedFile(file FileFD, filename string, flags int) {
 }

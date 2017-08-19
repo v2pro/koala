@@ -11,6 +11,8 @@ import (
 
 type SocketFD int
 
+type FileFD int
+
 type ThreadID int32
 
 type socket struct {

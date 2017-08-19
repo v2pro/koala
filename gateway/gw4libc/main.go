@@ -13,6 +13,7 @@ import (
 // #include "span.h"
 // #include "allocated_string.h"
 // #include "time_hook.h"
+// #include "init.h"
 import "C"
 import (
 	"github.com/v2pro/koala/ch"
@@ -20,7 +21,6 @@ import (
 	"net"
 	"github.com/v2pro/koala/envarg"
 	"github.com/v2pro/koala/gateway/gw4go"
-	"unsafe"
 )
 
 func init() {
@@ -36,6 +36,7 @@ func init() {
 		C.set_time_offset(C.int(offset))
 	}
 	gw4go.Start()
+	C.go_initialized()
 }
 
 //export on_connect
@@ -142,10 +143,45 @@ func on_sendto(threadID C.pid_t, socketFD C.int, span C.struct_ch_span, flags C.
 	})
 }
 
+//export on_fopening_file
+func on_fopening_file(threadID C.pid_t,
+	filename C.struct_ch_span,
+	opentype C.struct_ch_span) C.struct_ch_allocated_string {
+	defer func() {
+		recovered := recover()
+		if recovered != nil {
+			countlog.Fatal("event!gw4libc.fopening_file.panic", "err", recovered,
+				"stacktrace", countlog.ProvideStacktrace)
+		}
+	}()
+	redirectTo := sut.GetThread(sut.ThreadID(threadID)).
+		OnOpeningFile(ch_span_to_string(filename), ch_span_to_open_flags(opentype))
+	if redirectTo != "" {
+		return C.struct_ch_allocated_string{C.CString(redirectTo)}
+	}
+	return C.struct_ch_allocated_string{nil}
+}
+
+//export on_fopened_file
+func on_fopened_file(threadID C.pid_t,
+	fileFD C.int,
+	filename C.struct_ch_span,
+	opentype C.struct_ch_span) {
+	defer func() {
+		recovered := recover()
+		if recovered != nil {
+			countlog.Fatal("event!gw4libc.fopened_file.panic", "err", recovered,
+				"stacktrace", countlog.ProvideStacktrace)
+		}
+	}()
+	sut.GetThread(sut.ThreadID(threadID)).
+		OnOpenedFile(sut.FileFD(fileFD), ch_span_to_string(filename), ch_span_to_open_flags(opentype))
+}
+
 //export on_opening_file
 func on_opening_file(threadID C.pid_t,
 	filename C.struct_ch_span,
-	opentype C.struct_ch_span) C.struct_ch_allocated_string {
+	flags C.int, mode C.mode_t) C.struct_ch_allocated_string {
 	defer func() {
 		recovered := recover()
 		if recovered != nil {
@@ -154,20 +190,18 @@ func on_opening_file(threadID C.pid_t,
 		}
 	}()
 	redirectTo := sut.GetThread(sut.ThreadID(threadID)).
-		OnOpeningFile(ch_span_to_string(filename), ch_span_to_string(opentype))
+		OnOpeningFile(ch_span_to_string(filename), int(flags))
 	if redirectTo != "" {
 		return C.struct_ch_allocated_string{C.CString(redirectTo)}
 	}
 	return C.struct_ch_allocated_string{nil}
 }
 
-type FileHandle unsafe.Pointer
-
 //export on_opened_file
 func on_opened_file(threadID C.pid_t,
-	file FileHandle,
+	fileFD C.int,
 	filename C.struct_ch_span,
-	opentype C.struct_ch_span) {
+	flags C.int, mode C.mode_t) {
 	defer func() {
 		recovered := recover()
 		if recovered != nil {
@@ -176,7 +210,7 @@ func on_opened_file(threadID C.pid_t,
 		}
 	}()
 	sut.GetThread(sut.ThreadID(threadID)).
-		OnOpenedFile(sut.FileHandle(file), ch_span_to_string(filename), ch_span_to_string(opentype))
+		OnOpenedFile(sut.FileFD(fileFD), ch_span_to_string(filename), int(flags))
 }
 
 func main() {
