@@ -8,9 +8,21 @@ import (
 )
 
 type Session struct {
+	SessionId           string
 	InboundTalk         *Talk
 	OutboundTalks       []*Talk
+	Files               map[string][]byte
 	currentOutboundTalk *Talk
+}
+
+func (session *Session) FileAppend(ctx context.Context, content []byte, fileName string) {
+	if session == nil {
+		return
+	}
+	if session.Files == nil {
+		session.Files = map[string][]byte{}
+	}
+	session.Files[fileName] = append(session.Files[fileName], content...)
 }
 
 func (session *Session) InboundRecv(ctx context.Context, span []byte, peer net.TCPAddr) {

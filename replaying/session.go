@@ -11,13 +11,28 @@ import (
 
 type ReplayingSession struct {
 	recording.Session `json:"-"`
-	OriginalRequestTime           int64
-	OriginalResponse              []byte
-	ReplayedOutboundTalkCollector chan ReplayedTalk `json:"-"`
-	ReplayedRequestTime           int64
-	ReplayedResponse              []byte
-	ReplayedResponseTime          int64
-	ReplayedOutboundTalks         []ReplayedTalk
+	SessionId             string
+	OriginalRequestTime   int64
+	OriginalRequest       []byte
+	OriginalResponse      []byte
+	ResultCollector       chan interface{} `json:"-"`
+	ReplayedRequestTime   int64
+	ReplayedResponse      []byte
+	ReplayedResponseTime  int64
+	ReplayedOutboundTalks []ReplayedTalk
+	ReplayedFiles         map[string][]byte
+}
+
+func (replayingSession *ReplayingSession) FileAppend(ctx context.Context, content []byte, fileName string) {
+	if replayingSession == nil {
+		return
+	}
+	appendToFile := AppendToFile{FileName: fileName, Content: content}
+	select {
+	case replayingSession.ResultCollector <- appendToFile:
+	default:
+		countlog.Error("event!replaying.ResultCollector is full", "ctx", ctx)
+	}
 }
 
 func (replayingSession *ReplayingSession) Finish(response []byte) {
@@ -26,8 +41,17 @@ func (replayingSession *ReplayingSession) Finish(response []byte) {
 	done := false
 	for !done {
 		select {
-		case replayedTalk := <-replayingSession.ReplayedOutboundTalkCollector:
-			replayingSession.ReplayedOutboundTalks = append(replayingSession.ReplayedOutboundTalks, replayedTalk)
+		case result := <-replayingSession.ResultCollector:
+			switch typedResult := result.(type) {
+			case ReplayedTalk:
+				replayingSession.ReplayedOutboundTalks = append(replayingSession.ReplayedOutboundTalks, typedResult)
+			case AppendToFile:
+				if replayingSession.ReplayedFiles == nil {
+					replayingSession.ReplayedFiles = map[string][]byte{}
+				}
+				replayingSession.ReplayedFiles[typedResult.FileName] = append(
+					replayingSession.ReplayedFiles[typedResult.FileName], typedResult.Content...)
+			}
 		default:
 			done = true
 		}

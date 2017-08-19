@@ -62,11 +62,13 @@ func handleInbound(respWriter http.ResponseWriter, req *http.Request) {
 		return
 	}
 	replayingSession := replaying.ReplayingSession{
-		Session:                       session,
-		ReplayedOutboundTalkCollector: make(chan replaying.ReplayedTalk, 4096),
-		ReplayedRequestTime:           time.Now().UnixNano(),
-		OriginalRequestTime:           session.InboundTalk.RequestTime,
-		OriginalResponse:              session.InboundTalk.Response,
+		Session:             session,
+		SessionId:           session.SessionId,
+		ResultCollector:     make(chan interface{}, 4096),
+		ReplayedRequestTime: time.Now().UnixNano(),
+		OriginalRequestTime: session.InboundTalk.RequestTime,
+		OriginalResponse:    session.InboundTalk.Response,
+		OriginalRequest:     session.InboundTalk.Request,
 	}
 	replaying.StoreTmp(*localAddr, &replayingSession)
 	conn, err := net.DialTCP("tcp4", localAddr, envarg.SutAddr())

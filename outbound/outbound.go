@@ -83,7 +83,7 @@ func handleOutbound(conn *net.TCPConn) {
 						countlog.Error("event!outbound.outbound wait for follow up timed out",
 							"ctx", ctx,
 							"err", err)
-						continue
+						return
 					}
 					request = append(request, buf[:bytesRead]...)
 					break
@@ -126,9 +126,9 @@ func handleOutbound(conn *net.TCPConn) {
 		replayedTalk.MatchedTalkMark = mark
 		replayedTalk.ReplayedResponseTime = time.Now().UnixNano()
 		select {
-		case replayingSession.ReplayedOutboundTalkCollector <- replayedTalk:
+		case replayingSession.ResultCollector <- replayedTalk:
 		default:
-			countlog.Error("event!outbound.ReplayedOutboundTalkCollector is full", "ctx", ctx)
+			countlog.Error("event!outbound.ResultCollector is full", "ctx", ctx)
 		}
 		if matchedTalk == nil {
 			countlog.Error("event!outbound.failed to find matching talk", "ctx", ctx)

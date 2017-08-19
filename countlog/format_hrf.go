@@ -33,7 +33,7 @@ func (format *HumanReadableFormat) FormatLog(event Event) []byte {
 		if formattedV == "" {
 			continue
 		}
-		if format.StringLengthCap > 0 {
+		if event.Level < LEVEL_WARN && format.StringLengthCap > 0 {
 			lenCap := len(formattedV)
 			if format.StringLengthCap < lenCap {
 				lenCap = format.StringLengthCap
@@ -63,6 +63,10 @@ func formatV(v interface{}) string {
 	case string:
 		return typedV
 	default:
+		err, _ := v.(error)
+		if err != nil {
+			return err.Error()
+		}
 		stringer, _ := v.(fmt.Stringer)
 		if stringer != nil {
 			return stringer.String()

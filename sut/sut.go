@@ -8,6 +8,7 @@ import (
 	"time"
 	"github.com/v2pro/koala/recording"
 	"syscall"
+	"os"
 )
 
 var threadShutdownEvent = []byte("to-koala:thread-shutdown||")
@@ -185,13 +186,43 @@ func (thread *Thread) OnSendTo(socketFD SocketFD, span []byte, flags SendToFlags
 	}
 }
 
-func (thread *Thread) OnOpeningFile(filename string, flags int) string {
+func (thread *Thread) OnOpeningFile(fileName string, flags int) string {
 	countlog.Trace("event!sut.opening_file",
 		"threadID", thread.threadID,
-		"filename", filename,
+		"fileName", fileName,
 		"flags", flags)
 	return ""
 }
 
-func (thread *Thread) OnOpenedFile(file FileFD, filename string, flags int) {
+func (thread *Thread) OnOpenedFile(fileFD FileFD, fileName string, flags int) {
+	countlog.Trace("event!sut.opened_file",
+		"threadID", thread.threadID,
+		"fileFD", fileFD,
+		"fileName", fileName,
+		"flags", flags)
+	thread.files[fileFD] = &file{
+		fileFD:   fileFD,
+		fileName: fileName,
+		flags:    flags,
+	}
+}
+
+func (thread *Thread) OnWrite(fileFD FileFD, content []byte) {
+	countlog.Trace("event!sut.write",
+		"threadID", thread.threadID,
+		"fileFD", fileFD)
+	file := thread.files[fileFD]
+	if file == nil {
+		return
+	}
+	if file.flags&os.O_APPEND == 0 {
+		return
+	}
+	countlog.Debug("event!sut.fileAppend",
+		"threadID", thread.threadID,
+		"fileFD", fileFD,
+		"fileName", file.fileName,
+		"content", content)
+	thread.recordingSession.FileAppend(thread, content, file.fileName)
+	thread.replayingSession.FileAppend(thread, content, file.fileName)
 }

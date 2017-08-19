@@ -213,5 +213,20 @@ func on_opened_file(threadID C.pid_t,
 		OnOpenedFile(sut.FileFD(fileFD), ch_span_to_string(filename), int(flags))
 }
 
+//export on_write
+func on_write(threadID C.pid_t,
+	fileFD C.int,
+	span C.struct_ch_span) {
+	defer func() {
+		recovered := recover()
+		if recovered != nil {
+			countlog.Fatal("event!gw4libc.write.panic", "err", recovered,
+				"stacktrace", countlog.ProvideStacktrace)
+		}
+	}()
+	sut.GetThread(sut.ThreadID(threadID)).
+		OnWrite(sut.FileFD(fileFD), ch_span_to_bytes(span))
+}
+
 func main() {
 }

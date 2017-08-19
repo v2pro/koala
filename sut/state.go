@@ -22,10 +22,17 @@ type socket struct {
 	localAddr *net.TCPAddr
 }
 
+type file struct {
+	fileFD FileFD
+	fileName string
+	flags  int
+}
+
 type Thread struct {
 	context.Context
 	threadID         ThreadID
 	socks            map[SocketFD]*socket
+	files            map[FileFD]*file
 	recordingSession *recording.Session
 	replayingSession *replaying.ReplayingSession
 }
@@ -56,6 +63,7 @@ func GetThread(threadID ThreadID) *Thread {
 			Context:  context.WithValue(context.Background(), "threadID", threadID),
 			threadID: threadID,
 			socks:    map[SocketFD]*socket{},
+			files:    map[FileFD]*file{},
 		}
 		if envarg.IsRecording() {
 			thread.recordingSession = &recording.Session{}

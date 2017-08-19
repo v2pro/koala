@@ -25,6 +25,18 @@ static open_pfn_t orig_open_func;
 typedef int (*open64_pfn_t)(const char *filename, int flags, mode_t mode);
 static open64_pfn_t orig_open64_func;
 
+typedef ssize_t (*write_pfn_t)(int, const void *, size_t);
+static write_pfn_t orig_write_func;
+
+void file_hook_init (void) __attribute__ ((constructor));
+void file_hook_init() {
+    HOOK_SYS_FUNC( fopen );
+    HOOK_SYS_FUNC( fopen64 );
+    HOOK_SYS_FUNC( open );
+    HOOK_SYS_FUNC( open64 );
+    HOOK_SYS_FUNC( write );
+}
+
 FILE * fopen(const char *filename, const char *opentype) {
     HOOK_SYS_FUNC( fopen );
     if (is_go_initialized() != 1) {
@@ -137,4 +149,16 @@ int open64(const char *filename, int flags, mode_t mode) {
         on_opened_file(thread_id, file, filename_span, flags, mode);
     }
     return file;
+}
+
+ssize_t write(int fileFD, const void *buffer, size_t size) {
+    ssize_t written_size = orig_write_func(fileFD, buffer, size);
+    if (written_size >= 0) {
+        pid_t thread_id = syscall(__NR_gettid);
+        struct ch_span span;
+        span.Ptr = buffer;
+        span.Len = written_size;
+        on_write(thread_id, fileFD, span);
+    }
+    return written_size;
 }

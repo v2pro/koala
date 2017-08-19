@@ -15,6 +15,7 @@ type LogOutput interface {
 }
 
 type Event struct {
+	Level      int
 	Event      string
 	Properties []interface{}
 }

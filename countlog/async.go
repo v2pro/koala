@@ -24,7 +24,7 @@ func (logWriter *AsyncLogWriter) ShouldLog(level int, event string, properties [
 
 func (logWriter *AsyncLogWriter) WriteLog(level int, event string, properties []interface{}) {
 	select {
-	case logWriter.msgChan <- Event{Event: event, Properties: properties}:
+	case logWriter.msgChan <- Event{Level: level, Event: event, Properties: properties}:
 	default:
 		// drop on the floor
 	}
