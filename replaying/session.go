@@ -11,7 +11,7 @@ import (
 
 type ReplayingSession struct {
 	recording.Session `json:"-"`
-	SessionId             string
+	SessionId           string
 	OriginalRequestTime   int64
 	OriginalRequest       []byte
 	OriginalResponse      []byte
@@ -77,7 +77,7 @@ func (replayingSession *ReplayingSession) MatchOutboundTalk(
 			pos := bytes.Index(key, chunk)
 			if pos >= 0 {
 				keys[j] = key[pos:]
-				if chunkIndex == 0 {
+				if chunkIndex == 0 && len(chunks) > 5 {
 					scores[j] += 3 // first chunk has more weight
 				} else {
 					scores[j]++

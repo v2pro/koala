@@ -40,22 +40,23 @@ func Test_match_not_matched(t *testing.T) {
 
 func Test_bad_case(t *testing.T) {
 	should := require.New(t)
-	bytes, err := ioutil.ReadFile("/tmp/koala-orig.json")
+	bytes, err := ioutil.ReadFile("/tmp/koala-session.json")
 	should.Nil(err)
 	origSession := ReplayingSession{
 	}
 	err = json.Unmarshal(bytes, &origSession.Session)
-	bytes, err = ioutil.ReadFile("/tmp/koala-1.json")
+	bytes, err = ioutil.ReadFile("/tmp/koala-replayed-session.json")
 	should.Nil(err)
 	replayedSession := ReplayingSession{
 	}
 	err = json.Unmarshal(bytes, &replayedSession)
 	should.Nil(err)
 
-	req := replayedSession.ReplayedOutboundTalks[41].ReplayedRequest
+	req := replayedSession.ReplayedOutboundTalks[61].ReplayedRequest
 	fmt.Println(string(req))
-	index, _, matched := origSession.MatchOutboundTalk(nil, -1,
+	index, mark, matched := origSession.MatchOutboundTalk(nil, 0,
 		req)
 	fmt.Println(string(matched.Request))
+	fmt.Println(mark)
 	should.Equal(1, index)
 }
