@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"encoding/json"
 	"fmt"
+	"encoding/base64"
 )
 
 func Test_match_best_score(t *testing.T) {
@@ -18,7 +19,7 @@ func Test_match_best_score(t *testing.T) {
 			OutboundTalks: []*recording.Talk{&talk1, &talk2},
 		},
 	}
-	_, _, matched := replayingSession.MatchOutboundTalk(nil, -1, []byte{1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, })
+	_, _, matched := replayingSession.MatchOutboundTalk(nil, -1, []byte{1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8,})
 	should.Equal(&talk1, matched)
 }
 
@@ -32,15 +33,15 @@ func Test_match_not_matched(t *testing.T) {
 			OutboundTalks: []*recording.Talk{&talk1, &talk2, &talk3},
 		},
 	}
-	index, _, _ := replayingSession.MatchOutboundTalk(nil, -1, []byte{1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, })
+	index, _, _ := replayingSession.MatchOutboundTalk(nil, -1, []byte{1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8,})
 	should.Equal(0, index)
-	index, _, _ = replayingSession.MatchOutboundTalk(nil, 0, []byte{1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, })
+	index, _, _ = replayingSession.MatchOutboundTalk(nil, 0, []byte{1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8,})
 	should.Equal(1, index)
 }
 
 func Test_bad_case(t *testing.T) {
 	should := require.New(t)
-	bytes, err := ioutil.ReadFile("/tmp/koala-session.json")
+	bytes, err := ioutil.ReadFile("/tmp/koala-original-session.json")
 	should.Nil(err)
 	origSession := ReplayingSession{
 	}
@@ -52,11 +53,27 @@ func Test_bad_case(t *testing.T) {
 	err = json.Unmarshal(bytes, &replayedSession)
 	should.Nil(err)
 
-	req := replayedSession.ReplayedOutboundTalks[61].ReplayedRequest
+	fmt.Println(string(origSession.OutboundTalks[3].Request))
+	reqStr := get(replayedSession.Actions[22], "Request").(string)
+	req, _ := base64.StdEncoding.DecodeString(reqStr)
 	fmt.Println(string(req))
-	index, mark, matched := origSession.MatchOutboundTalk(nil, 0,
-		req)
+	index, mark, matched := origSession.MatchOutboundTalk(nil, -1, req)
+	should.NotNil(matched)
 	fmt.Println(string(matched.Request))
 	fmt.Println(mark)
 	should.Equal(1, index)
+}
+
+func get(obj interface{}, keys ...interface{}) interface{} {
+	for _, key := range keys {
+		switch typedKey := key.(type) {
+		case int:
+			obj = obj.([]interface{})[typedKey]
+		case string:
+			obj = obj.(map[string]interface{})[typedKey]
+		default:
+			panic("unsupported key type")
+		}
+	}
+	return obj
 }
