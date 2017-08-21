@@ -61,15 +61,7 @@ func handleInbound(respWriter http.ResponseWriter, req *http.Request) {
 		countlog.Error("event!inbound.failed to assign local addresses", "err", err)
 		return
 	}
-	replayingSession := replaying.ReplayingSession{
-		Session:             session,
-		SessionId:           session.SessionId,
-		ResultCollector:     make(chan interface{}, 4096),
-		ReplayedRequestTime: time.Now().UnixNano(),
-		OriginalRequestTime: session.InboundTalk.RequestTime,
-		OriginalResponse:    session.InboundTalk.Response,
-		OriginalRequest:     session.InboundTalk.Request,
-	}
+	replayingSession := replaying.NewReplayingSession(session)
 	replaying.StoreTmp(*localAddr, &replayingSession)
 	conn, err := net.DialTCP("tcp4", localAddr, envarg.SutAddr())
 	if err != nil {

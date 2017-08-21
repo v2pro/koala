@@ -1,7 +1,6 @@
 package replaying
 
 import (
-	"time"
 	"github.com/v2pro/koala/recording"
 	"fmt"
 	"github.com/v2pro/koala/countlog"
@@ -11,46 +10,61 @@ import (
 
 type ReplayingSession struct {
 	recording.Session `json:"-"`
-	SessionId           string
-	OriginalRequestTime   int64
-	OriginalRequest       []byte
-	OriginalResponse      []byte
-	ResultCollector       chan interface{} `json:"-"`
-	ReplayedRequestTime   int64
-	ReplayedResponse      []byte
-	ReplayedResponseTime  int64
-	ReplayedOutboundTalks []ReplayedTalk
-	ReplayedFiles         map[string][]byte
+	ActionCollector chan interface{} `json:"-"`
+	SessionId       string
+	CallFromInbound CallFromInbound
+	ReturnInbound   ReturnInbound
+	Actions         []interface{}
+}
+
+func NewReplayingSession(session recording.Session) ReplayingSession {
+	return ReplayingSession{
+		Session:         session,
+		SessionId:       session.SessionId,
+		ActionCollector: make(chan interface{}, 4096),
+		CallFromInbound: CallFromInbound{
+			Action:       NewAction("CallFromInbound"),
+			ReplayedTalk: session.InboundTalk,
+		},
+	}
 }
 
 func (replayingSession *ReplayingSession) FileAppend(ctx context.Context, content []byte, fileName string) {
 	if replayingSession == nil {
 		return
 	}
-	appendToFile := AppendToFile{FileName: fileName, Content: content}
+	appendFile := &AppendFile{
+		Action:   NewAction("AppendFile"),
+		FileName: fileName,
+		Content:  content,
+	}
 	select {
-	case replayingSession.ResultCollector <- appendToFile:
+	case replayingSession.ActionCollector <- appendFile:
 	default:
-		countlog.Error("event!replaying.ResultCollector is full", "ctx", ctx)
+		countlog.Error("event!replaying.ActionCollector is full", "ctx", ctx)
 	}
 }
 
 func (replayingSession *ReplayingSession) Finish(response []byte) {
-	replayingSession.ReplayedResponse = response
-	replayingSession.ReplayedResponseTime = time.Now().UnixNano()
+	replayingSession.ReturnInbound = ReturnInbound{
+		Action:   NewAction("ReturnInbound"),
+		Response: response,
+	}
 	done := false
+	appendFiles := map[string]*AppendFile{}
 	for !done {
 		select {
-		case result := <-replayingSession.ResultCollector:
-			switch typedResult := result.(type) {
-			case ReplayedTalk:
-				replayingSession.ReplayedOutboundTalks = append(replayingSession.ReplayedOutboundTalks, typedResult)
-			case AppendToFile:
-				if replayingSession.ReplayedFiles == nil {
-					replayingSession.ReplayedFiles = map[string][]byte{}
+		case action := <-replayingSession.ActionCollector:
+			switch typedAction := action.(type) {
+			case AppendFile:
+				existingAppendFile := appendFiles[typedAction.FileName]
+				if existingAppendFile == nil {
+					replayingSession.Actions = append(replayingSession.Actions, action)
+				} else {
+					existingAppendFile.Content = append(existingAppendFile.Content, typedAction.Content...)
 				}
-				replayingSession.ReplayedFiles[typedResult.FileName] = append(
-					replayingSession.ReplayedFiles[typedResult.FileName], typedResult.Content...)
+			default:
+				replayingSession.Actions = append(replayingSession.Actions, action)
 			}
 		default:
 			done = true

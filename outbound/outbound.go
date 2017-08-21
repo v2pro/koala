@@ -111,9 +111,9 @@ func handleOutbound(conn *net.TCPConn) {
 			"ctx", ctx,
 			"content", request,
 			"replayingSession", replayingSession)
-		replayedTalk := replaying.ReplayedTalk{
-			ReplayedRequest:     request,
-			ReplayedRequestTime: time.Now().UnixNano(),
+		callOutbound := replaying.CallOutbound{
+			Action: replaying.NewAction("CallOutbound"),
+			Request: request,
 		}
 		var matchedTalk *recording.Talk
 		var mark float64
@@ -121,12 +121,11 @@ func handleOutbound(conn *net.TCPConn) {
 		if matchedTalk == nil && lastMatchedIndex != 0 {
 			lastMatchedIndex, mark, matchedTalk = replayingSession.MatchOutboundTalk(ctx,-1, request)
 		}
-		replayedTalk.MatchedTalk = matchedTalk
-		replayedTalk.MatchedTalkIndex = lastMatchedIndex
-		replayedTalk.MatchedTalkMark = mark
-		replayedTalk.ReplayedResponseTime = time.Now().UnixNano()
+		callOutbound.MatchedTalk = matchedTalk
+		callOutbound.MatchedTalkIndex = lastMatchedIndex
+		callOutbound.MatchedTalkMark = mark
 		select {
-		case replayingSession.ResultCollector <- replayedTalk:
+		case replayingSession.ActionCollector <- &callOutbound:
 		default:
 			countlog.Error("event!outbound.ResultCollector is full", "ctx", ctx)
 		}
