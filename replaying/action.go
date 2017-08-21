@@ -4,6 +4,7 @@ import (
 	"github.com/v2pro/koala/recording"
 	"time"
 	"strconv"
+	"net"
 )
 
 type Action struct {
@@ -15,8 +16,8 @@ type Action struct {
 func NewAction(actionType string) Action {
 	occurredAt := time.Now().UnixNano()
 	actionId := strconv.FormatInt(occurredAt, 10)
-	return Action {
-		ActionId: actionId,
+	return Action{
+		ActionId:   actionId,
 		OccurredAt: occurredAt,
 		ActionType: actionType,
 	}
@@ -33,6 +34,7 @@ type CallOutbound struct {
 	MatchedTalkIndex int
 	MatchedTalkMark  float64
 	Request          []byte
+	Peer             net.TCPAddr
 }
 
 type ReturnInbound struct {

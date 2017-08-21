@@ -114,6 +114,7 @@ func handleOutbound(conn *net.TCPConn) {
 		callOutbound := replaying.CallOutbound{
 			Action: replaying.NewAction("CallOutbound"),
 			Request: request,
+			Peer: *tcpAddr,
 		}
 		var matchedTalk *recording.Talk
 		var mark float64
