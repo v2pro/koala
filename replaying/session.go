@@ -56,9 +56,10 @@ func (replayingSession *ReplayingSession) Finish(response []byte) {
 		select {
 		case action := <-replayingSession.ActionCollector:
 			switch typedAction := action.(type) {
-			case AppendFile:
+			case *AppendFile:
 				existingAppendFile := appendFiles[typedAction.FileName]
 				if existingAppendFile == nil {
+					appendFiles[typedAction.FileName] = typedAction
 					replayingSession.Actions = append(replayingSession.Actions, action)
 				} else {
 					existingAppendFile.Content = append(existingAppendFile.Content, typedAction.Content...)
