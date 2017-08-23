@@ -53,8 +53,8 @@ func Test_bad_case(t *testing.T) {
 	err = json.Unmarshal(bytes, &replayedSession)
 	should.Nil(err)
 
-	fmt.Println(string(origSession.OutboundTalks[3].Request))
-	reqStr := get(replayedSession.Actions[22], "Request").(string)
+	//fmt.Println(string(origSession.OutboundTalks[35].Request))
+	reqStr := get(replayedSession.Actions[34], "Request").(string)
 	req, _ := base64.StdEncoding.DecodeString(reqStr)
 	fmt.Println(string(req))
 	index, mark, matched := origSession.MatchOutboundTalk(nil, -1, req)
