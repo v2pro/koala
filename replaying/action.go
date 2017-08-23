@@ -1,49 +1,75 @@
 package replaying
 
 import (
-	"github.com/v2pro/koala/recording"
 	"time"
 	"strconv"
 	"net"
+	"github.com/v2pro/koala/recording"
 )
 
-type Action struct {
-	ActionId   string
-	OccurredAt int64
-	ActionType string
+type replayedAction struct {
+	actionId   string
+	occurredAt int64
+	actionType string
 }
 
-func NewAction(actionType string) Action {
+type ReplayedAction interface {
+	ActionId() string
+	ActionType() string
+	OccurredAt() int64
+}
+
+func (action *replayedAction) ActionType() string {
+	return action.actionType
+}
+
+func (action *replayedAction) ActionId() string {
+	return action.actionId
+}
+
+func (action *replayedAction) OccurredAt() int64 {
+	return action.occurredAt
+}
+
+func newReplayedAction(actionType string) replayedAction {
 	occurredAt := time.Now().UnixNano()
 	actionId := strconv.FormatInt(occurredAt, 10)
-	return Action{
-		ActionId:   actionId,
-		OccurredAt: occurredAt,
-		ActionType: actionType,
+	return replayedAction{
+		actionId:   actionId,
+		occurredAt: occurredAt,
+		actionType: actionType,
 	}
 }
 
 type CallFromInbound struct {
-	Action
-	ReplayedTalk *recording.Talk
+	replayedAction
+	Replayed *recording.CallFromInbound
+}
+
+type ReturnInbound struct {
+	replayedAction
+	Response []byte
 }
 
 type CallOutbound struct {
-	Action
-	MatchedTalk      *recording.Talk
+	replayedAction
+	MatchedTalk      *recording.CallOutbound
 	MatchedTalkIndex int
 	MatchedTalkMark  float64
 	Request          []byte
 	Peer             net.TCPAddr
 }
 
-type ReturnInbound struct {
-	Action
-	Response []byte
+func NewCallOutbound(peer net.TCPAddr, request []byte) *CallOutbound {
+	return &CallOutbound{
+		replayedAction: newReplayedAction("CallOutbound"),
+		Peer: peer,
+		Request: request,
+	}
 }
 
 type CallFunction struct {
-	Action
+	replayedAction
 	CallFromFile string
 	CallFromLine int
 	CallIntoFile string
@@ -53,13 +79,13 @@ type CallFunction struct {
 }
 
 type ReturnFunction struct {
-	Action
+	replayedAction
 	CallFunctionId string
 	ReturnValue    interface{}
 }
 
 type AppendFile struct {
-	Action
+	replayedAction
 	FileName string
 	Content  []byte
 }

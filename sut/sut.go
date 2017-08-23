@@ -66,10 +66,10 @@ func (thread *Thread) OnSend(socketFD SocketFD, span []byte, flags SendFlags) {
 	}
 	event := "event!sut.inbound_send"
 	if sock.isServer {
-		thread.recordingSession.InboundSend(thread, span, sock.addr)
+		thread.recordingSession.SendToInbound(thread, span, sock.addr)
 	} else {
 		event = "event!sut.outbound_send"
-		thread.recordingSession.OutboundSend(thread, span, sock.addr)
+		thread.recordingSession.SendToOutbound(thread, span, sock.addr)
 		if sock.localAddr != nil {
 			replaying.StoreTmp(*sock.localAddr, thread.replayingSession)
 		}
@@ -97,10 +97,10 @@ func (thread *Thread) OnRecv(socketFD SocketFD, span []byte, flags RecvFlags) {
 			thread.recordingSession.Shutdown(thread)
 			thread.recordingSession = &recording.Session{}
 		}
-		thread.recordingSession.InboundRecv(thread, span, sock.addr)
+		thread.recordingSession.RecvFromInbound(thread, span, sock.addr)
 		replayingSession := replaying.RetrieveTmp(sock.addr)
 		if replayingSession != nil {
-			nanoOffset := replayingSession.InboundTalk.RequestTime - time.Now().UnixNano()
+			nanoOffset := replayingSession.Session.CallFromInbound.OccurredAt() - time.Now().UnixNano()
 			SetTimeOffset(int(time.Duration(nanoOffset) / time.Second))
 			thread.replayingSession = replayingSession
 			countlog.Trace("event!sut.received_replaying_session",
@@ -110,7 +110,7 @@ func (thread *Thread) OnRecv(socketFD SocketFD, span []byte, flags RecvFlags) {
 		}
 	} else {
 		event = "event!sut.outbound_recv"
-		thread.recordingSession.OutboundRecv(thread, span, sock.addr)
+		thread.recordingSession.RecvFromOutbound(thread, span, sock.addr)
 	}
 	countlog.Trace(event,
 		"threadID", thread.threadID,
@@ -171,6 +171,11 @@ type SendToFlags int
 
 func (thread *Thread) OnSendTo(socketFD SocketFD, span []byte, flags SendToFlags, addr net.TCPAddr) {
 	if addr.String() != "127.127.127.127:127" {
+		countlog.Debug("event!sut.sendto",
+			"threadID", thread.threadID,
+			"socketFD", socketFD,
+			"addr", &addr,
+			"content", span)
 		return
 	}
 	helperInfo := span
@@ -224,5 +229,5 @@ func (thread *Thread) OnWrite(fileFD FileFD, content []byte) {
 		"fileName", file.fileName,
 		"content", content)
 	thread.recordingSession.FileAppend(thread, content, file.fileName)
-	thread.replayingSession.FileAppend(thread, content, file.fileName)
+	thread.replayingSession.AppendFile(thread, content, file.fileName)
 }

@@ -1,73 +1,105 @@
 package replaying
 
 import (
-	"net"
-	"sync"
+	"github.com/v2pro/koala/recording"
 	"github.com/v2pro/koala/countlog"
-	"syscall"
+	"context"
+	"bytes"
 )
 
-var tmp = map[string]*ReplayingSession{}
-var tmpMutex = &sync.Mutex{}
-
-func StoreTmp(inboundAddr net.TCPAddr, session *ReplayingSession) {
-	tmpMutex.Lock()
-	defer tmpMutex.Unlock()
-	tmp[inboundAddr.String()] = session
+type ReplayingSession struct {
+	Session         *recording.Session
+	callOutbounds   []*recording.CallOutbound
+	actionCollector chan ReplayedAction
 }
 
-func RetrieveTmp(inboundAddr net.TCPAddr) *ReplayingSession {
-	tmpMutex.Lock()
-	defer tmpMutex.Unlock()
-	key := inboundAddr.String()
-	session := tmp[key]
-	delete(tmp, key)
-	return session
+func NewReplayingSession(session *recording.Session) ReplayingSession {
+	callOutbounds := []*recording.CallOutbound{}
+	for _, action := range session.Actions {
+		if action.ActionType() == "CallOutbound" {
+			callOutbounds = append(callOutbounds, action.(*recording.CallOutbound))
+		}
+	}
+	return ReplayingSession{
+		Session:         session,
+		callOutbounds:   callOutbounds,
+		actionCollector: make(chan ReplayedAction, 4096),
+	}
 }
 
-func AssignLocalAddr() (*net.TCPAddr, error) {
-	// golang does not provide api to bind before connect
-	// this is a hack to assign 127.0.0.1:0 to pre-determine a local port
-	listener, err := net.Listen("tcp", "127.0.0.1:0") // ask for new port
-	if err != nil {
-		countlog.Error("event!replaying.failed to resolve local tcp addr port", "err", err)
-		return nil, err
+func (replayingSession *ReplayingSession) CallOutbound(ctx context.Context, callOutbound *CallOutbound) {
+	select {
+	case replayingSession.actionCollector <- callOutbound:
+	default:
+		countlog.Error("event!replaying.ActionCollector is full", "ctx", ctx)
 	}
-	localAddr := listener.Addr().(*net.TCPAddr)
-	err = listener.Close()
-	if err != nil {
-		countlog.Error("event!replaying.failed to close", "err", err)
-		return nil, err
-	}
-	return localAddr, nil
 }
 
-func BindFDToLocalAddr(socketFD int) (*net.TCPAddr, error) {
-	localAddr, err := syscall.Getsockname(int(socketFD))
-	if err != nil {
-		return nil, err
+func (replayingSession *ReplayingSession) AppendFile(ctx context.Context, content []byte, fileName string) {
+	if replayingSession == nil {
+		return
 	}
-	localInet4Addr := localAddr.(*syscall.SockaddrInet4)
-	if localInet4Addr.Port != 0 && localInet4Addr.Addr != [4]byte{} {
-		return &net.TCPAddr{
-			IP:   localInet4Addr.Addr[:],
-			Port: localInet4Addr.Port,
-		}, nil
+	appendFile := &AppendFile{
+		replayedAction: newReplayedAction("AppendFile"),
+		FileName:       fileName,
+		Content:        content,
 	}
-	err = syscall.Bind(socketFD, &syscall.SockaddrInet4{
-		Addr: [4]byte{127, 0, 0, 1},
-		Port: 0,
+	select {
+	case replayingSession.actionCollector <- appendFile:
+	default:
+		countlog.Error("event!replaying.ActionCollector is full", "ctx", ctx)
+	}
+}
+
+func findReadableChunk(key []byte) (int, int) {
+	start := bytes.IndexFunc(key, func(r rune) bool {
+		return r > 31 && r < 127
 	})
-	if err != nil {
-		return nil, err
+	if start == -1 {
+		return -1, -1
 	}
-	localAddr, err = syscall.Getsockname(int(socketFD))
-	if err != nil {
-		return nil, err
+	end := bytes.IndexFunc(key[start:], func(r rune) bool {
+		return r <= 31 || r >= 127
+	})
+	if end == -1 {
+		return start, len(key) - start
 	}
-	localInet4Addr = localAddr.(*syscall.SockaddrInet4)
-	return &net.TCPAddr{
-		IP:   localInet4Addr.Addr[:],
-		Port: localInet4Addr.Port,
-	}, nil
+	return start, end
+}
+
+func (replayingSession *ReplayingSession) Finish(response []byte) *ReplayedSession {
+	replayedSession := &ReplayedSession{
+		SessionId: replayingSession.Session.SessionId,
+		CallFromInbound: &CallFromInbound{
+			replayedAction: newReplayedAction("CallFromInbound"),
+			Replayed:       replayingSession.Session.CallFromInbound,
+		},
+	}
+	replayedSession.ReturnInbound = &ReturnInbound{
+		replayedAction: newReplayedAction("ReturnInbound"),
+		Response:       response,
+	}
+	done := false
+	appendFiles := map[string]*AppendFile{}
+	for !done {
+		select {
+		case action := <-replayingSession.actionCollector:
+			switch typedAction := action.(type) {
+			case *AppendFile:
+				existingAppendFile := appendFiles[typedAction.FileName]
+				if existingAppendFile == nil {
+					appendFiles[typedAction.FileName] = typedAction
+					replayedSession.Actions = append(replayedSession.Actions, action)
+				} else {
+					existingAppendFile.Content = append(existingAppendFile.Content, typedAction.Content...)
+				}
+			default:
+				replayedSession.Actions = append(replayedSession.Actions, action)
+			}
+		default:
+			done = true
+		}
+	}
+	replayedSession.Actions = append(replayedSession.Actions, replayedSession.ReturnInbound)
+	return replayedSession
 }

@@ -50,8 +50,8 @@ func handleInbound(respWriter http.ResponseWriter, req *http.Request) {
 		return
 	}
 	defer req.Body.Close()
-	session := recording.Session{}
-	err = json.Unmarshal(reqBody, &session)
+	session := &recording.Session{}
+	err = json.Unmarshal(reqBody, session)
 	if err != nil {
 		countlog.Error("event!inbound.failed to unmarshal session", "err", err)
 		return
@@ -68,7 +68,7 @@ func handleInbound(respWriter http.ResponseWriter, req *http.Request) {
 		countlog.Error("event!inbound.failed to connect sut", "err", err)
 		return
 	}
-	_, err = conn.Write(replayingSession.InboundTalk.Request)
+	_, err = conn.Write(replayingSession.Session.CallFromInbound.Request)
 	if err != nil {
 		countlog.Error("event!inbound.failed to write sut", "err", err)
 		return

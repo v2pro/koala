@@ -8,99 +8,116 @@ import (
 )
 
 type Session struct {
-	SessionId           string
-	InboundTalk         *Talk
-	OutboundTalks       []*Talk
-	Files               map[string][]byte
-	currentOutboundTalk *Talk
+	SessionId            string
+	CallFromInbound      *CallFromInbound
+	ReturnInbound        *ReturnInbound
+	Actions              []Action
+	currentAppendFiles   map[string]*AppendFile `json:"-"`
+	currentCallOutbound  *CallOutbound `json:"-"`
 }
 
 func (session *Session) FileAppend(ctx context.Context, content []byte, fileName string) {
 	if session == nil {
 		return
 	}
-	if session.Files == nil {
-		session.Files = map[string][]byte{}
+	if session.currentAppendFiles == nil {
+		session.currentAppendFiles = map[string]*AppendFile{}
 	}
-	session.Files[fileName] = append(session.Files[fileName], content...)
+	appendFile := session.currentAppendFiles[fileName]
+	if appendFile == nil {
+		appendFile = &AppendFile{
+			action:   newAction("AppendFile"),
+			FileName: fileName,
+		}
+		session.currentAppendFiles[fileName] = appendFile
+	}
+	appendFile.Content = append(appendFile.Content, content...)
 }
 
-func (session *Session) InboundRecv(ctx context.Context, span []byte, peer net.TCPAddr) {
+func (session *Session) RecvFromInbound(ctx context.Context, span []byte, peer net.TCPAddr) {
 	if session == nil {
 		return
 	}
-	if session.InboundTalk == nil {
-		session.InboundTalk = &Talk{Peer: peer}
+	if session.CallFromInbound == nil {
+		session.CallFromInbound = &CallFromInbound{
+			action: newAction("CallFromInbound"),
+			Peer:   peer,
+		}
 	}
-	if session.InboundTalk.RequestTime == 0 {
-		session.InboundTalk.RequestTime = time.Now().UnixNano()
-	}
-	session.InboundTalk.Request = append(session.InboundTalk.Request, span...)
+	session.CallFromInbound.Request = append(session.CallFromInbound.Request, span...)
 }
 
-func (session *Session) InboundSend(ctx context.Context, span []byte, peer net.TCPAddr) {
+func (session *Session) SendToInbound(ctx context.Context, span []byte, peer net.TCPAddr) {
 	if session == nil {
 		return
 	}
-	if session.InboundTalk == nil {
-		session.InboundTalk = &Talk{Peer: peer}
+	if session.ReturnInbound == nil {
+		session.ReturnInbound = &ReturnInbound{
+			action: newAction("ReturnInbound"),
+		}
+		session.Actions = append(session.Actions, session.ReturnInbound)
 	}
-	if session.InboundTalk.ResponseTime == 0 {
-		session.InboundTalk.ResponseTime = time.Now().UnixNano()
-	}
-	session.InboundTalk.Response = append(session.InboundTalk.Response, span...)
+	session.ReturnInbound.Response = append(session.ReturnInbound.Response, span...)
 }
 
-func (session *Session) OutboundRecv(ctx context.Context, span []byte, peer net.TCPAddr) {
+func (session *Session) RecvFromOutbound(ctx context.Context, span []byte, peer net.TCPAddr) {
 	if session == nil {
 		return
 	}
-	if session.currentOutboundTalk == nil {
-		session.currentOutboundTalk = &Talk{Peer: peer}
+	if session.currentCallOutbound == nil {
+		session.currentCallOutbound = &CallOutbound{
+			action: newAction("CallOutbound"),
+			Peer:   peer,
+		}
+		session.Actions = append(session.Actions, session.currentCallOutbound)
 	}
-	if session.currentOutboundTalk.ResponseTime == 0 {
-		session.currentOutboundTalk.ResponseTime = time.Now().UnixNano()
+	if session.currentCallOutbound.ResponseTime == 0 {
+		session.currentCallOutbound.ResponseTime = time.Now().UnixNano()
 	}
-	session.currentOutboundTalk.Response = append(session.currentOutboundTalk.Response, span...)
+	session.currentCallOutbound.Response = append(session.currentCallOutbound.Response, span...)
 }
 
-func (session *Session) OutboundSend(ctx context.Context, span []byte, peer net.TCPAddr) {
+func (session *Session) SendToOutbound(ctx context.Context, span []byte, peer net.TCPAddr) {
 	if session == nil {
 		return
 	}
-	if session.currentOutboundTalk == nil {
-		session.currentOutboundTalk = &Talk{Peer: peer}
+	if session.currentCallOutbound == nil {
+		session.currentCallOutbound = &CallOutbound{
+			action: newAction("CallOutbound"),
+			Peer:   peer,
+		}
+		session.Actions = append(session.Actions, session.currentCallOutbound)
 	}
-	if len(session.currentOutboundTalk.Response) > 0 {
+	if len(session.currentCallOutbound.Response) > 0 {
 		countlog.Trace("event!recording.outbound_talk_recorded",
-			"addr", session.currentOutboundTalk.Peer,
-			"request", session.currentOutboundTalk.Request,
-			"response", session.currentOutboundTalk.Response,
+			"addr", session.currentCallOutbound.Peer,
+			"request", session.currentCallOutbound.Request,
+			"response", session.currentCallOutbound.Response,
 			"ctx", ctx)
-		session.OutboundTalks = append(session.OutboundTalks, session.currentOutboundTalk)
-		session.currentOutboundTalk = &Talk{Peer: peer}
+		session.Actions = append(session.Actions, session.currentCallOutbound)
+		session.currentCallOutbound = &CallOutbound{
+			action: newAction("CallOutbound"),
+			Peer:   peer,
+		}
+		session.Actions = append(session.Actions, session.currentCallOutbound)
 	}
-	if session.currentOutboundTalk.RequestTime == 0 {
-		session.currentOutboundTalk.RequestTime = time.Now().UnixNano()
-	}
-	session.currentOutboundTalk.Request = append(session.currentOutboundTalk.Request, span...)
+	session.currentCallOutbound.Request = append(session.currentCallOutbound.Request, span...)
 }
 
 func (session *Session) HasResponded() bool {
 	if session == nil {
 		return false
 	}
-	if session.InboundTalk == nil {
+	if session.ReturnInbound == nil {
 		return false
 	}
-	return len(session.InboundTalk.Response) > 0
+	return true
 }
 
 func (session *Session) Shutdown(ctx context.Context) {
 	if session == nil {
 		return
 	}
-	session.OutboundTalks = append(session.OutboundTalks, session.currentOutboundTalk)
 	for _, recorder := range Recorders {
 		recorder.Record(session)
 	}

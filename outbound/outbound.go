@@ -111,12 +111,8 @@ func handleOutbound(conn *net.TCPConn) {
 			"ctx", ctx,
 			"content", request,
 			"replayingSession", replayingSession)
-		callOutbound := replaying.CallOutbound{
-			Action: replaying.NewAction("CallOutbound"),
-			Request: request,
-			Peer: *tcpAddr,
-		}
-		var matchedTalk *recording.Talk
+		callOutbound := replaying.NewCallOutbound(*tcpAddr, request)
+		var matchedTalk *recording.CallOutbound
 		var mark float64
 		lastMatchedIndex, mark, matchedTalk = replayingSession.MatchOutboundTalk(ctx, lastMatchedIndex, request)
 		if matchedTalk == nil && lastMatchedIndex != 0 {
@@ -125,11 +121,7 @@ func handleOutbound(conn *net.TCPConn) {
 		callOutbound.MatchedTalk = matchedTalk
 		callOutbound.MatchedTalkIndex = lastMatchedIndex
 		callOutbound.MatchedTalkMark = mark
-		select {
-		case replayingSession.ActionCollector <- &callOutbound:
-		default:
-			countlog.Error("event!outbound.ResultCollector is full", "ctx", ctx)
-		}
+		replayingSession.CallOutbound(ctx, callOutbound)
 		if matchedTalk == nil {
 			countlog.Error("event!outbound.failed to find matching talk", "ctx", ctx)
 			return
