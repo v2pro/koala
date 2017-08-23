@@ -16,7 +16,7 @@ type ReplayingSession struct {
 func NewReplayingSession(session *recording.Session) ReplayingSession {
 	callOutbounds := []*recording.CallOutbound{}
 	for _, action := range session.Actions {
-		if action.ActionType() == "CallOutbound" {
+		if action.GetActionType() == "CallOutbound" {
 			callOutbounds = append(callOutbounds, action.(*recording.CallOutbound))
 		}
 	}

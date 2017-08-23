@@ -8,36 +8,36 @@ import (
 )
 
 type replayedAction struct {
-	actionId   string
-	occurredAt int64
-	actionType string
+	ActionId   string
+	OccurredAt int64
+	ActionType string
 }
 
 type ReplayedAction interface {
-	ActionId() string
-	ActionType() string
-	OccurredAt() int64
+	GetActionId() string
+	GetActionType() string
+	GetOccurredAt() int64
 }
 
-func (action *replayedAction) ActionType() string {
-	return action.actionType
+func (action *replayedAction) GetActionType() string {
+	return action.ActionType
 }
 
-func (action *replayedAction) ActionId() string {
-	return action.actionId
+func (action *replayedAction) GetActionId() string {
+	return action.ActionId
 }
 
-func (action *replayedAction) OccurredAt() int64 {
-	return action.occurredAt
+func (action *replayedAction) GetOccurredAt() int64 {
+	return action.OccurredAt
 }
 
 func newReplayedAction(actionType string) replayedAction {
 	occurredAt := time.Now().UnixNano()
 	actionId := strconv.FormatInt(occurredAt, 10)
 	return replayedAction{
-		actionId:   actionId,
-		occurredAt: occurredAt,
-		actionType: actionType,
+		ActionId:   actionId,
+		OccurredAt: occurredAt,
+		ActionType: actionType,
 	}
 }
 

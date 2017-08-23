@@ -56,6 +56,24 @@ func handleInbound(respWriter http.ResponseWriter, req *http.Request) {
 		countlog.Error("event!inbound.failed to unmarshal session", "err", err)
 		return
 	}
+	for _, typelessAction := range session.TypelessActions {
+		m := map[string]interface{}{}
+		err := json.Unmarshal([]byte(typelessAction), &m)
+		if err != nil {
+			countlog.Error("event!inbound.failed to unmarshal session", "err", err)
+			return
+		}
+		switch m["ActionType"].(string) {
+		case "CallOutbound":
+			callOutbound := &recording.CallOutbound{}
+			err = json.Unmarshal([]byte(typelessAction), callOutbound)
+			if err != nil {
+				countlog.Error("event!inbound.failed to unmarshal session", "err", err)
+				return
+			}
+			session.Actions = append(session.Actions, callOutbound)
+		}
+	}
 	localAddr, err := replaying.AssignLocalAddr()
 	if err != nil {
 		countlog.Error("event!inbound.failed to assign local addresses", "err", err)
@@ -77,13 +95,13 @@ func handleInbound(respWriter http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		return
 	}
-	replayingSession.Finish(response)
-	marshaledReplayingSession, err := json.Marshal(replayingSession)
+	replayedSession := replayingSession.Finish(response)
+	marshaledReplayedSession, err := json.Marshal(replayedSession)
 	if err != nil {
 		countlog.Error("event!inbound.marshal replaying session failed", "err", err)
 		return
 	}
-	_, err = respWriter.Write(marshaledReplayingSession)
+	_, err = respWriter.Write(marshaledReplayedSession)
 	if err != nil {
 		countlog.Error("event!inbound.failed to write response", "err", err)
 		return

@@ -7,34 +7,36 @@ import (
 )
 
 type action struct {
-	actionId   string
-	occurredAt int64
-	actionType string
+	ActionId   string
+	OccurredAt int64
+	ActionType string
 }
 
 type Action interface {
-	ActionType() string
+	GetActionId() string
+	GetOccurredAt() int64
+	GetActionType() string
 }
 
-func (action *action) ActionType() string {
-	return action.actionType
+func (action *action) GetActionType() string {
+	return action.ActionType
 }
 
-func (action *action) ActionId() string {
-	return action.actionId
+func (action *action) GetActionId() string {
+	return action.ActionId
 }
 
-func (action *action) OccurredAt() int64 {
-	return action.occurredAt
+func (action *action) GetOccurredAt() int64 {
+	return action.OccurredAt
 }
 
 func newAction(actionType string) action {
 	occurredAt := time.Now().UnixNano()
 	actionId := strconv.FormatInt(occurredAt, 10)
 	return action{
-		actionId:   actionId,
-		occurredAt: occurredAt,
-		actionType: actionType,
+		ActionId:   actionId,
+		OccurredAt: occurredAt,
+		ActionType: actionType,
 	}
 }
 

@@ -5,15 +5,24 @@ import (
 	"net"
 	"github.com/v2pro/koala/countlog"
 	"context"
+	"fmt"
+	"encoding/json"
 )
 
 type Session struct {
-	SessionId            string
-	CallFromInbound      *CallFromInbound
-	ReturnInbound        *ReturnInbound
-	Actions              []Action
-	currentAppendFiles   map[string]*AppendFile `json:"-"`
-	currentCallOutbound  *CallOutbound `json:"-"`
+	SessionId           string
+	CallFromInbound     *CallFromInbound
+	ReturnInbound       *ReturnInbound
+	Actions             []Action `json:"-"`
+	TypelessActions     []json.RawMessage `json:"Actions"`
+	currentAppendFiles  map[string]*AppendFile `json:"-"`
+	currentCallOutbound *CallOutbound `json:"-"`
+}
+
+func NewSession(suffix int32) *Session {
+	return &Session{
+		SessionId: fmt.Sprintf("%d-%d", time.Now().UnixNano(), suffix),
+	}
 }
 
 func (session *Session) FileAppend(ctx context.Context, content []byte, fileName string) {

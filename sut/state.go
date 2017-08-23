@@ -66,7 +66,7 @@ func GetThread(threadID ThreadID) *Thread {
 			files:    map[FileFD]*file{},
 		}
 		if envarg.IsRecording() {
-			thread.recordingSession = &recording.Session{}
+			thread.recordingSession = recording.NewSession(int32(threadID))
 		}
 		globalThreads[threadID] = thread
 	}
