@@ -9,7 +9,6 @@ import (
 func Test_marshal_append_file(t *testing.T) {
 	should := require.New(t)
 	bytes, err := json.Marshal(&AppendFile{
-		action:   newAction("AppendFile"),
 		FileName: "/abc",
 		Content:  []byte("hello"),
 	})
@@ -20,7 +19,6 @@ func Test_marshal_append_file(t *testing.T) {
 func Test_marshal_call_outbound(t *testing.T) {
 	should := require.New(t)
 	bytes, err := json.Marshal(&CallOutbound{
-		action:   newAction("CallOutbound"),
 		Request:  []byte("hello"),
 		Response: []byte("world"),
 	})
@@ -32,7 +30,6 @@ func Test_marshal_call_outbound(t *testing.T) {
 func Test_marshal_return_inbound(t *testing.T) {
 	should := require.New(t)
 	bytes, err := json.Marshal(&ReturnInbound{
-		action:   newAction("ReturnInbound"),
 		Response: []byte("hello"),
 	})
 	should.Nil(err)
@@ -42,7 +39,6 @@ func Test_marshal_return_inbound(t *testing.T) {
 func Test_marshal_call_from_inbound(t *testing.T) {
 	should := require.New(t)
 	bytes, err := json.Marshal(&CallFromInbound{
-		action:  newAction("CallFromInbound"),
 		Request: []byte("hello"),
 	})
 	should.Nil(err)
@@ -52,21 +48,17 @@ func Test_marshal_call_from_inbound(t *testing.T) {
 func Test_marshal_session(t *testing.T) {
 	session := Session{
 		CallFromInbound: &CallFromInbound{
-			action:  newAction("CallFromInbound"),
 			Request: []byte("hello"),
 		},
 		ReturnInbound: &ReturnInbound{
-			action:   newAction("ReturnInbound"),
 			Response: []byte("hello"),
 		},
 		Actions: []Action{
 			&CallOutbound{
-				action:   newAction("CallOutbound"),
 				Request:  []byte("hello"),
 				Response: []byte("world"),
 			},
 			&AppendFile{
-				action:   newAction("AppendFile"),
 				FileName: "/abc",
 				Content:  []byte("hello"),
 			},

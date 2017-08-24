@@ -23,6 +23,15 @@ func NewSession(suffix int32) *Session {
 	}
 }
 
+func (session *Session) newAction(actionType string) action {
+	occurredAt := time.Now().UnixNano()
+	return action{
+		ActionIndex: len(session.Actions),
+		OccurredAt:  occurredAt,
+		ActionType:  actionType,
+	}
+}
+
 func (session *Session) FileAppend(ctx context.Context, content []byte, fileName string) {
 	if session == nil {
 		return
@@ -33,7 +42,7 @@ func (session *Session) FileAppend(ctx context.Context, content []byte, fileName
 	appendFile := session.currentAppendFiles[fileName]
 	if appendFile == nil {
 		appendFile = &AppendFile{
-			action:   newAction("AppendFile"),
+			action:   session.newAction("AppendFile"),
 			FileName: fileName,
 		}
 		session.currentAppendFiles[fileName] = appendFile
@@ -47,7 +56,7 @@ func (session *Session) RecvFromInbound(ctx context.Context, span []byte, peer n
 	}
 	if session.CallFromInbound == nil {
 		session.CallFromInbound = &CallFromInbound{
-			action: newAction("CallFromInbound"),
+			action: session.newAction("CallFromInbound"),
 			Peer:   peer,
 		}
 	}
@@ -60,7 +69,7 @@ func (session *Session) SendToInbound(ctx context.Context, span []byte, peer net
 	}
 	if session.ReturnInbound == nil {
 		session.ReturnInbound = &ReturnInbound{
-			action: newAction("ReturnInbound"),
+			action: session.newAction("ReturnInbound"),
 		}
 		session.Actions = append(session.Actions, session.ReturnInbound)
 	}
@@ -73,7 +82,7 @@ func (session *Session) RecvFromOutbound(ctx context.Context, span []byte, peer 
 	}
 	if session.currentCallOutbound == nil {
 		session.currentCallOutbound = &CallOutbound{
-			action: newAction("CallOutbound"),
+			action: session.newAction("CallOutbound"),
 			Peer:   peer,
 		}
 		session.Actions = append(session.Actions, session.currentCallOutbound)
@@ -90,7 +99,7 @@ func (session *Session) SendToOutbound(ctx context.Context, span []byte, peer ne
 	}
 	if session.currentCallOutbound == nil {
 		session.currentCallOutbound = &CallOutbound{
-			action: newAction("CallOutbound"),
+			action: session.newAction("CallOutbound"),
 			Peer:   peer,
 		}
 		session.Actions = append(session.Actions, session.currentCallOutbound)
@@ -103,7 +112,7 @@ func (session *Session) SendToOutbound(ctx context.Context, span []byte, peer ne
 			"ctx", ctx)
 		session.Actions = append(session.Actions, session.currentCallOutbound)
 		session.currentCallOutbound = &CallOutbound{
-			action: newAction("CallOutbound"),
+			action: session.newAction("CallOutbound"),
 			Peer:   peer,
 		}
 		session.Actions = append(session.Actions, session.currentCallOutbound)

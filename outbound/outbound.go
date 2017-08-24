@@ -118,9 +118,16 @@ func handleOutbound(conn *net.TCPConn) {
 		if matchedTalk == nil && lastMatchedIndex != 0 {
 			lastMatchedIndex, mark, matchedTalk = replayingSession.MatchOutboundTalk(ctx,-1, request)
 		}
-		callOutbound.MatchedTalk = matchedTalk
-		callOutbound.MatchedTalkIndex = lastMatchedIndex
-		callOutbound.MatchedTalkMark = mark
+		if matchedTalk == nil {
+			callOutbound.MatchedRequest = nil
+			callOutbound.MatchedResponse = nil
+			callOutbound.MatchedActionIndex = -1
+		} else {
+			callOutbound.MatchedRequest = matchedTalk.Request
+			callOutbound.MatchedResponse = matchedTalk.Response
+			callOutbound.MatchedActionIndex = matchedTalk.ActionIndex
+		}
+		callOutbound.MatchedMark = mark
 		replayingSession.CallOutbound(ctx, callOutbound)
 		if matchedTalk == nil {
 			countlog.Error("event!outbound.failed to find matching talk", "ctx", ctx)
@@ -135,6 +142,7 @@ func handleOutbound(conn *net.TCPConn) {
 		countlog.Debug("event!outbound.response",
 			"addr", *tcpAddr,
 			"matchedMark", mark,
+			"matchedActionIndex", matchedTalk.ActionIndex,
 			"matchedIndex", lastMatchedIndex,
 			"matchedRequest", matchedTalk.Request,
 			"matchedResponse", matchedTalk.Response,

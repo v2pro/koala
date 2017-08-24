@@ -4,7 +4,6 @@ import (
 	"time"
 	"strconv"
 	"net"
-	"github.com/v2pro/koala/recording"
 )
 
 type replayedAction struct {
@@ -44,22 +43,23 @@ func newReplayedAction(actionType string) replayedAction {
 type CallFromInbound struct {
 	replayedAction
 	OriginalRequestTime int64
-	OriginalRequest []byte
+	OriginalRequest     []byte
 }
 
 type ReturnInbound struct {
 	replayedAction
 	OriginalResponse []byte
-	Response []byte
+	Response         []byte
 }
 
 type CallOutbound struct {
 	replayedAction
-	MatchedTalk      *recording.CallOutbound
-	MatchedTalkIndex int
-	MatchedTalkMark  float64
-	Request          []byte
-	Peer             net.TCPAddr
+	MatchedRequest     []byte
+	MatchedResponse    []byte
+	MatchedActionIndex int
+	MatchedMark        float64
+	Request            []byte
+	Peer               net.TCPAddr
 }
 
 func NewCallOutbound(peer net.TCPAddr, request []byte) *CallOutbound {
