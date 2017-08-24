@@ -56,6 +56,10 @@ func (replayingSession *ReplayingSession) MatchOutboundTalk(
 		if mark < 0.85 {
 			return -1, 0, nil
 		}
+	} else {
+		if mark < 0.1 {
+			return -1, 0, nil
+		}
 	}
 	return maxScoreIndex, mark, replayingSession.CallOutbounds[maxScoreIndex]
 
