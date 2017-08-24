@@ -65,14 +65,15 @@ func (replayingSession *ReplayingSession) Finish(response []byte) *ReplayedSessi
 	replayedSession := &ReplayedSession{
 		SessionId: replayingSession.SessionId,
 		CallFromInbound: &CallFromInbound{
-			replayedAction: newReplayedAction("CallFromInbound"),
-			Original:       replayingSession.CallFromInbound,
+			replayedAction:      newReplayedAction("CallFromInbound"),
+			OriginalRequestTime: replayingSession.CallFromInbound.OccurredAt,
+			OriginalRequest:     replayingSession.CallFromInbound.Request,
 		},
 	}
 	replayedSession.ReturnInbound = &ReturnInbound{
-		replayedAction: newReplayedAction("ReturnInbound"),
-		Original:       replayingSession.ReturnInbound,
-		Response:       response,
+		replayedAction:   newReplayedAction("ReturnInbound"),
+		OriginalResponse: replayingSession.ReturnInbound.Response,
+		Response:         response,
 	}
 	done := false
 	appendFiles := map[string]*AppendFile{}

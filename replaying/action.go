@@ -43,12 +43,13 @@ func newReplayedAction(actionType string) replayedAction {
 
 type CallFromInbound struct {
 	replayedAction
-	Original *recording.CallFromInbound
+	OriginalRequestTime int64
+	OriginalRequest []byte
 }
 
 type ReturnInbound struct {
 	replayedAction
-	Original *recording.ReturnInbound
+	OriginalResponse []byte
 	Response []byte
 }
 
