@@ -6,15 +6,13 @@ import (
 	"github.com/v2pro/koala/countlog"
 	"context"
 	"fmt"
-	"encoding/json"
 )
 
 type Session struct {
 	SessionId           string
 	CallFromInbound     *CallFromInbound
 	ReturnInbound       *ReturnInbound
-	Actions             []Action `json:"-"`
-	TypelessActions     []json.RawMessage `json:"Actions"`
+	Actions             []Action
 	currentAppendFiles  map[string]*AppendFile `json:"-"`
 	currentCallOutbound *CallOutbound `json:"-"`
 }

@@ -13,7 +13,7 @@ func (replayingSession *ReplayingSession) MatchOutboundTalk(
 	unit := 16
 	chunks := cutToChunks(request, unit)
 	keys := replayingSession.loadKeys()
-	scores := make([]int, len(replayingSession.callOutbounds))
+	scores := make([]int, len(replayingSession.CallOutbounds))
 	maxScore := 0
 	maxScoreIndex := 0
 	for chunkIndex, chunk := range chunks {
@@ -57,13 +57,13 @@ func (replayingSession *ReplayingSession) MatchOutboundTalk(
 			return -1, 0, nil
 		}
 	}
-	return maxScoreIndex, mark, replayingSession.callOutbounds[maxScoreIndex]
+	return maxScoreIndex, mark, replayingSession.CallOutbounds[maxScoreIndex]
 
 }
 
 func (replayingSession *ReplayingSession) loadKeys() [][]byte {
-	keys := make([][]byte, len(replayingSession.callOutbounds))
-	for i, entry := range replayingSession.callOutbounds {
+	keys := make([][]byte, len(replayingSession.CallOutbounds))
+	for i, entry := range replayingSession.CallOutbounds {
 		keys[i] = entry.Request
 	}
 	return keys

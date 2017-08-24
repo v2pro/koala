@@ -43,11 +43,12 @@ func newReplayedAction(actionType string) replayedAction {
 
 type CallFromInbound struct {
 	replayedAction
-	Replayed *recording.CallFromInbound
+	Original *recording.CallFromInbound
 }
 
 type ReturnInbound struct {
 	replayedAction
+	Original *recording.ReturnInbound
 	Response []byte
 }
 
@@ -63,8 +64,8 @@ type CallOutbound struct {
 func NewCallOutbound(peer net.TCPAddr, request []byte) *CallOutbound {
 	return &CallOutbound{
 		replayedAction: newReplayedAction("CallOutbound"),
-		Peer: peer,
-		Request: request,
+		Peer:           peer,
+		Request:        request,
 	}
 }
 

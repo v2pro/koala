@@ -98,7 +98,13 @@ def replay():
     },
     "Request": "R0VUIC8gSFRUUC8xLjENCkFjY2VwdC1FbmNvZGluZzogaWRlbnRpdHkNCkhvc3Q6IDEyNy4wLjAuMTo5MDAwDQpDb25uZWN0aW9uOiBjbG9zZQ0KVXNlci1BZ2VudDogUHl0aG9uLXVybGxpYi8yLjcNCg0K"
   },
-  "Actions": [
+  "ReturnInbound": {
+    "ActionId": "1502583648218118763",
+    "OccurredAt": 1502583648218118763,
+    "ActionType": "ReturnInbound",
+    "Response": "Z29vZCBkYXk="
+  },
+  "CallOutbounds": [
     {
       "ActionId": "1502583648179667868",
       "OccurredAt": 1502583648179667868,

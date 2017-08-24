@@ -100,7 +100,7 @@ func (thread *Thread) OnRecv(socketFD SocketFD, span []byte, flags RecvFlags) {
 		thread.recordingSession.RecvFromInbound(thread, span, sock.addr)
 		replayingSession := replaying.RetrieveTmp(sock.addr)
 		if replayingSession != nil {
-			nanoOffset := replayingSession.Session.CallFromInbound.GetOccurredAt() - time.Now().UnixNano()
+			nanoOffset := replayingSession.CallFromInbound.GetOccurredAt() - time.Now().UnixNano()
 			SetTimeOffset(int(time.Duration(nanoOffset) / time.Second))
 			thread.replayingSession = replayingSession
 			countlog.Trace("event!sut.received_replaying_session",

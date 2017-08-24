@@ -7,7 +7,6 @@ import (
 	"net"
 	"time"
 	"github.com/v2pro/koala/replaying"
-	"github.com/v2pro/koala/recording"
 	"github.com/v2pro/koala/envarg"
 	"encoding/json"
 	"github.com/v2pro/koala/internal"
@@ -50,43 +49,24 @@ func handleInbound(respWriter http.ResponseWriter, req *http.Request) {
 		return
 	}
 	defer req.Body.Close()
-	session := &recording.Session{}
-	err = json.Unmarshal(reqBody, session)
+	replayingSession := replaying.NewReplayingSession()
+	err = json.Unmarshal(reqBody, replayingSession)
 	if err != nil {
 		countlog.Error("event!inbound.failed to unmarshal session", "err", err)
 		return
-	}
-	for _, typelessAction := range session.TypelessActions {
-		m := map[string]interface{}{}
-		err := json.Unmarshal([]byte(typelessAction), &m)
-		if err != nil {
-			countlog.Error("event!inbound.failed to unmarshal session", "err", err)
-			return
-		}
-		switch m["ActionType"].(string) {
-		case "CallOutbound":
-			callOutbound := &recording.CallOutbound{}
-			err = json.Unmarshal([]byte(typelessAction), callOutbound)
-			if err != nil {
-				countlog.Error("event!inbound.failed to unmarshal session", "err", err)
-				return
-			}
-			session.Actions = append(session.Actions, callOutbound)
-		}
 	}
 	localAddr, err := replaying.AssignLocalAddr()
 	if err != nil {
 		countlog.Error("event!inbound.failed to assign local addresses", "err", err)
 		return
 	}
-	replayingSession := replaying.NewReplayingSession(session)
-	replaying.StoreTmp(*localAddr, &replayingSession)
+	replaying.StoreTmp(*localAddr, replayingSession)
 	conn, err := net.DialTCP("tcp4", localAddr, envarg.SutAddr())
 	if err != nil {
 		countlog.Error("event!inbound.failed to connect sut", "err", err)
 		return
 	}
-	_, err = conn.Write(replayingSession.Session.CallFromInbound.Request)
+	_, err = conn.Write(replayingSession.CallFromInbound.Request)
 	if err != nil {
 		countlog.Error("event!inbound.failed to write sut", "err", err)
 		return

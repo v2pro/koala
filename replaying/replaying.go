@@ -8,21 +8,15 @@ import (
 )
 
 type ReplayingSession struct {
-	Session         *recording.Session
-	callOutbounds   []*recording.CallOutbound
+	SessionId       string
+	CallFromInbound *recording.CallFromInbound
+	ReturnInbound   *recording.ReturnInbound
+	CallOutbounds   []*recording.CallOutbound
 	actionCollector chan ReplayedAction
 }
 
-func NewReplayingSession(session *recording.Session) ReplayingSession {
-	callOutbounds := []*recording.CallOutbound{}
-	for _, action := range session.Actions {
-		if action.GetActionType() == "CallOutbound" {
-			callOutbounds = append(callOutbounds, action.(*recording.CallOutbound))
-		}
-	}
-	return ReplayingSession{
-		Session:         session,
-		callOutbounds:   callOutbounds,
+func NewReplayingSession() *ReplayingSession {
+	return &ReplayingSession{
 		actionCollector: make(chan ReplayedAction, 4096),
 	}
 }
@@ -69,14 +63,15 @@ func findReadableChunk(key []byte) (int, int) {
 
 func (replayingSession *ReplayingSession) Finish(response []byte) *ReplayedSession {
 	replayedSession := &ReplayedSession{
-		SessionId: replayingSession.Session.SessionId,
+		SessionId: replayingSession.SessionId,
 		CallFromInbound: &CallFromInbound{
 			replayedAction: newReplayedAction("CallFromInbound"),
-			Replayed:       replayingSession.Session.CallFromInbound,
+			Original:       replayingSession.CallFromInbound,
 		},
 	}
 	replayedSession.ReturnInbound = &ReturnInbound{
 		replayedAction: newReplayedAction("ReturnInbound"),
+		Original:       replayingSession.ReturnInbound,
 		Response:       response,
 	}
 	done := false
