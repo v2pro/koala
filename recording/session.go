@@ -120,6 +120,17 @@ func (session *Session) SendToOutbound(ctx context.Context, span []byte, peer ne
 	session.currentCallOutbound.Request = append(session.currentCallOutbound.Request, span...)
 }
 
+func (session *Session) SendUDP(ctx context.Context, span []byte, peer net.UDPAddr) {
+	if session == nil {
+		return
+	}
+	session.Actions = append(session.Actions, &SendUDP{
+		action: session.newAction("SendUDP"),
+		Peer: peer,
+		Content: span,
+	})
+}
+
 func (session *Session) HasResponded() bool {
 	if session == nil {
 		return false

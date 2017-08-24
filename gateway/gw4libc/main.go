@@ -137,7 +137,7 @@ func on_sendto(threadID C.pid_t, socketFD C.int, span C.struct_ch_span, flags C.
 		}
 	}()
 	sut.GetThread(sut.ThreadID(threadID)).
-		OnSendTo(sut.SocketFD(socketFD), ch_span_to_bytes(span), sut.SendToFlags(flags), net.TCPAddr{
+		OnSendTo(sut.SocketFD(socketFD), ch_span_to_bytes(span), sut.SendToFlags(flags), net.UDPAddr{
 		IP:   ch.Int2ip(sockaddr_in_sin_addr_get(addr)),
 		Port: int(ch.Ntohs(sockaddr_in_sin_port_get(addr))),
 	})

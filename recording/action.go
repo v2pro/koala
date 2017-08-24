@@ -95,3 +95,19 @@ func (appendFile *AppendFile) MarshalJSON() ([]byte, error) {
 		Content:    string(appendFile.Content),
 	})
 }
+
+type SendUDP struct {
+	action
+	Peer    net.UDPAddr
+	Content []byte
+}
+
+func (sendUDP *SendUDP) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		SendUDP
+		Content string
+	}{
+		SendUDP: *sendUDP,
+		Content: string(sendUDP.Content),
+	})
+}

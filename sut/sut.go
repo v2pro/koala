@@ -77,7 +77,7 @@ func (thread *Thread) OnSend(socketFD SocketFD, span []byte, flags SendFlags) {
 	countlog.Trace(event,
 		"threadID", thread.threadID,
 		"socketFD", socketFD,
-		"addr", sock.addr,
+		"addr", &sock.addr,
 		"content", span)
 }
 
@@ -115,7 +115,7 @@ func (thread *Thread) OnRecv(socketFD SocketFD, span []byte, flags RecvFlags) {
 	countlog.Trace(event,
 		"threadID", thread.threadID,
 		"socketFD", socketFD,
-		"addr", sock.addr,
+		"addr", &sock.addr,
 		"content", span)
 }
 
@@ -130,7 +130,7 @@ func (thread *Thread) OnAccept(serverSocketFD SocketFD, clientSocketFD SocketFD,
 		"threadID", thread.threadID,
 		"serverSocketFD", serverSocketFD,
 		"clientSocketFD", clientSocketFD,
-		"addr", addr)
+		"addr", &addr)
 }
 
 func (thread *Thread) OnBind(socketFD SocketFD, addr net.TCPAddr) {
@@ -163,26 +163,27 @@ func (thread *Thread) OnConnect(socketFD SocketFD, remoteAddr net.TCPAddr) {
 	countlog.Debug("event!sut.connect",
 		"threadID", thread.threadID,
 		"socketFD", socketFD,
-		"addr", remoteAddr,
+		"addr", &remoteAddr,
 		"localAddr", thread.socks[socketFD].localAddr)
 }
 
 type SendToFlags int
 
-func (thread *Thread) OnSendTo(socketFD SocketFD, span []byte, flags SendToFlags, addr net.TCPAddr) {
+func (thread *Thread) OnSendTo(socketFD SocketFD, span []byte, flags SendToFlags, addr net.UDPAddr) {
 	if addr.String() != "127.127.127.127:127" {
 		countlog.Debug("event!sut.sendto",
 			"threadID", thread.threadID,
 			"socketFD", socketFD,
 			"addr", &addr,
 			"content", span)
+		thread.recordingSession.SendUDP(thread, span, addr)
 		return
 	}
 	helperInfo := span
 	countlog.Debug("event!sut.received_helper_info",
 		"threadID", thread.threadID,
 		"socketFD", socketFD,
-		"addr", addr,
+		"addr", &addr,
 		"content", helperInfo)
 	if bytes.HasPrefix(helperInfo, threadShutdownEvent) {
 		thread.recordingSession.Shutdown(thread)
