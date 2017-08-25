@@ -32,7 +32,7 @@ func (session *Session) newAction(actionType string) action {
 	}
 }
 
-func (session *Session) FileAppend(ctx context.Context, content []byte, fileName string) {
+func (session *Session) AppendFile(ctx context.Context, content []byte, fileName string) {
 	if session == nil {
 		return
 	}

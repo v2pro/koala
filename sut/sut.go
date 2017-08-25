@@ -198,6 +198,10 @@ func (thread *Thread) OnOpeningFile(fileName string, flags int) string {
 		"threadID", thread.threadID,
 		"fileName", fileName,
 		"flags", flags)
+	if thread.replayingSession != nil && thread.replayingSession.MockFiles != nil {
+		mockContent := thread.replayingSession.MockFiles[fileName]
+		return mockFile(mockContent)
+	}
 	return ""
 }
 
@@ -225,11 +229,11 @@ func (thread *Thread) OnWrite(fileFD FileFD, content []byte) {
 	if file.flags&os.O_APPEND == 0 {
 		return
 	}
-	countlog.Debug("event!sut.fileAppend",
+	countlog.Trace("event!sut.fileAppend",
 		"threadID", thread.threadID,
 		"fileFD", fileFD,
 		"fileName", file.fileName,
 		"content", content)
-	thread.recordingSession.FileAppend(thread, content, file.fileName)
+	thread.recordingSession.AppendFile(thread, content, file.fileName)
 	thread.replayingSession.AppendFile(thread, content, file.fileName)
 }
