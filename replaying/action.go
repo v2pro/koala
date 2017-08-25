@@ -91,3 +91,9 @@ type AppendFile struct {
 	FileName string
 	Content  []byte
 }
+
+type SendUDP struct {
+	replayedAction
+	Peer net.UDPAddr
+	Content []byte
+}

@@ -171,12 +171,13 @@ type SendToFlags int
 
 func (thread *Thread) OnSendTo(socketFD SocketFD, span []byte, flags SendToFlags, addr net.UDPAddr) {
 	if addr.String() != "127.127.127.127:127" {
-		countlog.Debug("event!sut.sendto",
+		countlog.Trace("event!sut.sendto",
 			"threadID", thread.threadID,
 			"socketFD", socketFD,
 			"addr", &addr,
 			"content", span)
 		thread.recordingSession.SendUDP(thread, span, addr)
+		thread.replayingSession.SendUDP(thread, span, addr)
 		return
 	}
 	helperInfo := span

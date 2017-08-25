@@ -5,6 +5,7 @@ import (
 	"github.com/v2pro/koala/countlog"
 	"context"
 	"bytes"
+	"net"
 )
 
 type ReplayingSession struct {
@@ -40,6 +41,22 @@ func (replayingSession *ReplayingSession) AppendFile(ctx context.Context, conten
 	}
 	select {
 	case replayingSession.actionCollector <- appendFile:
+	default:
+		countlog.Error("event!replaying.ActionCollector is full", "ctx", ctx)
+	}
+}
+
+func (replayingSession *ReplayingSession) SendUDP(ctx context.Context, content []byte, peer net.UDPAddr) {
+	if replayingSession == nil {
+		return
+	}
+	sendUdp := &SendUDP{
+		replayedAction: newReplayedAction("SendUDP"),
+		Peer:           peer,
+		Content:        content,
+	}
+	select {
+	case replayingSession.actionCollector <- sendUdp:
 	default:
 		countlog.Error("event!replaying.ActionCollector is full", "ctx", ctx)
 	}

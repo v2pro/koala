@@ -43,13 +43,12 @@ func Test_bad_case(t *testing.T) {
 	err = json.Unmarshal(bytes, origSession)
 	bytes, err = ioutil.ReadFile("/tmp/koala-replayed-session.json")
 	should.Nil(err)
-	replayedSession := ReplayedSession{
-	}
+	var replayedSession interface{}
 	err = json.Unmarshal(bytes, &replayedSession)
 	should.Nil(err)
 
-	//fmt.Println(string(origSession.OutboundTalks[35].Request))
-	reqStr := get(replayedSession.Actions[34], "Request").(string)
+	fmt.Println(string(origSession.CallOutbounds[2].Request))
+	reqStr := get(replayedSession, "Actions", 33, "Request").(string)
 	req, _ := base64.StdEncoding.DecodeString(reqStr)
 	fmt.Println(string(req))
 	index, mark, matched := origSession.MatchOutboundTalk(nil, -1, req)
