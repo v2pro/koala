@@ -9,6 +9,7 @@ import (
 	"github.com/v2pro/koala/recording"
 	"syscall"
 	"os"
+	"strings"
 )
 
 var threadShutdownEvent = []byte("to-koala:thread-shutdown||")
@@ -198,9 +199,22 @@ func (thread *Thread) OnOpeningFile(fileName string, flags int) string {
 		"threadID", thread.threadID,
 		"fileName", fileName,
 		"flags", flags)
-	if thread.replayingSession != nil && thread.replayingSession.MockFiles != nil {
-		mockContent := thread.replayingSession.MockFiles[fileName]
-		return mockFile(mockContent)
+	if thread.replayingSession != nil {
+		if thread.replayingSession.MockFiles != nil {
+			mockContent := thread.replayingSession.MockFiles[fileName]
+			if mockContent != nil {
+				countlog.Debug("event!sut.mock_file",
+					"fileName", fileName,
+					"content", mockContent)
+				return mockFile(mockContent)
+			}
+		}
+		for redirectFrom, redirectTo := range thread.replayingSession.RedirectDirs {
+			if strings.HasPrefix(fileName, redirectFrom) {
+				return strings.Replace(fileName, redirectFrom,
+					redirectTo, 1)
+			}
+		}
 	}
 	return ""
 }

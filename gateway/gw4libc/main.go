@@ -228,5 +228,24 @@ func on_write(threadID C.pid_t,
 		OnWrite(sut.FileFD(fileFD), ch_span_to_bytes(span))
 }
 
+//export on_access
+func on_access(threadID C.pid_t,
+	pathname C.struct_ch_span,
+	mode C.int) C.struct_ch_allocated_string {
+	defer func() {
+		recovered := recover()
+		if recovered != nil {
+			countlog.Fatal("event!gw4libc.access.panic", "err", recovered,
+				"stacktrace", countlog.ProvideStacktrace)
+		}
+	}()
+	redirectTo := sut.GetThread(sut.ThreadID(threadID)).
+		OnOpeningFile(ch_span_to_string(pathname), int(mode))
+	if redirectTo != "" {
+		return C.struct_ch_allocated_string{C.CString(redirectTo)}
+	}
+	return C.struct_ch_allocated_string{nil}
+}
+
 func main() {
 }

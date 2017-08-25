@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/syscall.h>
+#include <dirent.h>
 #include "init.h"
 #include "_cgo_export.h"
 
@@ -28,14 +29,8 @@ static open64_pfn_t orig_open64_func;
 typedef ssize_t (*write_pfn_t)(int, const void *, size_t);
 static write_pfn_t orig_write_func;
 
-void file_hook_init (void) __attribute__ ((constructor));
-void file_hook_init() {
-    HOOK_SYS_FUNC( fopen );
-    HOOK_SYS_FUNC( fopen64 );
-    HOOK_SYS_FUNC( open );
-    HOOK_SYS_FUNC( open64 );
-    HOOK_SYS_FUNC( write );
-}
+typedef int (*access_pfn_t)(const char *pathname, int mode);
+static access_pfn_t orig_access_func;
 
 FILE * fopen(const char *filename, const char *opentype) {
     HOOK_SYS_FUNC( fopen );
@@ -108,8 +103,8 @@ int open(const char *filename, int flags, mode_t mode) {
     filename_span.Len = strlen(filename);
     struct ch_allocated_string redirect_to = on_opening_file(thread_id, filename_span, flags, mode);
     if (redirect_to.Ptr != NULL) {
-        int file = orig_open_func(filename, flags, mode);
-        if (file != 0) {
+        int file = orig_open_func(redirect_to.Ptr, flags, mode);
+        if (file != -1) {
             filename_span.Ptr = redirect_to.Ptr;
             filename_span.Len = strlen(redirect_to.Ptr);
             on_opened_file(thread_id, file, filename_span, flags, mode);
@@ -118,7 +113,7 @@ int open(const char *filename, int flags, mode_t mode) {
         return file;
     }
     int file = orig_open_func(filename, flags, mode);
-    if (file != 0) {
+    if (file != -1) {
         on_opened_file(thread_id, file, filename_span, flags, mode);
     }
     return file;
@@ -135,8 +130,8 @@ int open64(const char *filename, int flags, mode_t mode) {
     filename_span.Len = strlen(filename);
     struct ch_allocated_string redirect_to = on_opening_file(thread_id, filename_span, flags, mode);
     if (redirect_to.Ptr != NULL) {
-        int file = orig_open64_func(filename, flags, mode);
-        if (file != 0) {
+        int file = orig_open64_func(redirect_to.Ptr, flags, mode);
+        if (file != -1) {
             filename_span.Ptr = redirect_to.Ptr;
             filename_span.Len = strlen(redirect_to.Ptr);
             on_opened_file(thread_id, file, filename_span, flags, mode);
@@ -145,13 +140,17 @@ int open64(const char *filename, int flags, mode_t mode) {
         return file;
     }
     int file = orig_open64_func(filename, flags, mode);
-    if (file != 0) {
+    if (file != -1) {
         on_opened_file(thread_id, file, filename_span, flags, mode);
     }
     return file;
 }
 
 ssize_t write(int fileFD, const void *buffer, size_t size) {
+    HOOK_SYS_FUNC( write );
+    if (is_go_initialized() != 1) {
+        return orig_write_func(fileFD, buffer, size);
+    }
     ssize_t written_size = orig_write_func(fileFD, buffer, size);
     if (written_size >= 0) {
         pid_t thread_id = syscall(__NR_gettid);
@@ -161,4 +160,22 @@ ssize_t write(int fileFD, const void *buffer, size_t size) {
         on_write(thread_id, fileFD, span);
     }
     return written_size;
+}
+
+int access(const char *pathname, int mode) {
+    HOOK_SYS_FUNC( access );
+    if (is_go_initialized() != 1) {
+        return orig_access_func(pathname, mode);
+    }
+    pid_t thread_id = syscall(__NR_gettid);
+    struct ch_span pathname_span;
+    pathname_span.Ptr = pathname;
+    pathname_span.Len = strlen(pathname);
+    struct ch_allocated_string redirect_to = on_access(thread_id, pathname_span, mode);
+    if (redirect_to.Ptr != NULL) {
+        int result = orig_access_func(redirect_to.Ptr, mode);
+        free(redirect_to.Ptr);
+        return result;
+    }
+    return orig_access_func(pathname, mode);
 }

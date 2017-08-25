@@ -5,10 +5,14 @@ import (
 	"encoding/base32"
 	"io/ioutil"
 	"github.com/v2pro/koala/countlog"
+	"os"
 )
 
 func mockFile(content []byte) string {
 	mockedFile := "/tmp/" + hash(content)
+	if _, err := os.Stat(mockedFile); err == nil {
+		return mockedFile
+	}
 	err := ioutil.WriteFile(mockedFile, content, 0666)
 	if err != nil {
 		countlog.Error("event!sut.failed to write mock file",

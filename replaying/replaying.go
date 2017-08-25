@@ -13,6 +13,7 @@ type ReplayingSession struct {
 	CallFromInbound *recording.CallFromInbound
 	ReturnInbound   *recording.ReturnInbound
 	CallOutbounds   []*recording.CallOutbound
+	RedirectDirs    map[string]string
 	MockFiles       map[string][]byte
 	actionCollector chan ReplayedAction
 }
