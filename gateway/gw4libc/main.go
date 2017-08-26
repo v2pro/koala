@@ -5,7 +5,7 @@ import (
 	"github.com/v2pro/koala/countlog"
 )
 
-// #cgo LDFLAGS: -ldl -lm -lrt
+// #cgo LDFLAGS: -ldl -lm
 // #include <stddef.h>
 // #include <netinet/in.h>
 // #include <sys/types.h>
