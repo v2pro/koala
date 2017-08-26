@@ -201,14 +201,6 @@ static inline void timespec_from_saved (struct timespec *tp,
   tp->tv_nsec = be64toh(saved->nsec);
 }
 
-/** Saved timestamps */
-static struct saved_timestamp *stss = NULL;
-static size_t infile_size;
-static bool infile_set = false;
-
-/** File fd to save timestamps to */
-static int outfile = -1;
-
 static bool limited_faking = false;
 static long callcounter = 0;
 static long ft_start_after_secs = -1;
@@ -308,10 +300,6 @@ void ft_cleanup (void)
   {
     munmap(ft_shared, sizeof(uint64_t));
   }
-  if (stss != NULL)
-  {
-    munmap(stss, infile_size);
-  }
   if (shared_sem != NULL)
   {
     sem_close(shared_sem);
@@ -324,38 +312,6 @@ void ft_cleanup (void)
  *      Internal time retrieval                                     === INTTIME
  *      =======================================================================
  */
-
-/* Get system time from system for all clocks */
-static void system_time_from_system (struct system_time_s * systime)
-{
-#ifdef __APPLEOSX__
-  /* from http://stackoverflow.com/questions/5167269/clock-gettime-alternative-in-mac-os-x */
-  clock_serv_t cclock;
-  mach_timespec_t mts;
-  host_get_clock_service(mach_host_self(), CALENDAR_CLOCK, &clock_serv_real);
-  (*real_clock_get_time)(clock_serv_real, &mts);
-  systime->real.tv_sec = mts.tv_sec;
-  systime->real.tv_nsec = mts.tv_nsec;
-  host_get_clock_service(mach_host_self(), SYSTEM_CLOCK, &cclock);
-  (*real_clock_get_time)(cclock, &mts);
-  mach_port_deallocate(mach_task_self(), cclock);
-  systime->mon.tv_sec = mts.tv_sec;
-  systime->mon.tv_nsec = mts.tv_nsec;
-  systime->mon_raw.tv_sec = mts.tv_sec;
-  systime->mon_raw.tv_nsec = mts.tv_nsec;
-#else
-  DONT_FAKE_TIME((*real_clock_gettime)(CLOCK_REALTIME, &systime->real))
-   ;
-  DONT_FAKE_TIME((*real_clock_gettime)(CLOCK_MONOTONIC, &systime->mon))
-   ;
-  DONT_FAKE_TIME((*real_clock_gettime)(CLOCK_MONOTONIC_RAW, &systime->mon_raw))
-   ;
-#ifdef CLOCK_BOOTTIME
-  DONT_FAKE_TIME((*real_clock_gettime)(CLOCK_BOOTTIME, &systime->boot))
-   ;
-#endif
-#endif
-}
 
 static void next_time(struct timespec *tp, struct timespec *ticklen)
 {
@@ -380,108 +336,6 @@ static void next_time(struct timespec *tp, struct timespec *ticklen)
     }
   }
 }
-
-
-/*
- *      =======================================================================
- *      Saving & loading time                                          === SAVE
- *      =======================================================================
- */
-
-static void save_time(struct timespec *tp)
-{
-  if ((shared_sem != NULL) && (outfile != -1))
-  {
-    struct saved_timestamp time_write;
-    ssize_t written;
-    size_t n = 0;
-
-    time_write.sec = htobe64(tp->tv_sec);
-    time_write.nsec = htobe64(tp->tv_nsec);
-
-    /* lock */
-    if (sem_wait(shared_sem) == -1)
-    {
-      perror("sem_wait");
-      exit(1);
-    }
-
-    lseek(outfile, 0, SEEK_END);
-    do
-    {
-      written = write(outfile, &(((char*)&time_write)[n]), sizeof(time_write) - n);
-    }
-    while (((written == -1) && (errno == EINTR)) ||
-            (sizeof(time_write) < (n += written)));
-
-    if ((written == -1) || (n < sizeof(time_write)))
-    {
-      perror("Saving timestamp to file failed");
-    }
-
-    /* unlock */
-    if (sem_post(shared_sem) == -1)
-    {
-      perror("sem_post");
-      exit(1);
-    }
-  }
-}
-
-/*
- * Provide faked time from file.
- * @return time is set from filen
- */
-static bool load_time(struct timespec *tp)
-{
-  bool ret = false;
-  if ((shared_sem != NULL) && (infile_set))
-  {
-    /* lock */
-    if (sem_wait(shared_sem) == -1)
-    {
-      perror("sem_wait");
-      exit(1);
-    }
-
-    if ((sizeof(stss[0]) * (ft_shared->file_idx + 1)) > infile_size)
-    {
-      /* we are out of timstamps to replay, return to faking time by rules
-       * using last timestamp from file as the user provided timestamp */
-      timespec_from_saved(&user_faked_time_timespec, &stss[(infile_size / sizeof(stss[0])) - 1 ]);
-
-      if (ft_shared->ticks == 0)
-      {
-        /* we set shared memory to stop using infile */
-        ft_shared->ticks = 1;
-        system_time_from_system(&ftpl_starttime);
-        ft_shared->start_time = ftpl_starttime;
-      }
-      else
-      {
-        ftpl_starttime = ft_shared->start_time;
-      }
-
-      munmap(stss, infile_size);
-      infile_set = false;
-    }
-    else
-    {
-      timespec_from_saved(tp, &stss[ft_shared->file_idx]);
-      ft_shared->file_idx++;
-      ret = true;
-    }
-
-    /* unlock */
-    if (sem_post(shared_sem) == -1)
-    {
-      perror("sem_post");
-      exit(1);
-    }
-  }
-  return ret;
-}
-
 
 /*
  *      =======================================================================
@@ -1590,20 +1444,6 @@ void parse_ft_string(const char *user_faked_time)
       goto parse_modifiers;
       break;
 
-      /* Contributed by David North, TDI in version 0.7 */
-    case '@': /* Specific time, but clock along relative to that starttime */
-      ft_mode = FT_START_AT;
-      user_faked_time_tm.tm_isdst = -1;
-      (void) strptime(&user_faked_time[1], user_faked_time_fmt, &user_faked_time_tm);
-
-      user_faked_time_timespec.tv_sec = mktime(&user_faked_time_tm);
-      user_faked_time_timespec.tv_nsec = 0;
-
-      /* Reset starttime */
-      system_time_from_system(&ftpl_starttime);
-      goto parse_modifiers;
-      break;
-
     case 'i':
     case 'x': /* Only modifiers are passed, don't fall back to strptime */
 parse_modifiers:
@@ -1841,49 +1681,6 @@ void ftpl_init(void)
     }
   }
 
-  if ((tmp_env = getenv("FAKETIME_SAVE_FILE")) != NULL)
-  {
-    if (-1 == (outfile = open(tmp_env, O_RDWR | O_APPEND | O_CLOEXEC | O_CREAT,
-                              S_IWUSR | S_IRUSR)))
-    {
-      perror("Opening file for saving timestamps failed");
-      exit(EXIT_FAILURE);
-    }
-  }
-
-  /* load file only if reading timstamps from it is not finished yet */
-  if ((tmp_env = getenv("FAKETIME_LOAD_FILE")) != NULL)
-  {
-    int infile = -1;
-    struct stat sb;
-    if (-1 == (infile = open(tmp_env, O_RDONLY|O_CLOEXEC)))
-    {
-      perror("Opening file for loading timestamps failed");
-      exit(EXIT_FAILURE);
-    }
-
-    fstat(infile, &sb);
-    if (sizeof(stss[0]) > (infile_size = sb.st_size))
-    {
-      printf("There are no timestamps in the provided file to load timestamps from");
-      exit(EXIT_FAILURE);
-    }
-
-    if ((infile_size % sizeof(stss[0])) != 0)
-    {
-      printf("File size is not multiple of timestamp size. It is probably damaged.");
-      exit(EXIT_FAILURE);
-    }
-
-    stss = mmap(NULL, infile_size, PROT_READ, MAP_SHARED, infile, 0);
-    if (stss == MAP_FAILED)
-    {
-      perror("Mapping file for loading timestamps failed");
-      exit(EXIT_FAILURE);
-    }
-    infile_set = true;
-  }
-
   tmp_env = getenv("FAKETIME_FMT");
   if (tmp_env == NULL)
   {
@@ -1894,34 +1691,6 @@ void ftpl_init(void)
     strncpy(user_faked_time_fmt, tmp_env, BUFSIZ);
   }
 
-  if (shared_sem != 0)
-  {
-    if (sem_wait(shared_sem) == -1)
-    {
-      perror("sem_wait");
-      exit(1);
-    }
-    if (ft_shared->start_time.real.tv_nsec == -1)
-    {
-      /* set up global start time */
-      system_time_from_system(&ftpl_starttime);
-      ft_shared->start_time = ftpl_starttime;
-    }
-    else
-    {
-      /** get preset start time */
-      ftpl_starttime = ft_shared->start_time;
-    }
-    if (sem_post(shared_sem) == -1)
-    {
-      perror("sem_post");
-      exit(1);
-    }
-  }
-  else
-  {
-    system_time_from_system(&ftpl_starttime);
-  }
   /* fake time supplied as environment variable? */
   if (NULL != (tmp_env = getenv("FAKETIME")))
   {
@@ -2122,14 +1891,6 @@ int fake_clock_gettime(clockid_t clk_id, struct timespec *tp)
     parse_ft_string(user_faked_time);
   } /* cache had expired */
 
-  if (infile_set)
-  {
-    if (load_time(tp))
-    {
-      return 0;
-    }
-  }
-
   /* check whether the user gave us an absolute time to fake */
   switch (ft_mode)
   {
@@ -2195,7 +1956,6 @@ int fake_clock_gettime(clockid_t clk_id, struct timespec *tp)
 #ifdef PTHREAD_SINGLETHREADED_TIME
   pthread_cleanup_pop(1);
 #endif
-  save_time(tp);
   return 0;
 }
 
