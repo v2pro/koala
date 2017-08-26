@@ -1,4 +1,5 @@
 *.so
+*.dylib
 *.iml
 /vendor
 /test/*.h

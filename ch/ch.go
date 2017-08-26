@@ -25,9 +25,17 @@ func FieldOf(typ reflect.Type, name string) *reflect.StructField {
 	panic(name + " not found in " + typ.String())
 }
 
+func GetUint8(ptr unsafe.Pointer, field *reflect.StructField) uint8 {
+	if field.Type.Kind() != reflect.Uint8 {
+		panic(fmt.Sprintf("kind mismatch, expect uint8, actual %v", field.Type.Kind()))
+	}
+	fieldPtr := unsafe.Pointer(uintptr(ptr) + field.Offset)
+	return *(*uint8)(fieldPtr)
+}
+
 func GetUint16(ptr unsafe.Pointer, field *reflect.StructField) uint16 {
 	if field.Type.Kind() != reflect.Uint16 {
-		panic("kind mismatch")
+		panic(fmt.Sprintf("kind mismatch, expect uint16, actual %v", field.Type.Kind()))
 	}
 	fieldPtr := unsafe.Pointer(uintptr(ptr) + field.Offset)
 	return *(*uint16)(fieldPtr)

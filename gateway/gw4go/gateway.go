@@ -144,6 +144,7 @@ func startLogging() {
 		StringLengthCap:      512,
 	}
 	logWriter.EventWhitelist["event!replaying.talks_scored"] = true
+	logWriter.EventWhitelist["event!sut.opening_file"] = true
 	logWriter.Start()
 	countlog.LogWriters = append(countlog.LogWriters, logWriter)
 }

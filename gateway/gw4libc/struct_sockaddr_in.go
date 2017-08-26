@@ -24,7 +24,11 @@ func init() {
 }
 
 func sockaddr_in_sin_family_get(ptr *C.struct_sockaddr_in) uint16 {
-	return ch.GetUint16(unsafe.Pointer(ptr), sockaddr_in_sin_family_field)
+	if sockaddr_in_sin_family_field.Type.Kind() == reflect.Uint16 {
+		return ch.GetUint16(unsafe.Pointer(ptr), sockaddr_in_sin_family_field)
+	} else {
+		return uint16(ch.GetUint8(unsafe.Pointer(ptr), sockaddr_in_sin_family_field))
+	}
 }
 
 func sockaddr_in_sin_port_get(ptr *C.struct_sockaddr_in) uint16 {
