@@ -1,3 +1,5 @@
+#define _GNU_SOURCE
+
 #include <dlfcn.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -6,11 +8,10 @@
 #include <sys/syscall.h>
 #include <dirent.h>
 #include "init.h"
+#include "thread_id.h"
 #include "_cgo_export.h"
 
 extern long syscall(long number, ...);
-
-#define RTLD_NEXT	((void *) -1l)
 
 #define HOOK_SYS_FUNC(name) if( !orig_##name##_func ) { orig_##name##_func = (name##_pfn_t)dlsym(RTLD_NEXT,#name); }
 
@@ -37,7 +38,7 @@ FILE * fopen(const char *filename, const char *opentype) {
     if (is_go_initialized() != 1) {
         return orig_fopen_func(filename, opentype);
     }
-    pid_t thread_id = syscall(__NR_gettid);
+    pid_t thread_id = get_thread_id();
     struct ch_span filename_span;
     filename_span.Ptr = filename;
     filename_span.Len = strlen(filename);
@@ -67,7 +68,7 @@ FILE * fopen64(const char *filename, const char *opentype) {
     if (is_go_initialized() != 1) {
         return orig_fopen64_func(filename, opentype);
     }
-    pid_t thread_id = syscall(__NR_gettid);
+    pid_t thread_id = get_thread_id();
     struct ch_span filename_span;
     filename_span.Ptr = filename;
     filename_span.Len = strlen(filename);
@@ -97,7 +98,7 @@ int open(const char *filename, int flags, mode_t mode) {
     if (is_go_initialized() != 1) {
         return orig_open_func(filename, flags, mode);
     }
-    pid_t thread_id = syscall(__NR_gettid);
+    pid_t thread_id = get_thread_id();
     struct ch_span filename_span;
     filename_span.Ptr = filename;
     filename_span.Len = strlen(filename);
@@ -124,7 +125,7 @@ int open64(const char *filename, int flags, mode_t mode) {
     if (is_go_initialized() != 1) {
         return orig_open64_func(filename, flags, mode);
     }
-    pid_t thread_id = syscall(__NR_gettid);
+    pid_t thread_id = get_thread_id();
     struct ch_span filename_span;
     filename_span.Ptr = filename;
     filename_span.Len = strlen(filename);
@@ -153,7 +154,7 @@ ssize_t write(int fileFD, const void *buffer, size_t size) {
     }
     ssize_t written_size = orig_write_func(fileFD, buffer, size);
     if (written_size >= 0) {
-        pid_t thread_id = syscall(__NR_gettid);
+        pid_t thread_id = get_thread_id();
         struct ch_span span;
         span.Ptr = buffer;
         span.Len = written_size;
@@ -167,7 +168,7 @@ int access(const char *pathname, int mode) {
     if (is_go_initialized() != 1) {
         return orig_access_func(pathname, mode);
     }
-    pid_t thread_id = syscall(__NR_gettid);
+    pid_t thread_id = get_thread_id();
     struct ch_span pathname_span;
     pathname_span.Ptr = pathname;
     pathname_span.Len = strlen(pathname);

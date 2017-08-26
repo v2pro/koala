@@ -13,11 +13,10 @@
 #include <sys/types.h>
 #include <sys/syscall.h>
 #include "span.h"
+#include "thread_id.h"
 #include "_cgo_export.h"
 
 extern long syscall(long number, ...);
-
-#define RTLD_NEXT	((void *) -1l)
 
 #define HOOK_SYS_FUNC(name) if( !orig_##name##_func ) { orig_##name##_func = (name##_pfn_t)dlsym(RTLD_NEXT,#name); }
 
@@ -53,7 +52,7 @@ int bind (int socketFD, const struct sockaddr *addr, socklen_t length) {
     int errno = orig_bind_func(socketFD,addr, length);
     if (errno == 0 && addr->sa_family == AF_INET) {
         struct sockaddr_in *typed_addr = (struct sockaddr_in *)(addr);
-        pid_t thread_id = syscall(__NR_gettid);
+        pid_t thread_id = get_thread_id();
         on_bind(thread_id, socketFD, typed_addr);
     }
     return errno;
@@ -65,7 +64,7 @@ ssize_t send(int socketFD, const void *buffer, size_t size, int flags) {
         struct ch_span span;
         span.Ptr = buffer;
         span.Len = sent_size;
-        pid_t thread_id = syscall(__NR_gettid);
+        pid_t thread_id = get_thread_id();
         on_send(thread_id, socketFD, span, flags);
     }
     return sent_size;
@@ -77,7 +76,7 @@ ssize_t recv (int socketFD, void *buffer, size_t size, int flags) {
         struct ch_span span;
         span.Ptr = buffer;
         span.Len = received_size;
-        pid_t thread_id = syscall(__NR_gettid);
+        pid_t thread_id = get_thread_id();
         on_recv(thread_id, socketFD, span, flags);
     }
     return received_size;
@@ -90,7 +89,7 @@ ssize_t sendto(int socketFD, const void *buffer, size_t buffer_size, int flags,
         struct ch_span span;
         span.Ptr = buffer;
         span.Len = buffer_size;
-        pid_t thread_id = syscall(__NR_gettid);
+        pid_t thread_id = get_thread_id();
         on_sendto(thread_id, socketFD, span, flags, typed_addr);
     }
     return orig_sendto_func(socketFD, buffer, buffer_size, flags, addr, addr_size);
@@ -99,7 +98,7 @@ ssize_t sendto(int socketFD, const void *buffer, size_t buffer_size, int flags,
 int connect(int socketFD, const struct sockaddr *remote_addr, socklen_t remote_addr_len) {
     if (remote_addr->sa_family == AF_INET) {
         struct sockaddr_in *typed_remote_addr = (struct sockaddr_in *)(remote_addr);
-        pid_t thread_id = syscall(__NR_gettid);
+        pid_t thread_id = get_thread_id();
         on_connect(thread_id, socketFD, typed_remote_addr);
     }
     return orig_connect_func(socketFD, remote_addr, remote_addr_len);
@@ -109,7 +108,7 @@ int accept(int serverSocketFD, struct sockaddr *addr, socklen_t *addrlen) {
     int clientSocketFD = orig_accept_func(serverSocketFD, addr, addrlen);
     if (clientSocketFD > 0 && addr->sa_family == AF_INET) {
         struct sockaddr_in *typed_addr = (struct sockaddr_in *)(addr);
-        pid_t thread_id = syscall(__NR_gettid);
+        pid_t thread_id = get_thread_id();
         on_accept(thread_id, serverSocketFD, clientSocketFD, typed_addr);
     }
     return clientSocketFD;
