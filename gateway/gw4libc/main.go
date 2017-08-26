@@ -247,5 +247,23 @@ func on_access(threadID C.pid_t,
 	return C.struct_ch_allocated_string{nil}
 }
 
+//export on_xstat
+func on_xstat(threadID C.pid_t,
+	pathname C.struct_ch_span) C.struct_ch_allocated_string {
+	defer func() {
+		recovered := recover()
+		if recovered != nil {
+			countlog.Fatal("event!gw4libc.xstat.panic", "err", recovered,
+				"stacktrace", countlog.ProvideStacktrace)
+		}
+	}()
+	redirectTo := sut.GetThread(sut.ThreadID(threadID)).
+		OnOpeningFile(ch_span_to_string(pathname), 0)
+	if redirectTo != "" {
+		return C.struct_ch_allocated_string{C.CString(redirectTo)}
+	}
+	return C.struct_ch_allocated_string{nil}
+}
+
 func main() {
 }

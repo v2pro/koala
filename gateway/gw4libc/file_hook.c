@@ -30,9 +30,6 @@ static open64_pfn_t orig_open64_func;
 typedef ssize_t (*write_pfn_t)(int, const void *, size_t);
 static write_pfn_t orig_write_func;
 
-typedef int (*access_pfn_t)(const char *pathname, int mode);
-static access_pfn_t orig_access_func;
-
 FILE * fopen(const char *filename, const char *opentype) {
     HOOK_SYS_FUNC( fopen );
     if (is_go_initialized() != 1) {
@@ -161,22 +158,4 @@ ssize_t write(int fileFD, const void *buffer, size_t size) {
         on_write(thread_id, fileFD, span);
     }
     return written_size;
-}
-
-int access(const char *pathname, int mode) {
-    HOOK_SYS_FUNC( access );
-    if (is_go_initialized() != 1) {
-        return orig_access_func(pathname, mode);
-    }
-    pid_t thread_id = get_thread_id();
-    struct ch_span pathname_span;
-    pathname_span.Ptr = pathname;
-    pathname_span.Len = strlen(pathname);
-    struct ch_allocated_string redirect_to = on_access(thread_id, pathname_span, mode);
-    if (redirect_to.Ptr != NULL) {
-        int result = orig_access_func(redirect_to.Ptr, mode);
-        free(redirect_to.Ptr);
-        return result;
-    }
-    return orig_access_func(pathname, mode);
 }

@@ -1,4 +1,4 @@
-#ifdef USE_LIB_FAKETIME
+#ifdef KOALA_REPLAYER
 /*
  *  This file is part of libfaketime, version 0.9.6
  *
@@ -251,47 +251,6 @@ static bool parse_config_file = false;
 
 void ft_cleanup (void) __attribute__ ((destructor));
 void ftpl_init (void) __attribute__ ((constructor));
-
-
-/*
- *      =======================================================================
- *      Shared memory related functions                                 === SHM
- *      =======================================================================
- */
-
-static void ft_shm_init (void)
-{
-  int ticks_shm_fd;
-  char sem_name[256], shm_name[256], *ft_shared_env = getenv("FAKETIME_SHARED");
-
-  if (ft_shared_env != NULL)
-  {
-    if (sscanf(ft_shared_env, "%255s %255s", sem_name, shm_name) < 2)
-    {
-      printf("Error parsing semaphore name and shared memory id from string: %s", ft_shared_env);
-      exit(1);
-    }
-
-    if (SEM_FAILED == (shared_sem = sem_open(sem_name, 0)))
-    {
-      perror("sem_open");
-      exit(1);
-    }
-
-    if (-1 == (ticks_shm_fd = shm_open(shm_name, O_CREAT|O_RDWR, S_IWUSR|S_IRUSR)))
-    {
-      perror("shm_open");
-      exit(1);
-    }
-
-    if (MAP_FAILED == (ft_shared = mmap(NULL, sizeof(struct ft_shared_s), PROT_READ|PROT_WRITE,
-            MAP_SHARED, ticks_shm_fd, 0)))
-    {
-      perror("mmap");
-      exit(1);
-    }
-  }
-}
 
 void ft_cleanup (void)
 {
@@ -1550,7 +1509,6 @@ void ftpl_init(void)
   dont_fake_final = false;
   initialized = 1;
 
-  ft_shm_init();
 #ifdef FAKE_STAT
   if (getenv("NO_FAKE_STAT")!=NULL)
   {
@@ -2169,10 +2127,10 @@ int __ftime(struct timeb *tb)
  * :indentSize=2:tabSize=2:noTabs=true:
  */
 
-#else // USE_LIB_FAKETIME
+#else // KOALA_REPLAYER
 void ftpl_init(void) {
 }
 void parse_ft_string(const char *user_faked_time) {
 }
-#endif // USE_LIB_FAKETIME
+#endif // KOALA_REPLAYER
 /* eof */
