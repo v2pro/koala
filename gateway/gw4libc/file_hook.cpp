@@ -1,39 +1,18 @@
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 
-#include <dlfcn.h>
-#include <stddef.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
-#include <sys/syscall.h>
-#include <dirent.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include "interpose.h"
 #include "init.h"
 #include "thread_id.h"
 #include "_cgo_export.h"
 
-extern long syscall(long number, ...);
-
-#define HOOK_SYS_FUNC(name) if( !orig_##name##_func ) { orig_##name##_func = (name##_pfn_t)dlsym(RTLD_NEXT,#name); }
-
-typedef FILE * (*fopen_pfn_t)(const char *filename, const char *opentype);
-static fopen_pfn_t orig_fopen_func;
-
-typedef FILE * (*fopen64_pfn_t)(const char *filename, const char *opentype);
-static fopen64_pfn_t orig_fopen64_func;
-
-typedef int (*open_pfn_t)(const char *filename, int flags, mode_t mode);
-static open_pfn_t orig_open_func;
-
-typedef int (*open64_pfn_t)(const char *filename, int flags, mode_t mode);
-static open64_pfn_t orig_open64_func;
-
-typedef ssize_t (*write_pfn_t)(int, const void *, size_t);
-static write_pfn_t orig_write_func;
-
-FILE * fopen(const char *filename, const char *opentype) {
-    HOOK_SYS_FUNC( fopen );
+INTERPOSE(fopen)(const char *filename, const char *opentype) {
     if (is_go_initialized() != 1) {
-        return orig_fopen_func(filename, opentype);
+        return real::fopen(filename, opentype);
     }
     pid_t thread_id = get_thread_id();
     struct ch_span filename_span;
@@ -44,7 +23,7 @@ FILE * fopen(const char *filename, const char *opentype) {
     opentype_span.Len = strlen(opentype);
     struct ch_allocated_string redirect_to = on_fopening_file(thread_id, filename_span, opentype_span);
     if (redirect_to.Ptr != NULL) {
-        FILE *file = orig_fopen_func(redirect_to.Ptr, opentype);
+        auto file = real::fopen(redirect_to.Ptr, opentype);
         if (file != NULL) {
             filename_span.Ptr = redirect_to.Ptr;
             filename_span.Len = strlen(redirect_to.Ptr);
@@ -53,17 +32,16 @@ FILE * fopen(const char *filename, const char *opentype) {
         free(redirect_to.Ptr);
         return file;
     }
-    FILE *file = orig_fopen_func(filename, opentype);
+    auto file = real::fopen(filename, opentype);
     if (file != NULL) {
         on_fopened_file(thread_id, fileno(file), filename_span, opentype_span);
     }
     return file;
 }
 
-FILE * fopen64(const char *filename, const char *opentype) {
-    HOOK_SYS_FUNC( fopen64 );
+INTERPOSE(fopen64)(const char *filename, const char *opentype) {
     if (is_go_initialized() != 1) {
-        return orig_fopen64_func(filename, opentype);
+        return real::fopen64(filename, opentype);
     }
     pid_t thread_id = get_thread_id();
     struct ch_span filename_span;
@@ -74,7 +52,7 @@ FILE * fopen64(const char *filename, const char *opentype) {
     opentype_span.Len = strlen(opentype);
     struct ch_allocated_string redirect_to = on_fopening_file(thread_id, filename_span, opentype_span);
     if (redirect_to.Ptr != NULL) {
-        FILE *file = orig_fopen64_func(redirect_to.Ptr, opentype);
+        FILE *file = real::fopen64(redirect_to.Ptr, opentype);
         if (file != NULL) {
             filename_span.Ptr = redirect_to.Ptr;
             filename_span.Len = strlen(redirect_to.Ptr);
@@ -83,17 +61,16 @@ FILE * fopen64(const char *filename, const char *opentype) {
         free(redirect_to.Ptr);
         return file;
     }
-    FILE *file = orig_fopen64_func(filename, opentype);
+    FILE *file = real::fopen64(filename, opentype);
     if (file != NULL) {
         on_fopened_file(thread_id, fileno(file), filename_span, opentype_span);
     }
     return file;
 }
 
-int open(const char *filename, int flags, mode_t mode) {
-    HOOK_SYS_FUNC( open );
+INTERPOSE(open)(const char *filename, int flags, mode_t mode) {
     if (is_go_initialized() != 1) {
-        return orig_open_func(filename, flags, mode);
+        return real::open(filename, flags, mode);
     }
     pid_t thread_id = get_thread_id();
     struct ch_span filename_span;
@@ -101,7 +78,7 @@ int open(const char *filename, int flags, mode_t mode) {
     filename_span.Len = strlen(filename);
     struct ch_allocated_string redirect_to = on_opening_file(thread_id, filename_span, flags, mode);
     if (redirect_to.Ptr != NULL) {
-        int file = orig_open_func(redirect_to.Ptr, flags, mode);
+        int file = real::open(redirect_to.Ptr, flags, mode);
         if (file != -1) {
             filename_span.Ptr = redirect_to.Ptr;
             filename_span.Len = strlen(redirect_to.Ptr);
@@ -110,17 +87,16 @@ int open(const char *filename, int flags, mode_t mode) {
         free(redirect_to.Ptr);
         return file;
     }
-    int file = orig_open_func(filename, flags, mode);
+    int file = real::open(filename, flags, mode);
     if (file != -1) {
         on_opened_file(thread_id, file, filename_span, flags, mode);
     }
     return file;
 }
 
-int open64(const char *filename, int flags, mode_t mode) {
-    HOOK_SYS_FUNC( open64 );
+INTERPOSE(open64)(const char *filename, int flags, mode_t mode) {
     if (is_go_initialized() != 1) {
-        return orig_open64_func(filename, flags, mode);
+        return real::open64(filename, flags, mode);
     }
     pid_t thread_id = get_thread_id();
     struct ch_span filename_span;
@@ -128,7 +104,7 @@ int open64(const char *filename, int flags, mode_t mode) {
     filename_span.Len = strlen(filename);
     struct ch_allocated_string redirect_to = on_opening_file(thread_id, filename_span, flags, mode);
     if (redirect_to.Ptr != NULL) {
-        int file = orig_open64_func(redirect_to.Ptr, flags, mode);
+        int file = real::open64(redirect_to.Ptr, flags, mode);
         if (file != -1) {
             filename_span.Ptr = redirect_to.Ptr;
             filename_span.Len = strlen(redirect_to.Ptr);
@@ -137,19 +113,18 @@ int open64(const char *filename, int flags, mode_t mode) {
         free(redirect_to.Ptr);
         return file;
     }
-    int file = orig_open64_func(filename, flags, mode);
+    int file = real::open64(filename, flags, mode);
     if (file != -1) {
         on_opened_file(thread_id, file, filename_span, flags, mode);
     }
     return file;
 }
 
-ssize_t write(int fileFD, const void *buffer, size_t size) {
-    HOOK_SYS_FUNC( write );
+INTERPOSE(write)(int fileFD, const void *buffer, size_t size) {
     if (is_go_initialized() != 1) {
-        return orig_write_func(fileFD, buffer, size);
+        return real::write(fileFD, buffer, size);
     }
-    ssize_t written_size = orig_write_func(fileFD, buffer, size);
+    ssize_t written_size = real::write(fileFD, buffer, size);
     if (written_size >= 0) {
         pid_t thread_id = get_thread_id();
         struct ch_span span;
