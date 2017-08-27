@@ -1,4 +1,4 @@
-#ifdef KOALA_REPLAYER
+#ifdef KOALA_REPLAYER2
 /*
  *  This file is part of libfaketime, version 0.9.6
  *
