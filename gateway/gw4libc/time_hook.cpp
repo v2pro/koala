@@ -39,7 +39,11 @@ INTERPOSE(ftime)(struct timeb *tb) {
     }
     return result;
 }
+#ifdef __APPLE__
+INTERPOSE(gettimeofday)(struct timeval *tv, void *tz) {
+#else
 INTERPOSE(gettimeofday)(struct timeval *tv, struct timezone *tz) {
+#endif
     fprintf(stderr, "interpose gettimeofday: %d\n", offset);
     fflush(stderr);
     auto result = real::gettimeofday(tv, tz);
@@ -50,6 +54,21 @@ INTERPOSE(gettimeofday)(struct timeval *tv, struct timezone *tz) {
     }
     return result;
 }
+#ifdef __APPLE__
+#include <mach/clock.h>
+#include <mach/mach.h>
+INTERPOSE(clock_get_time)(clock_serv_t clock_serv, mach_timespec_t *cur_timeclockid_t){
+    fprintf(stderr, "interpose clock_get_time: %d\n", offset);
+    fflush(stderr);
+    auto result = real::clock_get_time(clock_serv, cur_timeclockid_t);
+    if (cur_timeclockid_t != NULL) {
+        cur_timeclockid_t->tv_sec = cur_timeclockid_t->tv_sec + offset;
+        fprintf(stderr, "interpose clock_get_time modified %d\n", cur_timeclockid_t->tv_sec);
+        fflush(stderr);
+    }
+    return result;
+}
+#else
 INTERPOSE(clock_gettime)(clockid_t clk_id, struct timespec *tp) {
     fprintf(stderr, "interpose clock_gettime: %d\n", offset);
     fflush(stderr);
@@ -61,3 +80,4 @@ INTERPOSE(clock_gettime)(clockid_t clk_id, struct timespec *tp) {
     }
     return result;
 }
+#endif
