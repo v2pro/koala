@@ -43,7 +43,8 @@ INTERPOSE(clock_gettime)(clockid_t clk_id, struct timespec *tp) {
     return result;
 }
 INTERPOSE(time)(time_t *time_tptr) {
-    auto result = real::time(NULL);
+    time_t my_time;
+    auto result = real::time(&my_time);
     auto old_result = result;
     result += offset;
      fprintf(stderr, "interpose time modified %ld + %d = %ld\n", old_result, offset, result);
