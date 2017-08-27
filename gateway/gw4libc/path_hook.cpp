@@ -93,6 +93,16 @@ INTERPOSE(__xstat)(int ver, const char *path, struct stat *buf) {
     auto result = real::__xstat(ver, path, buf);
     PATH_HOOK_EXIT
 }
+INTERPOSE(__xstat64)(int ver, const char *path, struct stat64 *buf) {
+    PATH_HOOK_ENTER(__xstat64)
+    auto result = real::__xstat64(ver, path, buf);
+    PATH_HOOK_EXIT
+}
+INTERPOSE(__lxstat)(int ver, const char *path, struct stat *buf) {
+    PATH_HOOK_ENTER(__lxstat)
+    auto result = real::__lxstat(ver, path, buf);
+    PATH_HOOK_EXIT
+}
 INTERPOSE(statfs)(const char *path, struct statfs *buf){
     PATH_HOOK_ENTER(statfs)
     auto result = real::statfs(path, buf);
