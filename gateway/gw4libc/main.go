@@ -1,10 +1,5 @@
 package main
 
-import (
-	"github.com/v2pro/koala/sut"
-	"github.com/v2pro/koala/countlog"
-)
-
 // #cgo LDFLAGS: -ldl -lm
 // #include <stddef.h>
 // #include <netinet/in.h>
@@ -16,6 +11,8 @@ import (
 // #include "init.h"
 import "C"
 import (
+	"github.com/v2pro/koala/sut"
+	"github.com/v2pro/koala/countlog"
 	"github.com/v2pro/koala/ch"
 	"syscall"
 	"net"

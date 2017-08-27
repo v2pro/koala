@@ -10,36 +10,11 @@
 #include "thread_id.h"
 #include "_cgo_export.h"
 
-INTERPOSE(fopen)(const char *filename, const char *opentype) {
-    if (is_go_initialized() != 1) {
-        return real::fopen(filename, opentype);
-    }
-    pid_t thread_id = get_thread_id();
-    struct ch_span filename_span;
-    filename_span.Ptr = filename;
-    filename_span.Len = strlen(filename);
-    struct ch_span opentype_span;
-    opentype_span.Ptr = opentype;
-    opentype_span.Len = strlen(opentype);
-    struct ch_allocated_string redirect_to = on_fopening_file(thread_id, filename_span, opentype_span);
-    if (redirect_to.Ptr != NULL) {
-        auto file = real::fopen(redirect_to.Ptr, opentype);
-        if (file != NULL) {
-            filename_span.Ptr = redirect_to.Ptr;
-            filename_span.Len = strlen(redirect_to.Ptr);
-            on_fopened_file(thread_id, fileno(file), filename_span, opentype_span);
-        }
-        free(redirect_to.Ptr);
-        return file;
-    }
-    auto file = real::fopen(filename, opentype);
-    if (file != NULL) {
-        on_fopened_file(thread_id, fileno(file), filename_span, opentype_span);
-    }
-    return file;
-}
+#define FILE_HOOK_ENTER(name)
 
+#ifndef __APPLE__
 INTERPOSE(fopen64)(const char *filename, const char *opentype) {
+    FILE_HOOK_ENTER(fopen64)
     if (is_go_initialized() != 1) {
         return real::fopen64(filename, opentype);
     }
@@ -68,33 +43,8 @@ INTERPOSE(fopen64)(const char *filename, const char *opentype) {
     return file;
 }
 
-INTERPOSE(open)(const char *filename, int flags, mode_t mode) {
-    if (is_go_initialized() != 1) {
-        return real::open(filename, flags, mode);
-    }
-    pid_t thread_id = get_thread_id();
-    struct ch_span filename_span;
-    filename_span.Ptr = filename;
-    filename_span.Len = strlen(filename);
-    struct ch_allocated_string redirect_to = on_opening_file(thread_id, filename_span, flags, mode);
-    if (redirect_to.Ptr != NULL) {
-        int file = real::open(redirect_to.Ptr, flags, mode);
-        if (file != -1) {
-            filename_span.Ptr = redirect_to.Ptr;
-            filename_span.Len = strlen(redirect_to.Ptr);
-            on_opened_file(thread_id, file, filename_span, flags, mode);
-        }
-        free(redirect_to.Ptr);
-        return file;
-    }
-    int file = real::open(filename, flags, mode);
-    if (file != -1) {
-        on_opened_file(thread_id, file, filename_span, flags, mode);
-    }
-    return file;
-}
-
 INTERPOSE(open64)(const char *filename, int flags, mode_t mode) {
+    FILE_HOOK_ENTER(open64)
     if (is_go_initialized() != 1) {
         return real::open64(filename, flags, mode);
     }
@@ -119,8 +69,97 @@ INTERPOSE(open64)(const char *filename, int flags, mode_t mode) {
     }
     return file;
 }
+#endif // __APPLE__
+
+INTERPOSE(fopen)(const char *filename, const char *opentype) {
+    FILE_HOOK_ENTER(fopen)
+    if (is_go_initialized() != 1) {
+        return real::fopen(filename, opentype);
+    }
+    pid_t thread_id = get_thread_id();
+    struct ch_span filename_span;
+    filename_span.Ptr = filename;
+    filename_span.Len = strlen(filename);
+    struct ch_span opentype_span;
+    opentype_span.Ptr = opentype;
+    opentype_span.Len = strlen(opentype);
+    struct ch_allocated_string redirect_to = on_fopening_file(thread_id, filename_span, opentype_span);
+    if (redirect_to.Ptr != NULL) {
+        auto file = real::fopen(redirect_to.Ptr, opentype);
+        if (file != NULL) {
+            filename_span.Ptr = redirect_to.Ptr;
+            filename_span.Len = strlen(redirect_to.Ptr);
+            on_fopened_file(thread_id, fileno(file), filename_span, opentype_span);
+        }
+        free(redirect_to.Ptr);
+        return file;
+    }
+    auto file = real::fopen(filename, opentype);
+    if (file != NULL) {
+        on_fopened_file(thread_id, fileno(file), filename_span, opentype_span);
+    }
+    return file;
+}
+
+INTERPOSE(open)(const char *filename, int flags, ...) {
+    FILE_HOOK_ENTER(open)
+    if(flags & O_CREAT){
+        va_list vl;
+        va_start(vl,flags);
+        mode_t mode = va_arg(vl,int);
+        va_end(vl);
+        if (is_go_initialized() != 1) {
+            return real::open(filename, flags, mode);
+        }
+        pid_t thread_id = get_thread_id();
+        struct ch_span filename_span;
+        filename_span.Ptr = filename;
+        filename_span.Len = strlen(filename);
+        struct ch_allocated_string redirect_to = on_opening_file(thread_id, filename_span, flags, mode);
+        if (redirect_to.Ptr != NULL) {
+            int file = real::open(redirect_to.Ptr, flags, mode);
+            if (file != -1) {
+                filename_span.Ptr = redirect_to.Ptr;
+                filename_span.Len = strlen(redirect_to.Ptr);
+                on_opened_file(thread_id, file, filename_span, flags, mode);
+            }
+            free(redirect_to.Ptr);
+            return file;
+        }
+        int file = real::open(filename, flags, mode);
+        if (file != -1) {
+            on_opened_file(thread_id, file, filename_span, flags, mode);
+        }
+        return file;
+    } else {
+        if (is_go_initialized() != 1) {
+            return real::open(filename, flags);
+        }
+        pid_t thread_id = get_thread_id();
+        struct ch_span filename_span;
+        filename_span.Ptr = filename;
+        filename_span.Len = strlen(filename);
+        struct ch_allocated_string redirect_to = on_opening_file(thread_id, filename_span, flags, 0);
+        if (redirect_to.Ptr != NULL) {
+            int file = real::open(redirect_to.Ptr, flags);
+            if (file != -1) {
+                filename_span.Ptr = redirect_to.Ptr;
+                filename_span.Len = strlen(redirect_to.Ptr);
+                on_opened_file(thread_id, file, filename_span, flags, 0);
+            }
+            free(redirect_to.Ptr);
+            return file;
+        }
+        int file = real::open(filename, flags);
+        if (file != -1) {
+            on_opened_file(thread_id, file, filename_span, flags, 0);
+        }
+        return file;
+    }
+}
 
 INTERPOSE(write)(int fileFD, const void *buffer, size_t size) {
+    FILE_HOOK_ENTER(write)
     if (is_go_initialized() != 1) {
         return real::write(fileFD, buffer, size);
     }

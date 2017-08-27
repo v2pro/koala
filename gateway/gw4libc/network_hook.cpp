@@ -18,6 +18,12 @@
 #include "thread_id.h"
 #include "_cgo_export.h"
 
+
+#define HOOK_SYS_FUNC(name) if( !orig_##name##_func ) { orig_##name##_func = (name##_pfn_t)dlsym(RTLD_NEXT,#name); }
+
+typedef ssize_t (*sendto_pfn_t)(int, const void *, size_t, int, const struct sockaddr *, socklen_t);
+static sendto_pfn_t orig_sendto_func;
+
 INTERPOSE(bind)(int socketFD, const struct sockaddr *addr, socklen_t length) {
     auto result = real::bind(socketFD, addr, length);
     if (result == 0 && addr->sa_family == AF_INET) {
@@ -54,7 +60,8 @@ INTERPOSE(recv)(int socketFD, void *buffer, size_t size, int flags) {
 
 INTERPOSE(sendto)(int socketFD, const void *buffer, size_t buffer_size, int flags,
                const struct sockaddr *addr, socklen_t addr_size) {
-    if (addr->sa_family == AF_INET) {
+    auto result = real::sendto(socketFD, buffer, buffer_size, flags, addr, addr_size);
+    if (addr && addr->sa_family == AF_INET) {
         struct sockaddr_in *typed_addr = (struct sockaddr_in *)(addr);
         struct ch_span span;
         span.Ptr = buffer;
@@ -62,7 +69,7 @@ INTERPOSE(sendto)(int socketFD, const void *buffer, size_t buffer_size, int flag
         pid_t thread_id = get_thread_id();
         on_sendto(thread_id, socketFD, span, flags, typed_addr);
     }
-    return real::sendto(socketFD, buffer, buffer_size, flags, addr, addr_size);
+    return result;
 }
 
 INTERPOSE(connect)(int socketFD, const struct sockaddr *remote_addr, socklen_t remote_addr_len) {
