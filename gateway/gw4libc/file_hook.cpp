@@ -5,6 +5,7 @@
 #include <string.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <stdarg.h>
 #include "interpose.h"
 #include "init.h"
 #include "thread_id.h"
