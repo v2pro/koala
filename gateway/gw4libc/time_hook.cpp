@@ -1,3 +1,4 @@
+#ifdef KOALA_REPLAYER
 #include <dlfcn.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -54,3 +55,4 @@ INTERPOSE(ftime)(struct timeb *tb) {
     return result;
 }
 #endif
+#endif // KOALA_REPLAYER

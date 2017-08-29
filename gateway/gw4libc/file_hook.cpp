@@ -1,3 +1,4 @@
+#ifdef KOALA_REPLAYER
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
@@ -174,3 +175,4 @@ INTERPOSE(write)(int fileFD, const void *buffer, size_t size) {
     }
     return written_size;
 }
+#endif // KOALA_REPLAYER
