@@ -77,7 +77,7 @@ type CallFunction struct {
 	CallIntoFile string
 	CallIntoLine int
 	FuncName     string
-	Args         map[string]interface{}
+	Args         []interface{}
 }
 
 type ReturnFunction struct {

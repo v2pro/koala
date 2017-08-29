@@ -6,6 +6,10 @@ import (
 	"context"
 	"bytes"
 	"net"
+	"encoding/json"
+	"time"
+	"strings"
+	"fmt"
 )
 
 type ReplayingSession struct {
@@ -20,13 +24,33 @@ type ReplayingSession struct {
 
 func NewReplayingSession() *ReplayingSession {
 	return &ReplayingSession{
-		actionCollector: make(chan ReplayedAction, 4096),
+		actionCollector: make(chan ReplayedAction, 40960),
 	}
 }
 
 func (replayingSession *ReplayingSession) CallOutbound(ctx context.Context, callOutbound *CallOutbound) {
 	select {
 	case replayingSession.actionCollector <- callOutbound:
+	default:
+		countlog.Error("event!replaying.ActionCollector is full", "ctx", ctx)
+	}
+}
+
+func (replayingSession *ReplayingSession) CallFunction(ctx context.Context, content []byte) {
+	callFunction := &CallFunction{}
+	err := json.Unmarshal(content, callFunction)
+	if err != nil {
+		countlog.Error("event!replaying.unmarshal CallFunction failed", "err", err, "content", content)
+		return
+	}
+	callFunction.OccurredAt = time.Now().UnixNano()
+	callFunction.ActionType = "CallFunction"
+	if !strings.HasPrefix(callFunction.CallIntoFile, "/home/xiaoju/workspace/passenger-api/controllers/") {
+		return
+	}
+	fmt.Println(callFunction.CallIntoFile)
+	select {
+	case replayingSession.actionCollector <- callFunction:
 	default:
 		countlog.Error("event!replaying.ActionCollector is full", "ctx", ctx)
 	}

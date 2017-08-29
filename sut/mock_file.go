@@ -6,10 +6,17 @@ import (
 	"io/ioutil"
 	"github.com/v2pro/koala/countlog"
 	"os"
+	"github.com/v2pro/koala/envarg"
 )
 
+func init() {
+	if envarg.IsReplaying() {
+		os.Mkdir("/tmp/koala-mocked-files", 0777)
+	}
+}
+
 func mockFile(content []byte) string {
-	mockedFile := "/tmp/" + hash(content)
+	mockedFile := "/tmp/koala-mocked-files/" + hash(content)
 	if _, err := os.Stat(mockedFile); err == nil {
 		return mockedFile
 	}

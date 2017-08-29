@@ -11,9 +11,12 @@ import (
 	"os"
 	"strings"
 	"github.com/v2pro/koala/envarg"
+	"github.com/v2pro/koala/trace"
 )
 
-var threadShutdownEvent = []byte("to-koala:thread-shutdown||")
+var threadShutdownEvent = []byte("to-koala:thread-shutdown\n")
+var callFunctionEvent = []byte("to-koala:call-function\n")
+var returnFunctionEvent = []byte("to-koala:return-function\n")
 
 func (thread *Thread) lookupSocket(socketFD SocketFD) *socket {
 	sock := thread.socks[socketFD]
@@ -185,7 +188,7 @@ func (thread *Thread) OnSendTo(socketFD SocketFD, span []byte, flags SendToFlags
 		return
 	}
 	helperInfo := span
-	countlog.Debug("event!sut.received_helper_info",
+	countlog.Trace("event!sut.received_helper_info",
 		"threadID", thread.threadID,
 		"socketFD", socketFD,
 		"addr", &addr,
@@ -194,6 +197,8 @@ func (thread *Thread) OnSendTo(socketFD SocketFD, span []byte, flags SendToFlags
 		thread.recordingSession.Shutdown(thread)
 		countlog.Debug("event!sut.thread_shutdown",
 			"threadID", thread.threadID)
+	} else if bytes.HasPrefix(helperInfo, callFunctionEvent) {
+		thread.replayingSession.CallFunction(thread, helperInfo[len(callFunctionEvent):])
 	}
 }
 
@@ -203,21 +208,31 @@ func (thread *Thread) OnOpeningFile(fileName string, flags int) string {
 		"fileName", fileName,
 		"flags", flags)
 	if thread.replayingSession != nil {
-		if thread.replayingSession.MockFiles != nil {
-			mockContent := thread.replayingSession.MockFiles[fileName]
-			if mockContent != nil {
-				countlog.Debug("event!sut.mock_file",
-					"fileName", fileName,
-					"content", mockContent)
-				return mockFile(mockContent)
-			}
-		}
+		var redirectedFileName string
 		for redirectFrom, redirectTo := range thread.replayingSession.RedirectDirs {
 			if strings.HasPrefix(fileName, redirectFrom) {
-				return strings.Replace(fileName, redirectFrom,
+				redirectedFileName = strings.Replace(fileName, redirectFrom,
 					redirectTo, 1)
+				break
 			}
 		}
+		if redirectedFileName != "" {
+			fileName = redirectedFileName
+		}
+		var mockContent []byte
+		if thread.replayingSession.MockFiles != nil {
+			mockContent = thread.replayingSession.MockFiles[fileName]
+		}
+		//if mockContent == nil {
+		//	mockContent = trace.MockFile(redirectedFileName)
+		//}
+		if mockContent != nil {
+			countlog.Trace("event!sut.mock_file",
+				"fileName", fileName,
+				"content", mockContent)
+			return mockFile(mockContent)
+		}
+		return redirectedFileName
 	}
 	return ""
 }
