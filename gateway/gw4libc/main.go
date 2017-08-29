@@ -1,4 +1,4 @@
-package main
+package gw4libc
 
 // #cgo LDFLAGS: -ldl -lm
 // #include <stddef.h>
@@ -11,13 +11,13 @@ package main
 // #include "init.h"
 import "C"
 import (
-	"github.com/v2pro/koala/sut"
-	"github.com/v2pro/koala/countlog"
 	"github.com/v2pro/koala/ch"
-	"syscall"
-	"net"
+	"github.com/v2pro/koala/countlog"
 	"github.com/v2pro/koala/envarg"
 	"github.com/v2pro/koala/gateway/gw4go"
+	"github.com/v2pro/koala/sut"
+	"net"
+	"syscall"
 )
 
 func init() {
@@ -74,9 +74,9 @@ func on_bind(threadID C.pid_t, socketFD C.int, addr *C.struct_sockaddr_in) {
 	}()
 	sut.GetThread(sut.ThreadID(threadID)).
 		OnBind(sut.SocketFD(socketFD), net.TCPAddr{
-		IP:   ch.Int2ip(sockaddr_in_sin_addr_get(addr)),
-		Port: int(ch.Ntohs(sockaddr_in_sin_port_get(addr))),
-	})
+			IP:   ch.Int2ip(sockaddr_in_sin_addr_get(addr)),
+			Port: int(ch.Ntohs(sockaddr_in_sin_port_get(addr))),
+		})
 }
 
 //export on_accept
@@ -93,9 +93,9 @@ func on_accept(threadID C.pid_t, serverSocketFD C.int, clientSocketFD C.int, add
 	}
 	sut.GetThread(sut.ThreadID(threadID)).
 		OnAccept(sut.SocketFD(serverSocketFD), sut.SocketFD(clientSocketFD), net.TCPAddr{
-		IP:   ch.Int2ip(sockaddr_in_sin_addr_get(addr)),
-		Port: int(ch.Ntohs(sockaddr_in_sin_port_get(addr))),
-	})
+			IP:   ch.Int2ip(sockaddr_in_sin_addr_get(addr)),
+			Port: int(ch.Ntohs(sockaddr_in_sin_port_get(addr))),
+		})
 }
 
 //export on_send
@@ -135,9 +135,9 @@ func on_sendto(threadID C.pid_t, socketFD C.int, span C.struct_ch_span, flags C.
 	}()
 	sut.GetThread(sut.ThreadID(threadID)).
 		OnSendTo(sut.SocketFD(socketFD), ch_span_to_bytes(span), sut.SendToFlags(flags), net.UDPAddr{
-		IP:   ch.Int2ip(sockaddr_in_sin_addr_get(addr)),
-		Port: int(ch.Ntohs(sockaddr_in_sin_port_get(addr))),
-	})
+			IP:   ch.Int2ip(sockaddr_in_sin_addr_get(addr)),
+			Port: int(ch.Ntohs(sockaddr_in_sin_port_get(addr))),
+		})
 }
 
 //export on_fopening_file
@@ -241,7 +241,4 @@ func redirect_path(threadID C.pid_t,
 		return C.struct_ch_allocated_string{C.CString(redirectTo)}
 	}
 	return C.struct_ch_allocated_string{nil}
-}
-
-func main() {
 }

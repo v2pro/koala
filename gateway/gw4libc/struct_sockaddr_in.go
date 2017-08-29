@@ -1,4 +1,4 @@
-package main
+package gw4libc
 
 // #include <stddef.h>
 // #include <netinet/in.h>
