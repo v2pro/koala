@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"os"
 	"strings"
+	"github.com/v2pro/koala/envarg"
 )
 
 var threadShutdownEvent = []byte("to-koala:thread-shutdown||")
@@ -152,14 +153,16 @@ func (thread *Thread) OnConnect(socketFD SocketFD, remoteAddr net.TCPAddr) {
 		isServer: false,
 		addr:     remoteAddr,
 	}
-	localAddr, err := replaying.BindFDToLocalAddr(int(socketFD))
-	if err != nil {
-		countlog.Error("event!sut.failed to bind local addr", "err", err)
-		return
-	}
-	thread.socks[socketFD].localAddr = localAddr
-	if thread.replayingSession != nil {
-		replaying.StoreTmp(*localAddr, thread.replayingSession)
+	if envarg.IsReplaying() {
+		localAddr, err := replaying.BindFDToLocalAddr(int(socketFD))
+		if err != nil {
+			countlog.Error("event!sut.failed to bind local addr", "err", err)
+			return
+		}
+		thread.socks[socketFD].localAddr = localAddr
+		if thread.replayingSession != nil {
+			replaying.StoreTmp(*localAddr, thread.replayingSession)
+		}
 	}
 	countlog.Debug("event!sut.connect",
 		"threadID", thread.threadID,
