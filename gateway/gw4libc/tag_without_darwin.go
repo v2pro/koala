@@ -1,6 +1,6 @@
 // +build !darwin
 
-package main
+package gw4libc
 
 // #cgo LDFLAGS: -lrt
 import "C"
