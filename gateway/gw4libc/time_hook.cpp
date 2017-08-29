@@ -55,4 +55,9 @@ INTERPOSE(ftime)(struct timeb *tb) {
     return result;
 }
 #endif
+#else
+extern "C" {
+    void set_time_offset(int val) {
+    }
+}
 #endif // KOALA_REPLAYER
