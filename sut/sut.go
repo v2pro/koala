@@ -11,7 +11,6 @@ import (
 	"os"
 	"strings"
 	"github.com/v2pro/koala/envarg"
-	"github.com/v2pro/koala/trace"
 )
 
 var threadShutdownEvent = []byte("to-koala:thread-shutdown\n")
