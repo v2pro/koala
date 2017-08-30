@@ -11,11 +11,12 @@ import (
 	"os"
 	"strings"
 	"github.com/v2pro/koala/envarg"
+	"github.com/v2pro/koala/trace"
 )
 
-var threadShutdownEvent = []byte("to-koala:thread-shutdown\n")
-var callFunctionEvent = []byte("to-koala:call-function\n")
-var returnFunctionEvent = []byte("to-koala:return-function\n")
+var helperThreadShutdown = "to-koala!thread-shutdown"
+var helperCallFunction = "to-koala!call-function"
+var helperReturnFunction = "to-koala!return-function"
 
 func (thread *Thread) lookupSocket(socketFD SocketFD) *socket {
 	sock := thread.socks[socketFD]
@@ -192,12 +193,24 @@ func (thread *Thread) OnSendTo(socketFD SocketFD, span []byte, flags SendToFlags
 		"socketFD", socketFD,
 		"addr", &addr,
 		"content", helperInfo)
-	if bytes.HasPrefix(helperInfo, threadShutdownEvent) {
+	newlinePos := bytes.IndexByte(helperInfo, '\n')
+	if newlinePos == -1 {
+		return
+	}
+	helperType := string(helperInfo[:newlinePos])
+	body := helperInfo[newlinePos+1:]
+	switch helperType {
+	case helperThreadShutdown:
 		thread.recordingSession.Shutdown(thread)
 		countlog.Debug("event!sut.thread_shutdown",
 			"threadID", thread.threadID)
-	} else if bytes.HasPrefix(helperInfo, callFunctionEvent) {
-		thread.replayingSession.CallFunction(thread, helperInfo[len(callFunctionEvent):])
+	case helperCallFunction:
+		thread.replayingSession.CallFunction(thread, body)
+	case helperReturnFunction:
+		thread.replayingSession.ReturnFunction(thread, body)
+	default:
+		countlog.Debug("event!sut.unknown_helper",
+			"threadID", thread.threadID, "helperType", helperType)
 	}
 }
 
@@ -206,34 +219,36 @@ func (thread *Thread) OnOpeningFile(fileName string, flags int) string {
 		"threadID", thread.threadID,
 		"fileName", fileName,
 		"flags", flags)
-	if thread.replayingSession != nil {
-		var redirectedFileName string
-		for redirectFrom, redirectTo := range thread.replayingSession.RedirectDirs {
-			if strings.HasPrefix(fileName, redirectFrom) {
-				redirectedFileName = strings.Replace(fileName, redirectFrom,
-					redirectTo, 1)
-				break
-			}
-		}
-		if redirectedFileName != "" {
-			fileName = redirectedFileName
-		}
-		var mockContent []byte
-		if thread.replayingSession.MockFiles != nil {
-			mockContent = thread.replayingSession.MockFiles[fileName]
-		}
-		//if mockContent == nil {
-		//	mockContent = trace.MockFile(redirectedFileName)
-		//}
+	if thread.replayingSession == nil {
+		return ""
+	}
+	if thread.replayingSession.MockFiles != nil {
+		mockContent := thread.replayingSession.MockFiles[fileName]
 		if mockContent != nil {
 			countlog.Trace("event!sut.mock_file",
 				"fileName", fileName,
 				"content", mockContent)
 			return mockFile(mockContent)
 		}
-		return redirectedFileName
 	}
-	return ""
+	var redirectedFileName string
+	for redirectFrom, redirectTo := range thread.replayingSession.RedirectDirs {
+		if strings.HasPrefix(fileName, redirectFrom) {
+			redirectedFileName = strings.Replace(fileName, redirectFrom,
+				redirectTo, 1)
+			break
+		}
+	}
+	if redirectedFileName != "" {
+		fileName = redirectedFileName
+	}
+	if len(thread.replayingSession.TracePaths) > 0 {
+		instrumentedFileName := trace.InstrumentFile(fileName)
+		if instrumentedFileName != "" {
+			return instrumentedFileName
+		}
+	}
+	return redirectedFileName
 }
 
 func (thread *Thread) OnOpenedFile(fileFD FileFD, fileName string, flags int) {

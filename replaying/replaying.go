@@ -7,9 +7,8 @@ import (
 	"bytes"
 	"net"
 	"encoding/json"
-	"time"
 	"strings"
-	"fmt"
+	"strconv"
 )
 
 type ReplayingSession struct {
@@ -19,6 +18,7 @@ type ReplayingSession struct {
 	CallOutbounds   []*recording.CallOutbound
 	RedirectDirs    map[string]string
 	MockFiles       map[string][]byte
+	TracePaths		[]string
 	actionCollector chan ReplayedAction
 }
 
@@ -43,18 +43,29 @@ func (replayingSession *ReplayingSession) CallFunction(ctx context.Context, cont
 		countlog.Error("event!replaying.unmarshal CallFunction failed", "err", err, "content", content)
 		return
 	}
-	callFunction.OccurredAt = time.Now().UnixNano()
 	callFunction.ActionType = "CallFunction"
-	if !strings.HasPrefix(callFunction.CallIntoFile, "/home/xiaoju/workspace/passenger-api/controllers/") {
+	shouldTrace := false
+	for _, tracePath := range replayingSession.TracePaths {
+		if strings.HasPrefix(callFunction.CallIntoFile, tracePath) {
+			shouldTrace = true
+			break
+		}
+	}
+	if !shouldTrace {
 		return
 	}
-	fmt.Println(callFunction.CallIntoFile)
+	callFunction.OccurredAt, _ = strconv.ParseInt(callFunction.ActionId, 10, 64)
 	select {
 	case replayingSession.actionCollector <- callFunction:
 	default:
 		countlog.Error("event!replaying.ActionCollector is full", "ctx", ctx)
 	}
 }
+
+func (replayingSession *ReplayingSession) ReturnFunction(ctx context.Context, content []byte) {
+
+}
+
 
 func (replayingSession *ReplayingSession) AppendFile(ctx context.Context, content []byte, fileName string) {
 	if replayingSession == nil {

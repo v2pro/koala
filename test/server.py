@@ -42,7 +42,7 @@ class ThreadingMixIn:
                 self.shutdown_request(request)
         finally:
             socket.socket(socket.AF_INET, socket.SOCK_DGRAM).sendto(
-                'to-koala:thread-shutdown||',
+                'to-koala!thread-shutdown\n',
                 ('127.127.127.127', 127))
 
     def process_request(self, request, client_address):
