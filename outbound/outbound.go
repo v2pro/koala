@@ -111,6 +111,10 @@ func handleOutbound(conn *net.TCPConn) {
 			"ctx", ctx,
 			"content", request,
 			"replayingSession", replayingSession)
+		if len(request) == 0 {
+			countlog.Error("event!outbound.received empty request", "ctx", ctx)
+			return
+		}
 		callOutbound := replaying.NewCallOutbound(*tcpAddr, request)
 		var matchedTalk *recording.CallOutbound
 		var mark float64
