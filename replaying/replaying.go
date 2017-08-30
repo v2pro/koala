@@ -17,7 +17,7 @@ type ReplayingSession struct {
 	CallOutbounds   []*recording.CallOutbound
 	RedirectDirs    map[string]string
 	MockFiles       map[string][]byte
-	TracePaths		[]string
+	TracePaths      []string
 	actionCollector chan ReplayedAction
 }
 
@@ -101,22 +101,10 @@ func (replayingSession *ReplayingSession) Finish(response []byte) *ReplayedSessi
 		Response:         response,
 	}
 	done := false
-	appendFiles := map[string]*AppendFile{}
 	for !done {
 		select {
 		case action := <-replayingSession.actionCollector:
-			switch typedAction := action.(type) {
-			case *AppendFile:
-				existingAppendFile := appendFiles[typedAction.FileName]
-				if existingAppendFile == nil {
-					appendFiles[typedAction.FileName] = typedAction
-					replayedSession.Actions = append(replayedSession.Actions, action)
-				} else {
-					existingAppendFile.Content = append(existingAppendFile.Content, typedAction.Content...)
-				}
-			default:
-				replayedSession.Actions = append(replayedSession.Actions, action)
-			}
+			replayedSession.Actions = append(replayedSession.Actions, action)
 		default:
 			done = true
 		}

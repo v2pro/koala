@@ -30,10 +30,14 @@ func init() {
 	if !envarg.IsReplaying() {
 		return
 	}
-	err := os.Mkdir("/tmp/koala-instrumented-files", 0777)
-	if err != nil {
-		countlog.Error("event!trace.failed to create instrumented dir", "err", err)
+	if _, err := os.Stat("/tmp/koala-instrumented-files"); err != nil {
+		// dir not created yet, create
+		err = os.Mkdir("/tmp/koala-instrumented-files", 0777)
+		if err != nil {
+			countlog.Error("event!trace.failed to create instrumented dir", "err", err)
+		}
 	}
+	var err error
 	re_function, err = regexp.Compile(`((static[\s\r\n]+)?(public[\s\r\n]+)?(private[\s\r\n]+)?(static[\s\r\n]+)?)function[\s\r\n]*(\w+)\(([\s\r\n\w$&,='"]*)\)[\s\r\n]*{`)
 	if err != nil {
 		countlog.Error("event!trace.failed to compile regex", "err", err)

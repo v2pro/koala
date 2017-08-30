@@ -15,8 +15,11 @@ var mockedFilesMutex = &sync.Mutex{}
 
 func init() {
 	if envarg.IsReplaying() {
-		err := os.Mkdir("/tmp/koala-mocked-files", 0777)
-		countlog.Error("event!sut.failed to create mocked dir", "err", err)
+		if _, err := os.Stat("/tmp/koala-mocked-files"); err != nil {
+			// dir not created yet, create
+			err = os.Mkdir("/tmp/koala-mocked-files", 0777)
+			countlog.Error("event!sut.failed to create mocked dir", "err", err)
+		}
 	}
 }
 
