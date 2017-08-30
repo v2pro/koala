@@ -242,7 +242,7 @@ func (thread *Thread) OnOpeningFile(fileName string, flags int) string {
 	if redirectedFileName != "" {
 		fileName = redirectedFileName
 	}
-	if len(thread.replayingSession.TracePaths) > 0 {
+	if thread.replayingSession.ShouldTraceFile(fileName) {
 		instrumentedFileName := trace.InstrumentFile(fileName)
 		if instrumentedFileName != "" {
 			return instrumentedFileName

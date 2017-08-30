@@ -104,3 +104,19 @@ func cutToChunks(key []byte, unit int) [][]byte {
 	}
 	return chunks
 }
+
+func findReadableChunk(key []byte) (int, int) {
+	start := bytes.IndexFunc(key, func(r rune) bool {
+		return r > 31 && r < 127
+	})
+	if start == -1 {
+		return -1, -1
+	}
+	end := bytes.IndexFunc(key[start:], func(r rune) bool {
+		return r <= 31 || r >= 127
+	})
+	if end == -1 {
+		return start, len(key) - start
+	}
+	return start, end
+}
