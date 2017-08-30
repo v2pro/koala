@@ -206,18 +206,21 @@ $callFunction = "to-koala!call-function\n" . json_encode([
 	'ActionId' => $actionId,
 	'CallIntoFile' => '%s',
 	'CallIntoLine' => %v,
-	'FuncName' => '%s',
+	'FuncName' => empty(__CLASS__) ? '%s' : strval(__CLASS__) . '::%s',
 	'Args' => [%s],
 ], JSON_PARTIAL_OUTPUT_ON_ERROR);
 socket_sendto($sock, $callFunction, strlen($callFunction), 0, '127.127.127.127', 127);
-%s
-$returnFunction = "to-koala!return-function\n" . json_encode([
-	'CallFunctionId' => $actionId,
-	'ReturnValue' => $response,
-], JSON_PARTIAL_OUTPUT_ON_ERROR);
-socket_sendto($sock, $returnFunction, strlen($returnFunction), 0, '127.127.127.127', 127);
-return $response;
-	`, fileName, lineNo, functionName, invokeArgs, delegateInvocation)
+try {
+	%s
+	return $response;
+} finally {
+	$returnFunction = "to-koala!return-function\n" . json_encode([
+		'CallFunctionId' => $actionId,
+		'ReturnValue' => $response,
+	], JSON_PARTIAL_OUTPUT_ON_ERROR);
+	socket_sendto($sock, $returnFunction, strlen($returnFunction), 0, '127.127.127.127', 127);
+}
+	`, fileName, lineNo, functionName, functionName, invokeArgs, delegateInvocation)
 }
 
 func countNewLines(str string) (count int, lastLine string) {
