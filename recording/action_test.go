@@ -69,3 +69,17 @@ func Test_marshal_session(t *testing.T) {
 	should.Nil(err)
 	should.NotContains(string(bytes), "=") // no base64
 }
+
+func Test_encode_any_byte_array(t *testing.T) {
+	should := require.New(t)
+	should.Equal(json.RawMessage(`"hello"`), encodeAnyByteArray([]byte("hello")))
+	should.Equal(json.RawMessage(`"hel\nlo"`), encodeAnyByteArray([]byte("hel\nlo")))
+	should.Equal(json.RawMessage(`"hel\rlo"`), encodeAnyByteArray([]byte("hel\rlo")))
+	should.Equal(json.RawMessage(`"hel\tlo"`), encodeAnyByteArray([]byte("hel\tlo")))
+	should.Equal(json.RawMessage(`"hel\"lo"`), encodeAnyByteArray([]byte("hel\"lo")))
+	should.Equal(json.RawMessage(`"hel\u0000lo"`), encodeAnyByteArray([]byte("hel\u0000lo")))
+	should.Equal(json.RawMessage(`"\u0001\u0002\u0003"`), encodeAnyByteArray([]byte{1, 2, 3}))
+	should.Equal(json.RawMessage(`"中文"`), encodeAnyByteArray([]byte("中文")))
+	should.Equal(json.RawMessage([]byte{'"', 239, 191, 189, 66, 69, 69, 70, '"'}),
+		encodeAnyByteArray([]byte{239, 191, 189, 66, 69, 69, 70}))
+}
