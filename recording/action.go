@@ -222,7 +222,6 @@ func encodeAnyByteArray(s []byte) json.RawMessage {
 	encoded := []byte{'"'}
 	i := 0
 	start := i
-	// for the remaining parts, we process them char by char
 	for i < len(s) {
 		if b := s[i]; b < utf8.RuneSelf {
 			if safeSet[b] {
@@ -233,22 +232,18 @@ func encodeAnyByteArray(s []byte) json.RawMessage {
 				encoded = append(encoded, s[start:i]...)
 			}
 			switch b {
-			case '\\', '"':
-				encoded = append(encoded, '\\')
-				encoded = append(encoded, b)
+			case '\\':
+				encoded = append(encoded, `\\x5c`...)
+			case '"':
+				encoded = append(encoded, `\"`...)
 			case '\n':
-				encoded = append(encoded, "\\n"...)
+				encoded = append(encoded, `\n`...)
 			case '\r':
-				encoded = append(encoded, "\\r"...)
+				encoded = append(encoded, `\r`...)
 			case '\t':
-				encoded = append(encoded, "\\t"...)
+				encoded = append(encoded, `\t`...)
 			default:
-				// This encodes bytes < 0x20 except for \t, \n and \r.
-				// If escapeHTML is set, it also escapes <, >, and &
-				// because they can lead to security holes when
-				// user-controlled strings are rendered into JSON
-				// and served to some browsers.
-				encoded = append(encoded, `\u00`...)
+				encoded = append(encoded, `\\x`...)
 				encoded = append(encoded, hex[b>>4])
 				encoded = append(encoded, hex[b&0xF])
 			}
@@ -256,8 +251,21 @@ func encodeAnyByteArray(s []byte) json.RawMessage {
 			start = i
 			continue
 		}
-		i++
-		continue
+		c, size := utf8.DecodeRune(s[i:])
+		if c == utf8.RuneError {
+			if start < i {
+				encoded = append(encoded, s[start:i]...)
+			}
+			for _, b := range s[i:i+size] {
+				encoded = append(encoded, `\\x`...)
+				encoded = append(encoded, hex[b>>4])
+				encoded = append(encoded, hex[b&0xF])
+			}
+			i += size
+			start = i
+		} else {
+			i += size
+		}
 	}
 	if start < len(s) {
 		encoded = append(encoded, s[start:]...)
