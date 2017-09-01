@@ -206,12 +206,17 @@ else { $response = $orig(%s); }
 	return fmt.Sprintf(`
 $sock = $GLOBALS['koala_helper_sock'] ?? socket_create(AF_INET, SOCK_DGRAM, SOL_UDP);
 $actionId = sprintf('%%.0f', microtime(true) * 1000 * 1000 * 1000);
+$args = [%s];
+$encodedArgs = [];
+foreach($args as $arg) {
+	$encodedArgs []= json_encode($arg);
+}
 $callFunction = "to-koala!call-function\n" . json_encode([
 	'ActionId' => $actionId,
 	'CallIntoFile' => '%s',
 	'CallIntoLine' => %v,
 	'FuncName' => empty(__CLASS__) ? '%s' : strval(__CLASS__) . '::%s',
-	'Args' => [%s],
+	'Args' => $encodedArgs,
 ], JSON_PARTIAL_OUTPUT_ON_ERROR);
 socket_sendto($sock, $callFunction, strlen($callFunction), 0, '127.127.127.127', 127);
 try {
@@ -224,7 +229,7 @@ try {
 	], JSON_PARTIAL_OUTPUT_ON_ERROR);
 	socket_sendto($sock, $returnFunction, strlen($returnFunction), 0, '127.127.127.127', 127);
 }
-	`, fileName, lineNo, functionName, functionName, invokeArgs, delegateInvocation)
+	`,invokeArgs, fileName, lineNo, functionName, functionName, delegateInvocation)
 }
 
 func countNewLines(str string) (count int, lastLine string) {
