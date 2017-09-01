@@ -209,7 +209,7 @@ $actionId = sprintf('%%.0f', microtime(true) * 1000 * 1000 * 1000);
 $args = [%s];
 $encodedArgs = [];
 foreach($args as $arg) {
-	$encodedArgs []= json_encode($arg);
+	$encodedArgs []= json_encode($arg, JSON_PARTIAL_OUTPUT_ON_ERROR);
 }
 $callFunction = "to-koala!call-function\n" . json_encode([
 	'ActionId' => $actionId,
