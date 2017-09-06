@@ -14,6 +14,13 @@ import (
 	"github.com/v2pro/koala/trace"
 )
 
+// InboundRequestPrefix is used to recognize php-fpm FCGI_BEGIN_REQUEST packet.
+// fastcgi_finish_request() will send STDOUT first, then recv STDIN (if POST body has not been read before)
+// this behavior will trigger session shutdown as we are going to think the recv STDIN
+// is the beginning of next request.
+// Set InboundRequestPrefix to []byte{1, 1} to only begin new session for FCGI_BEGIN_REQUEST.
+// First 0x01 is the version field of fastcgi protocol, second 0x01 is FCGI_BEGIN_REQUEST.
+var InboundRequestPrefix = []byte{}
 var helperThreadShutdown = "to-koala!thread-shutdown"
 var helperCallFunction = "to-koala!call-function"
 var helperReturnFunction = "to-koala!return-function"
@@ -33,6 +40,9 @@ func (thread *Thread) lookupSocket(socketFD SocketFD) *socket {
 type SendFlags int
 
 func (thread *Thread) OnSend(socketFD SocketFD, span []byte, flags SendFlags) {
+	if len(span) == 0 {
+		return
+	}
 	sock := thread.lookupSocket(socketFD)
 	if sock == nil {
 		localAddr, err := syscall.Getsockname(int(socketFD))
@@ -89,6 +99,9 @@ func (thread *Thread) OnSend(socketFD SocketFD, span []byte, flags SendFlags) {
 type RecvFlags int
 
 func (thread *Thread) OnRecv(socketFD SocketFD, span []byte, flags RecvFlags) {
+	if len(span) == 0 {
+		return
+	}
 	sock := thread.lookupSocket(socketFD)
 	if sock == nil {
 		countlog.Warn("event!sut.unknown-recv",
@@ -98,7 +111,7 @@ func (thread *Thread) OnRecv(socketFD SocketFD, span []byte, flags RecvFlags) {
 	}
 	event := "event!sut.inbound_recv"
 	if sock.isServer {
-		if thread.recordingSession.HasResponded() {
+		if thread.recordingSession.HasResponded() && bytes.HasPrefix(span, InboundRequestPrefix) {
 			thread.recordingSession.Shutdown(thread)
 			thread.recordingSession = recording.NewSession(int32(thread.threadID))
 		}
