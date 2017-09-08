@@ -209,7 +209,11 @@ $actionId = sprintf('%%.0f', microtime(true) * 1000 * 1000 * 1000);
 $args = [%s];
 $encodedArgs = [];
 foreach($args as $arg) {
-	$encodedArgs []= json_encode($arg, JSON_PARTIAL_OUTPUT_ON_ERROR);
+	$encodedArg = json_encode($arg, JSON_PARTIAL_OUTPUT_ON_ERROR);
+	if (strlen($encodedArg) > 4096) {
+		$encodedArg = null;
+	}
+	$encodedArgs []= $encodedArg;
 }
 $callFunction = "to-koala!call-function\n" . json_encode([
 	'ActionId' => $actionId,
@@ -225,7 +229,7 @@ try {
 } finally {
 	$returnFunction = "to-koala!return-function\n" . json_encode([
 		'CallFunctionId' => $actionId,
-		'ReturnValue' => $response,
+		'ReturnValue' => json_encode($response, JSON_PARTIAL_OUTPUT_ON_ERROR),
 	], JSON_PARTIAL_OUTPUT_ON_ERROR);
 	socket_sendto($sock, $returnFunction, strlen($returnFunction), 0, '127.127.127.127', 127);
 }
