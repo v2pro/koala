@@ -28,7 +28,7 @@ func (replayingSession *ReplayingSession) MatchOutboundTalk(
 			if pos >= 0 {
 				keys[j] = key[pos:]
 				if chunkIndex == 0 && lastMatchedIndex == -1 {
-					scores[j] += 3 // first chunk has more weight
+					scores[j] += len(chunks) // first chunk has more weight
 				} else {
 					scores[j]++
 				}
@@ -75,7 +75,7 @@ func (replayingSession *ReplayingSession) loadKeys() [][]byte {
 
 func cutToChunks(key []byte, unit int) [][]byte {
 	chunks := [][]byte{}
-	if len(key) > 512 {
+	if len(key) > 256 {
 		offset := 0
 		for {
 			strikeStart, strikeLen := findReadableChunk(key[offset:])
