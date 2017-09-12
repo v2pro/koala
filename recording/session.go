@@ -1,11 +1,11 @@
 package recording
 
 import (
-	"time"
-	"net"
-	"github.com/v2pro/koala/countlog"
 	"context"
 	"fmt"
+	"github.com/v2pro/koala/countlog"
+	"net"
+	"time"
 )
 
 type Session struct {
@@ -14,7 +14,7 @@ type Session struct {
 	ReturnInbound       *ReturnInbound
 	Actions             []Action
 	currentAppendFiles  map[string]*AppendFile `json:"-"`
-	currentCallOutbound *CallOutbound `json:"-"`
+	currentCallOutbound *CallOutbound          `json:"-"`
 }
 
 func NewSession(suffix int32) *Session {
@@ -77,21 +77,24 @@ func (session *Session) SendToInbound(ctx context.Context, span []byte, peer net
 	session.ReturnInbound.Response = append(session.ReturnInbound.Response, span...)
 }
 
-func (session *Session) RecvFromOutbound(ctx context.Context, span []byte, peer net.TCPAddr) {
+func (session *Session) RecvFromOutbound(ctx context.Context, span []byte, peer net.TCPAddr, socketFD int) {
 	if session == nil {
 		return
 	}
 	if session.currentCallOutbound == nil {
 		session.currentCallOutbound = &CallOutbound{
-			action: session.newAction("CallOutbound"),
-			Peer:   peer,
+			action:   session.newAction("CallOutbound"),
+			Peer:     peer,
+			SocketFD: socketFD,
 		}
 		session.addAction(session.currentCallOutbound)
 	}
-	if session.currentCallOutbound.Peer.String() != peer.String() {
+	if (session.currentCallOutbound.Peer.String() != peer.String()) ||
+		(session.currentCallOutbound.SocketFD != socketFD) {
 		session.currentCallOutbound = &CallOutbound{
-			action: session.newAction("CallOutbound"),
-			Peer:   peer,
+			action:   session.newAction("CallOutbound"),
+			Peer:     peer,
+			SocketFD: socketFD,
 		}
 		session.addAction(session.currentCallOutbound)
 	}
@@ -101,21 +104,24 @@ func (session *Session) RecvFromOutbound(ctx context.Context, span []byte, peer 
 	session.currentCallOutbound.Response = append(session.currentCallOutbound.Response, span...)
 }
 
-func (session *Session) SendToOutbound(ctx context.Context, span []byte, peer net.TCPAddr) {
+func (session *Session) SendToOutbound(ctx context.Context, span []byte, peer net.TCPAddr, socketFD int) {
 	if session == nil {
 		return
 	}
 	if session.currentCallOutbound == nil {
 		session.currentCallOutbound = &CallOutbound{
-			action: session.newAction("CallOutbound"),
-			Peer:   peer,
+			action:   session.newAction("CallOutbound"),
+			Peer:     peer,
+			SocketFD: socketFD,
 		}
 		session.addAction(session.currentCallOutbound)
 	}
-	if session.currentCallOutbound.Peer.String() != peer.String() {
+	if (session.currentCallOutbound.Peer.String() != peer.String()) ||
+		(session.currentCallOutbound.SocketFD != socketFD) {
 		session.currentCallOutbound = &CallOutbound{
-			action: session.newAction("CallOutbound"),
-			Peer:   peer,
+			action:   session.newAction("CallOutbound"),
+			Peer:     peer,
+			SocketFD: socketFD,
 		}
 		session.addAction(session.currentCallOutbound)
 	}
@@ -134,8 +140,8 @@ func (session *Session) SendUDP(ctx context.Context, span []byte, peer net.UDPAd
 		return
 	}
 	session.addAction(&SendUDP{
-		action: session.newAction("SendUDP"),
-		Peer: peer,
+		action:  session.newAction("SendUDP"),
+		Peer:    peer,
 		Content: span,
 	})
 }

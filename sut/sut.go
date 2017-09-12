@@ -1,17 +1,17 @@
 package sut
 
 import (
-	"net"
-	"github.com/v2pro/koala/countlog"
 	"bytes"
-	"github.com/v2pro/koala/replaying"
-	"time"
+	"github.com/v2pro/koala/countlog"
+	"github.com/v2pro/koala/envarg"
 	"github.com/v2pro/koala/recording"
-	"syscall"
+	"github.com/v2pro/koala/replaying"
+	"github.com/v2pro/koala/trace"
+	"net"
 	"os"
 	"strings"
-	"github.com/v2pro/koala/envarg"
-	"github.com/v2pro/koala/trace"
+	"syscall"
+	"time"
 )
 
 // InboundRequestPrefix is used to recognize php-fpm FCGI_BEGIN_REQUEST packet.
@@ -84,7 +84,7 @@ func (thread *Thread) OnSend(socketFD SocketFD, span []byte, flags SendFlags) {
 		thread.recordingSession.SendToInbound(thread, span, sock.addr)
 	} else {
 		event = "event!sut.outbound_send"
-		thread.recordingSession.SendToOutbound(thread, span, sock.addr)
+		thread.recordingSession.SendToOutbound(thread, span, sock.addr, int(sock.socketFD))
 		if sock.localAddr != nil {
 			replaying.StoreTmp(*sock.localAddr, thread.replayingSession)
 		}
@@ -128,7 +128,7 @@ func (thread *Thread) OnRecv(socketFD SocketFD, span []byte, flags RecvFlags) {
 		}
 	} else {
 		event = "event!sut.outbound_recv"
-		thread.recordingSession.RecvFromOutbound(thread, span, sock.addr)
+		thread.recordingSession.RecvFromOutbound(thread, span, sock.addr, int(sock.socketFD))
 	}
 	countlog.Trace(event,
 		"threadID", thread.threadID,
@@ -180,7 +180,7 @@ func (thread *Thread) OnConnect(socketFD SocketFD, remoteAddr net.TCPAddr) {
 			replaying.StoreTmp(*localAddr, thread.replayingSession)
 		}
 	}
-	countlog.Trace("event!sut.connect",
+	countlog.Debug("event!sut.connect",
 		"threadID", thread.threadID,
 		"socketFD", socketFD,
 		"addr", &remoteAddr,
