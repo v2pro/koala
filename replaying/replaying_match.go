@@ -22,6 +22,9 @@ func (replayingSession *ReplayingSession) MatchOutboundTalk(
 				continue
 			}
 			if len(key) < len(chunk) {
+				if scores[j] > 0 {
+					scores[j]--
+				}
 				continue
 			}
 			pos := bytes.Index(key, chunk)
@@ -36,6 +39,10 @@ func (replayingSession *ReplayingSession) MatchOutboundTalk(
 				if hasBetterScore {
 					maxScore = scores[j]
 					maxScoreIndex = j
+				}
+			} else {
+				if scores[j] > 0 {
+					scores[j]--
 				}
 			}
 		}
