@@ -1,8 +1,8 @@
 package recording
 
 import (
-	"net"
 	"encoding/json"
+	"net"
 	"unicode/utf8"
 )
 
@@ -63,6 +63,7 @@ func (returnInbound *ReturnInbound) MarshalJSON() ([]byte, error) {
 
 type CallOutbound struct {
 	action
+	SocketFD     int
 	Peer         net.TCPAddr
 	Request      []byte
 	ResponseTime int64
@@ -218,6 +219,7 @@ var safeSet = [utf8.RuneSelf]bool{
 	'\u007f': true,
 }
 var hex = "0123456789abcdef"
+
 func encodeAnyByteArray(s []byte) json.RawMessage {
 	encoded := []byte{'"'}
 	i := 0
@@ -256,7 +258,7 @@ func encodeAnyByteArray(s []byte) json.RawMessage {
 			if start < i {
 				encoded = append(encoded, s[start:i]...)
 			}
-			for _, b := range s[i:i+size] {
+			for _, b := range s[i : i+size] {
 				encoded = append(encoded, `\\x`...)
 				encoded = append(encoded, hex[b>>4])
 				encoded = append(encoded, hex[b&0xF])
