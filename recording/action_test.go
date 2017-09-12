@@ -69,3 +69,18 @@ func Test_marshal_session(t *testing.T) {
 	should.Nil(err)
 	should.NotContains(string(bytes), "=") // no base64
 }
+
+func Test_encode_any_byte_array(t *testing.T) {
+	should := require.New(t)
+	should.Equal(`"hello"`, string(encodeAnyByteArray([]byte("hello"))))
+	should.Equal(`"hel\nlo"`, string(encodeAnyByteArray([]byte("hel\nlo"))))
+	should.Equal(`"hel\rlo"`, string(encodeAnyByteArray([]byte("hel\rlo"))))
+	should.Equal(`"hel\tlo"`, string(encodeAnyByteArray([]byte("hel\tlo"))))
+	should.Equal(`"hel\"lo"`, string(encodeAnyByteArray([]byte("hel\"lo"))))
+	should.Equal(`"hel\\x5cx00lo"`, string(encodeAnyByteArray([]byte(`hel\x00lo`))))
+	should.Equal(`"hel\\x00lo"`, string(encodeAnyByteArray([]byte("hel\u0000lo"))))
+	should.Equal(`"\\x01\\x02\\x03"`, string(encodeAnyByteArray([]byte{1, 2, 3})))
+	should.Equal(`"中文"`, string(encodeAnyByteArray([]byte("中文"))))
+	should.Equal(`"\\xef\\xbf\\xbdBEEF"`,
+		string(encodeAnyByteArray([]byte{239, 191, 189, 66, 69, 69, 70})))
+}

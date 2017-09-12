@@ -88,6 +88,13 @@ func (session *Session) RecvFromOutbound(ctx context.Context, span []byte, peer 
 		}
 		session.addAction(session.currentCallOutbound)
 	}
+	if session.currentCallOutbound.Peer.String() != peer.String() {
+		session.currentCallOutbound = &CallOutbound{
+			action: session.newAction("CallOutbound"),
+			Peer:   peer,
+		}
+		session.addAction(session.currentCallOutbound)
+	}
 	if session.currentCallOutbound.ResponseTime == 0 {
 		session.currentCallOutbound.ResponseTime = time.Now().UnixNano()
 	}
@@ -105,13 +112,14 @@ func (session *Session) SendToOutbound(ctx context.Context, span []byte, peer ne
 		}
 		session.addAction(session.currentCallOutbound)
 	}
-	if len(session.currentCallOutbound.Response) > 0 {
-		countlog.Trace("event!recording.outbound_talk_recorded",
-			"addr", session.currentCallOutbound.Peer,
-			"request", session.currentCallOutbound.Request,
-			"response", session.currentCallOutbound.Response,
-			"ctx", ctx)
+	if session.currentCallOutbound.Peer.String() != peer.String() {
+		session.currentCallOutbound = &CallOutbound{
+			action: session.newAction("CallOutbound"),
+			Peer:   peer,
+		}
 		session.addAction(session.currentCallOutbound)
+	}
+	if len(session.currentCallOutbound.Response) > 0 {
 		session.currentCallOutbound = &CallOutbound{
 			action: session.newAction("CallOutbound"),
 			Peer:   peer,

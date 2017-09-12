@@ -72,12 +72,10 @@ func NewCallOutbound(peer net.TCPAddr, request []byte) *CallOutbound {
 
 type CallFunction struct {
 	replayedAction
-	CallFromFile string
-	CallFromLine int
 	CallIntoFile string
 	CallIntoLine int
 	FuncName     string
-	Args         map[string]interface{}
+	Args         []interface{}
 }
 
 type ReturnFunction struct {

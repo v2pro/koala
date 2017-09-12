@@ -1,7 +1,6 @@
 package gw4go
 
 import (
-	_ "github.com/v2pro/koala/extension"
 	"github.com/v2pro/koala/countlog"
 	"github.com/v2pro/koala/envarg"
 	"github.com/v2pro/koala/inbound"
@@ -18,7 +17,6 @@ func Start() {
 	setupRecvHook()
 	setupSendHook()
 	setupConnectHook()
-	startLogging()
 	if envarg.IsReplaying() {
 		inbound.Start()
 		outbound.Start()
@@ -131,20 +129,4 @@ func setupSendHook() {
 		sut.GetThread(sut.ThreadID(internal.GetCurrentGoRoutineId())).OnSend(
 			sut.SocketFD(fd), span, 0)
 	})
-}
-
-func startLogging() {
-	if len(countlog.LogWriters) != 0 {
-		// extension already setup alternative log writers
-		return
-	}
-	logWriter := countlog.NewAsyncLogWriter(envarg.LogLevel(), countlog.NewFileLogOutput(envarg.LogFile()))
-	logWriter.LogFormatter = &countlog.HumanReadableFormat{
-		ContextPropertyNames: []string{"threadID", "outboundSrc"},
-		StringLengthCap:      512,
-	}
-	logWriter.EventWhitelist["event!replaying.talks_scored"] = true
-	//logWriter.EventWhitelist["event!sut.opening_file"] = true
-	logWriter.Start()
-	countlog.LogWriters = append(countlog.LogWriters, logWriter)
 }

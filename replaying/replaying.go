@@ -4,8 +4,10 @@ import (
 	"github.com/v2pro/koala/recording"
 	"github.com/v2pro/koala/countlog"
 	"context"
-	"bytes"
 	"net"
+	"encoding/json"
+	"strings"
+	"strconv"
 )
 
 type ReplayingSession struct {
@@ -15,21 +17,49 @@ type ReplayingSession struct {
 	CallOutbounds   []*recording.CallOutbound
 	RedirectDirs    map[string]string
 	MockFiles       map[string][]byte
+	TracePaths      []string
 	actionCollector chan ReplayedAction
 }
 
 func NewReplayingSession() *ReplayingSession {
 	return &ReplayingSession{
-		actionCollector: make(chan ReplayedAction, 4096),
+		actionCollector: make(chan ReplayedAction, 40960),
+	}
+}
+
+func (replayingSession *ReplayingSession) collectAction(ctx context.Context, action ReplayedAction) {
+	select {
+	case replayingSession.actionCollector <- action:
+	default:
+		countlog.Error("event!replaying.ActionCollector is full", "ctx", ctx)
 	}
 }
 
 func (replayingSession *ReplayingSession) CallOutbound(ctx context.Context, callOutbound *CallOutbound) {
-	select {
-	case replayingSession.actionCollector <- callOutbound:
-	default:
-		countlog.Error("event!replaying.ActionCollector is full", "ctx", ctx)
+	replayingSession.collectAction(ctx, callOutbound)
+}
+
+func (replayingSession *ReplayingSession) CallFunction(ctx context.Context, content []byte) {
+	callFunction := &CallFunction{}
+	err := json.Unmarshal(content, callFunction)
+	if err != nil {
+		countlog.Error("event!replaying.unmarshal CallFunction failed", "err", err, "content", content)
+		return
 	}
+	callFunction.ActionType = "CallFunction"
+	callFunction.OccurredAt, _ = strconv.ParseInt(callFunction.ActionId, 10, 64)
+	replayingSession.collectAction(ctx, callFunction)
+}
+
+func (replayingSession *ReplayingSession) ReturnFunction(ctx context.Context, content []byte) {
+	returnFunction := &ReturnFunction{}
+	err := json.Unmarshal(content, returnFunction)
+	if err != nil {
+		countlog.Error("event!replaying.unmarshal ReturnFunction failed", "err", err, "content", content)
+		return
+	}
+	returnFunction.replayedAction = newReplayedAction("ReturnFunction")
+	replayingSession.collectAction(ctx, returnFunction)
 }
 
 func (replayingSession *ReplayingSession) AppendFile(ctx context.Context, content []byte, fileName string) {
@@ -41,11 +71,7 @@ func (replayingSession *ReplayingSession) AppendFile(ctx context.Context, conten
 		FileName:       fileName,
 		Content:        content,
 	}
-	select {
-	case replayingSession.actionCollector <- appendFile:
-	default:
-		countlog.Error("event!replaying.ActionCollector is full", "ctx", ctx)
-	}
+	replayingSession.collectAction(ctx, appendFile)
 }
 
 func (replayingSession *ReplayingSession) SendUDP(ctx context.Context, content []byte, peer net.UDPAddr) {
@@ -57,27 +83,7 @@ func (replayingSession *ReplayingSession) SendUDP(ctx context.Context, content [
 		Peer:           peer,
 		Content:        content,
 	}
-	select {
-	case replayingSession.actionCollector <- sendUdp:
-	default:
-		countlog.Error("event!replaying.ActionCollector is full", "ctx", ctx)
-	}
-}
-
-func findReadableChunk(key []byte) (int, int) {
-	start := bytes.IndexFunc(key, func(r rune) bool {
-		return r > 31 && r < 127
-	})
-	if start == -1 {
-		return -1, -1
-	}
-	end := bytes.IndexFunc(key[start:], func(r rune) bool {
-		return r <= 31 || r >= 127
-	})
-	if end == -1 {
-		return start, len(key) - start
-	}
-	return start, end
+	replayingSession.collectAction(ctx, sendUdp)
 }
 
 func (replayingSession *ReplayingSession) Finish(response []byte) *ReplayedSession {
@@ -95,26 +101,23 @@ func (replayingSession *ReplayingSession) Finish(response []byte) *ReplayedSessi
 		Response:         response,
 	}
 	done := false
-	appendFiles := map[string]*AppendFile{}
 	for !done {
 		select {
 		case action := <-replayingSession.actionCollector:
-			switch typedAction := action.(type) {
-			case *AppendFile:
-				existingAppendFile := appendFiles[typedAction.FileName]
-				if existingAppendFile == nil {
-					appendFiles[typedAction.FileName] = typedAction
-					replayedSession.Actions = append(replayedSession.Actions, action)
-				} else {
-					existingAppendFile.Content = append(existingAppendFile.Content, typedAction.Content...)
-				}
-			default:
-				replayedSession.Actions = append(replayedSession.Actions, action)
-			}
+			replayedSession.Actions = append(replayedSession.Actions, action)
 		default:
 			done = true
 		}
 	}
 	replayedSession.Actions = append(replayedSession.Actions, replayedSession.ReturnInbound)
 	return replayedSession
+}
+
+func (replayingSession *ReplayingSession) ShouldTraceFile(fileName string) bool {
+	for _, tracePath := range replayingSession.TracePaths {
+		if strings.HasPrefix(fileName, tracePath) {
+			return true
+		}
+	}
+	return false
 }

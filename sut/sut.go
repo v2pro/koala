@@ -11,9 +11,19 @@ import (
 	"os"
 	"strings"
 	"github.com/v2pro/koala/envarg"
+	"github.com/v2pro/koala/trace"
 )
 
-var threadShutdownEvent = []byte("to-koala:thread-shutdown||")
+// InboundRequestPrefix is used to recognize php-fpm FCGI_BEGIN_REQUEST packet.
+// fastcgi_finish_request() will send STDOUT first, then recv STDIN (if POST body has not been read before)
+// this behavior will trigger session shutdown as we are going to think the recv STDIN
+// is the beginning of next request.
+// Set InboundRequestPrefix to []byte{1, 1} to only begin new session for FCGI_BEGIN_REQUEST.
+// First 0x01 is the version field of fastcgi protocol, second 0x01 is FCGI_BEGIN_REQUEST.
+var InboundRequestPrefix = []byte{}
+var helperThreadShutdown = "to-koala!thread-shutdown"
+var helperCallFunction = "to-koala!call-function"
+var helperReturnFunction = "to-koala!return-function"
 
 func (thread *Thread) lookupSocket(socketFD SocketFD) *socket {
 	sock := thread.socks[socketFD]
@@ -30,6 +40,9 @@ func (thread *Thread) lookupSocket(socketFD SocketFD) *socket {
 type SendFlags int
 
 func (thread *Thread) OnSend(socketFD SocketFD, span []byte, flags SendFlags) {
+	if len(span) == 0 {
+		return
+	}
 	sock := thread.lookupSocket(socketFD)
 	if sock == nil {
 		localAddr, err := syscall.Getsockname(int(socketFD))
@@ -86,6 +99,9 @@ func (thread *Thread) OnSend(socketFD SocketFD, span []byte, flags SendFlags) {
 type RecvFlags int
 
 func (thread *Thread) OnRecv(socketFD SocketFD, span []byte, flags RecvFlags) {
+	if len(span) == 0 {
+		return
+	}
 	sock := thread.lookupSocket(socketFD)
 	if sock == nil {
 		countlog.Warn("event!sut.unknown-recv",
@@ -95,7 +111,7 @@ func (thread *Thread) OnRecv(socketFD SocketFD, span []byte, flags RecvFlags) {
 	}
 	event := "event!sut.inbound_recv"
 	if sock.isServer {
-		if thread.recordingSession.HasResponded() {
+		if thread.recordingSession.HasResponded() && bytes.HasPrefix(span, InboundRequestPrefix) {
 			thread.recordingSession.Shutdown(thread)
 			thread.recordingSession = recording.NewSession(int32(thread.threadID))
 		}
@@ -164,7 +180,7 @@ func (thread *Thread) OnConnect(socketFD SocketFD, remoteAddr net.TCPAddr) {
 			replaying.StoreTmp(*localAddr, thread.replayingSession)
 		}
 	}
-	countlog.Debug("event!sut.connect",
+	countlog.Trace("event!sut.connect",
 		"threadID", thread.threadID,
 		"socketFD", socketFD,
 		"addr", &remoteAddr,
@@ -185,15 +201,29 @@ func (thread *Thread) OnSendTo(socketFD SocketFD, span []byte, flags SendToFlags
 		return
 	}
 	helperInfo := span
-	countlog.Debug("event!sut.received_helper_info",
+	countlog.Trace("event!sut.received_helper_info",
 		"threadID", thread.threadID,
 		"socketFD", socketFD,
 		"addr", &addr,
 		"content", helperInfo)
-	if bytes.HasPrefix(helperInfo, threadShutdownEvent) {
+	newlinePos := bytes.IndexByte(helperInfo, '\n')
+	if newlinePos == -1 {
+		return
+	}
+	helperType := string(helperInfo[:newlinePos])
+	body := helperInfo[newlinePos+1:]
+	switch helperType {
+	case helperThreadShutdown:
 		thread.recordingSession.Shutdown(thread)
 		countlog.Debug("event!sut.thread_shutdown",
 			"threadID", thread.threadID)
+	case helperCallFunction:
+		thread.replayingSession.CallFunction(thread, body)
+	case helperReturnFunction:
+		thread.replayingSession.ReturnFunction(thread, body)
+	default:
+		countlog.Debug("event!sut.unknown_helper",
+			"threadID", thread.threadID, "helperType", helperType)
 	}
 }
 
@@ -202,24 +232,36 @@ func (thread *Thread) OnOpeningFile(fileName string, flags int) string {
 		"threadID", thread.threadID,
 		"fileName", fileName,
 		"flags", flags)
-	if thread.replayingSession != nil {
-		if thread.replayingSession.MockFiles != nil {
-			mockContent := thread.replayingSession.MockFiles[fileName]
-			if mockContent != nil {
-				countlog.Debug("event!sut.mock_file",
-					"fileName", fileName,
-					"content", mockContent)
-				return mockFile(mockContent)
-			}
-		}
-		for redirectFrom, redirectTo := range thread.replayingSession.RedirectDirs {
-			if strings.HasPrefix(fileName, redirectFrom) {
-				return strings.Replace(fileName, redirectFrom,
-					redirectTo, 1)
-			}
+	if thread.replayingSession == nil {
+		return ""
+	}
+	if thread.replayingSession.MockFiles != nil {
+		mockContent := thread.replayingSession.MockFiles[fileName]
+		if mockContent != nil {
+			countlog.Trace("event!sut.mock_file",
+				"fileName", fileName,
+				"content", mockContent)
+			return mockFile(mockContent)
 		}
 	}
-	return ""
+	var redirectedFileName string
+	for redirectFrom, redirectTo := range thread.replayingSession.RedirectDirs {
+		if strings.HasPrefix(fileName, redirectFrom) {
+			redirectedFileName = strings.Replace(fileName, redirectFrom,
+				redirectTo, 1)
+			break
+		}
+	}
+	if redirectedFileName != "" {
+		fileName = redirectedFileName
+	}
+	if thread.replayingSession.ShouldTraceFile(fileName) {
+		instrumentedFileName := trace.InstrumentFile(fileName)
+		if instrumentedFileName != "" {
+			return instrumentedFileName
+		}
+	}
+	return redirectedFileName
 }
 
 func (thread *Thread) OnOpenedFile(fileFD FileFD, fileName string, flags int) {

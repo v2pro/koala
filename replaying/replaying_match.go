@@ -22,13 +22,16 @@ func (replayingSession *ReplayingSession) MatchOutboundTalk(
 				continue
 			}
 			if len(key) < len(chunk) {
+				if scores[j] > 0 {
+					scores[j]--
+				}
 				continue
 			}
 			pos := bytes.Index(key, chunk)
 			if pos >= 0 {
 				keys[j] = key[pos:]
 				if chunkIndex == 0 && lastMatchedIndex == -1 {
-					scores[j] += 3 // first chunk has more weight
+					scores[j] += len(chunks) // first chunk has more weight
 				} else {
 					scores[j]++
 				}
@@ -36,6 +39,10 @@ func (replayingSession *ReplayingSession) MatchOutboundTalk(
 				if hasBetterScore {
 					maxScore = scores[j]
 					maxScoreIndex = j
+				}
+			} else {
+				if scores[j] > 0 {
+					scores[j]--
 				}
 			}
 		}
@@ -75,7 +82,7 @@ func (replayingSession *ReplayingSession) loadKeys() [][]byte {
 
 func cutToChunks(key []byte, unit int) [][]byte {
 	chunks := [][]byte{}
-	if len(key) > 512 {
+	if len(key) > 256 {
 		offset := 0
 		for {
 			strikeStart, strikeLen := findReadableChunk(key[offset:])
@@ -103,4 +110,20 @@ func cutToChunks(key []byte, unit int) [][]byte {
 		chunks = append(chunks, lastChunk)
 	}
 	return chunks
+}
+
+func findReadableChunk(key []byte) (int, int) {
+	start := bytes.IndexFunc(key, func(r rune) bool {
+		return r > 31 && r < 127
+	})
+	if start == -1 {
+		return -1, -1
+	}
+	end := bytes.IndexFunc(key[start:], func(r rune) bool {
+		return r <= 31 || r >= 127
+	})
+	if end == -1 {
+		return start, len(key) - start
+	}
+	return start, end
 }
