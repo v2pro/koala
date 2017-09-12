@@ -108,7 +108,10 @@ func (session *Session) SendToOutbound(ctx context.Context, span []byte, peer ne
 	if session == nil {
 		return
 	}
-	if session.currentCallOutbound == nil {
+	if (session.currentCallOutbound == nil) ||
+		(session.currentCallOutbound.Peer.String() != peer.String()) ||
+		(session.currentCallOutbound.SocketFD != socketFD) ||
+		(len(session.currentCallOutbound.Response) > 0) {
 		session.currentCallOutbound = &CallOutbound{
 			action:   session.newAction("CallOutbound"),
 			Peer:     peer,
@@ -116,22 +119,7 @@ func (session *Session) SendToOutbound(ctx context.Context, span []byte, peer ne
 		}
 		session.addAction(session.currentCallOutbound)
 	}
-	if (session.currentCallOutbound.Peer.String() != peer.String()) ||
-		(session.currentCallOutbound.SocketFD != socketFD) {
-		session.currentCallOutbound = &CallOutbound{
-			action:   session.newAction("CallOutbound"),
-			Peer:     peer,
-			SocketFD: socketFD,
-		}
-		session.addAction(session.currentCallOutbound)
-	}
-	if len(session.currentCallOutbound.Response) > 0 {
-		session.currentCallOutbound = &CallOutbound{
-			action: session.newAction("CallOutbound"),
-			Peer:   peer,
-		}
-		session.addAction(session.currentCallOutbound)
-	}
+
 	session.currentCallOutbound.Request = append(session.currentCallOutbound.Request, span...)
 }
 
