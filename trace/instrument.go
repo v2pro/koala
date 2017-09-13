@@ -136,7 +136,7 @@ func subPhpFunctionDefinition(fileName string, enterLineNo int, src string,
 	functionModifier := src[idx[2]:idx[3]]
 	definedInClass := !isBlank(functionModifier)
 	newlineCount, lastLine := countNewLines(src[:functionNameLeftIdx])
-	if strings.IndexByte(lastLine, '#') != -1 {
+	if strings.IndexByte(lastLine, '#') != -1 || strings.Index(lastLine, "//") != -1 {
 		// if we add tracepoint after line comment
 		// the newline added will escape the comment scope
 		// this is a fix for this particular fix
