@@ -31,8 +31,6 @@ INTERPOSE(fopen64)(const char *filename, const char *opentype) {
     if (redirect_to.Ptr != NULL) {
         FILE *file = real::fopen64(redirect_to.Ptr, opentype);
         if (file != NULL) {
-            filename_span.Ptr = redirect_to.Ptr;
-            filename_span.Len = strlen(redirect_to.Ptr);
             on_fopened_file(thread_id, fileno(file), filename_span, opentype_span);
         }
         free(redirect_to.Ptr);
@@ -58,8 +56,6 @@ INTERPOSE(open64)(const char *filename, int flags, mode_t mode) {
     if (redirect_to.Ptr != NULL) {
         int file = real::open64(redirect_to.Ptr, flags, mode);
         if (file != -1) {
-            filename_span.Ptr = redirect_to.Ptr;
-            filename_span.Len = strlen(redirect_to.Ptr);
             on_opened_file(thread_id, file, filename_span, flags, mode);
         }
         free(redirect_to.Ptr);
@@ -89,8 +85,6 @@ INTERPOSE(fopen)(const char *filename, const char *opentype) {
     if (redirect_to.Ptr != NULL) {
         auto file = real::fopen(redirect_to.Ptr, opentype);
         if (file != NULL) {
-            filename_span.Ptr = redirect_to.Ptr;
-            filename_span.Len = strlen(redirect_to.Ptr);
             on_fopened_file(thread_id, fileno(file), filename_span, opentype_span);
         }
         free(redirect_to.Ptr);
@@ -121,8 +115,6 @@ INTERPOSE(open)(const char *filename, int flags, ...) {
         if (redirect_to.Ptr != NULL) {
             int file = real::open(redirect_to.Ptr, flags, mode);
             if (file != -1) {
-                filename_span.Ptr = redirect_to.Ptr;
-                filename_span.Len = strlen(redirect_to.Ptr);
                 on_opened_file(thread_id, file, filename_span, flags, mode);
             }
             free(redirect_to.Ptr);
@@ -145,8 +137,6 @@ INTERPOSE(open)(const char *filename, int flags, ...) {
         if (redirect_to.Ptr != NULL) {
             int file = real::open(redirect_to.Ptr, flags);
             if (file != -1) {
-                filename_span.Ptr = redirect_to.Ptr;
-                filename_span.Len = strlen(redirect_to.Ptr);
                 on_opened_file(thread_id, file, filename_span, flags, 0);
             }
             free(redirect_to.Ptr);

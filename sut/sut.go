@@ -235,33 +235,55 @@ func (thread *Thread) OnOpeningFile(fileName string, flags int) string {
 	if thread.replayingSession == nil {
 		return ""
 	}
+	shouldTrace := thread.replayingSession.ShouldTraceFile(fileName)
+	fileName = thread.tryMockFile(fileName)
+	if shouldTrace {
+		fileName = thread.instrumentFile(fileName)
+	}
+	fileName = thread.tryRedirectFile(fileName)
+	shouldTrace = thread.replayingSession.ShouldTraceFile(fileName)
+	fileName = thread.tryMockFile(fileName)
+	if shouldTrace {
+		fileName = thread.instrumentFile(fileName)
+	}
+	return fileName
+}
+
+func (thread *Thread) tryRedirectFile(fileName string) string {
+	for redirectFrom, redirectTo := range thread.replayingSession.RedirectDirs {
+		if strings.HasPrefix(fileName, redirectFrom) {
+			redirectedFileName := strings.Replace(fileName, redirectFrom,
+				redirectTo, 1)
+			if redirectedFileName != "" {
+				return redirectedFileName
+			}
+		}
+	}
+	return fileName
+}
+
+func (thread *Thread) instrumentFile(fileName string) string {
+	instrumentedFileName := trace.InstrumentFile(fileName)
+	if instrumentedFileName != "" {
+		return instrumentedFileName
+	}
+	return fileName
+}
+
+func (thread *Thread) tryMockFile(fileName string) string {
 	if thread.replayingSession.MockFiles != nil {
 		mockContent := thread.replayingSession.MockFiles[fileName]
 		if mockContent != nil {
 			countlog.Trace("event!sut.mock_file",
 				"fileName", fileName,
 				"content", mockContent)
-			return mockFile(mockContent)
+			mockedFileName := mockFile(mockContent)
+			if mockedFileName != "" {
+				return mockedFileName
+			}
 		}
 	}
-	var redirectedFileName string
-	for redirectFrom, redirectTo := range thread.replayingSession.RedirectDirs {
-		if strings.HasPrefix(fileName, redirectFrom) {
-			redirectedFileName = strings.Replace(fileName, redirectFrom,
-				redirectTo, 1)
-			break
-		}
-	}
-	if redirectedFileName != "" {
-		fileName = redirectedFileName
-	}
-	if thread.replayingSession.ShouldTraceFile(fileName) {
-		instrumentedFileName := trace.InstrumentFile(fileName)
-		if instrumentedFileName != "" {
-			return instrumentedFileName
-		}
-	}
-	return redirectedFileName
+	return fileName
 }
 
 func (thread *Thread) OnOpenedFile(fileFD FileFD, fileName string, flags int) {
