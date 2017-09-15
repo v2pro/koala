@@ -120,20 +120,23 @@ func handleOutbound(conn *net.TCPConn) {
 }
 
 var globalTimeoutMutex = &sync.Mutex{}
-var nonFirstPacketTimeout = time.Millisecond * 20
+var nonFirstPacketTimeout = time.Millisecond * 10
 
 func readRequest(ctx context.Context, conn *net.TCPConn, buf []byte, isFirstPacket bool) []byte {
-	firstPacketTimeout := nonFirstPacketTimeout * 10
-	if firstPacketTimeout > time.Millisecond*50 {
-		firstPacketTimeout = time.Millisecond * 50
+	firstPacketTimeout := nonFirstPacketTimeout * 5
+	if firstPacketTimeout > time.Millisecond*30 {
+		firstPacketTimeout = time.Millisecond * 30
 	}
 	request := []byte{}
 	if isFirstPacket {
-		conn.SetReadDeadline(time.Now().Add(time.Millisecond * 50))
+		conn.SetReadDeadline(time.Now().Add(firstPacketTimeout))
 	} else {
-		conn.SetReadDeadline(time.Now().Add(nonFirstPacketTimeout))
+		conn.SetReadDeadline(time.Now().Add(time.Second * 5))
 	}
 	bytesRead, err := conn.Read(buf)
+	if err == io.EOF {
+		return nil
+	}
 	if err != nil {
 		if isFirstPacket {
 			countlog.Debug("event!outbound.write_mysql_greeting",
@@ -144,15 +147,6 @@ func readRequest(ctx context.Context, conn *net.TCPConn, buf []byte, isFirstPack
 					"ctx", ctx,
 					"err", err)
 				return nil
-			}
-		} else {
-			conn.SetReadDeadline(time.Now().Add(time.Second))
-			bytesRead, err := conn.Read(buf)
-			if err == io.EOF {
-				return nil
-			}
-			if err == nil {
-				request = append(request, buf[:bytesRead]...)
 			}
 		}
 	} else {
@@ -167,7 +161,7 @@ func readRequest(ctx context.Context, conn *net.TCPConn, buf []byte, isFirstPack
 		if err != nil {
 			break
 		}
-		nanoSeconds := (nonFirstPacketTimeout.Nanoseconds() + (latency.Nanoseconds() * 200)) / 2
+		nanoSeconds := (nonFirstPacketTimeout.Nanoseconds() + (latency.Nanoseconds() * 100)) / 2
 		globalTimeoutMutex.Lock()
 		nonFirstPacketTimeout = time.Duration(nanoSeconds) * time.Nanosecond
 		globalTimeoutMutex.Unlock()
