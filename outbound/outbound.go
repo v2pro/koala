@@ -76,10 +76,6 @@ func handleOutbound(conn *net.TCPConn) {
 				"content", request)
 			return
 		}
-		countlog.Debug("event!outbound.request",
-			"ctx", ctx,
-			"content", request,
-			"replayingSession", replayingSession)
 		if len(request) == 0 {
 			countlog.Error("event!outbound.received empty request", "ctx", ctx)
 			return
@@ -124,22 +120,24 @@ func handleOutbound(conn *net.TCPConn) {
 }
 
 var globalTimeoutMutex = &sync.Mutex{}
-var nonFirstPacketTimeout = time.Millisecond  * 20
+var nonFirstPacketTimeout = time.Millisecond * 20
 
 func readRequest(ctx context.Context, conn *net.TCPConn, buf []byte, isFirstPacket bool) []byte {
+	firstPacketTimeout := nonFirstPacketTimeout * 10
+	if firstPacketTimeout > time.Millisecond*50 {
+		firstPacketTimeout = time.Millisecond * 50
+	}
 	request := []byte{}
 	if isFirstPacket {
-		firstPacketTimeout := nonFirstPacketTimeout * 100000
-		if firstPacketTimeout > time.Millisecond * 20 {
-			firstPacketTimeout = time.Millisecond * 20
-		}
-		conn.SetReadDeadline(time.Now().Add(firstPacketTimeout))
+		conn.SetReadDeadline(time.Now().Add(time.Millisecond * 50))
 	} else {
 		conn.SetReadDeadline(time.Now().Add(nonFirstPacketTimeout))
 	}
 	bytesRead, err := conn.Read(buf)
 	if err != nil {
 		if isFirstPacket {
+			countlog.Debug("event!outbound.write_mysql_greeting",
+				"ctx", ctx)
 			_, err := conn.Write(mysqlGreeting)
 			if err != nil {
 				countlog.Error("event!outbound.failed to write mysql greeting",
@@ -175,5 +173,10 @@ func readRequest(ctx context.Context, conn *net.TCPConn, buf []byte, isFirstPack
 		globalTimeoutMutex.Unlock()
 		request = append(request, buf[:bytesRead]...)
 	}
+	countlog.Debug("event!outbound.request",
+		"ctx", ctx,
+		"content", request,
+		"firstPacketTimeout", firstPacketTimeout,
+		"nonFirstPacketTimeout", nonFirstPacketTimeout)
 	return request
 }
