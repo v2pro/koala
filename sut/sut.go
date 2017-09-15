@@ -180,7 +180,7 @@ func (thread *Thread) OnConnect(socketFD SocketFD, remoteAddr net.TCPAddr) {
 			replaying.StoreTmp(*localAddr, thread.replayingSession)
 		}
 	}
-	countlog.Debug("event!sut.connect",
+	countlog.Trace("event!sut.connect",
 		"threadID", thread.threadID,
 		"socketFD", socketFD,
 		"addr", &remoteAddr,
