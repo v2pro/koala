@@ -11,7 +11,6 @@ import (
 	"github.com/v2pro/koala/internal"
 	"io"
 	"sync"
-	"fmt"
 )
 
 var mysqlGreeting = []byte{53, 0, 0, 0, 10, 53, 46, 48, 46, 53, 49, 98, 0, 1, 0, 0, 0, 47, 85, 62, 116, 80, 114, 109, 75, 0, 12, 162, 33, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 86, 76, 87, 84, 124, 52, 47, 46, 55, 107, 55, 110, 0}
@@ -125,16 +124,20 @@ func handleOutbound(conn *net.TCPConn) {
 }
 
 var globalTimeoutMutex = &sync.Mutex{}
-var firstPacketTimeout = time.Millisecond * 20
 var nonFirstPacketTimeout = time.Millisecond  * 20
 
 func readRequest(ctx context.Context, conn *net.TCPConn, buf []byte, isFirstPacket bool) []byte {
 	request := []byte{}
-	conn.SetReadDeadline(time.Now().Add(firstPacketTimeout))
-	before := time.Now()
+	if isFirstPacket {
+		firstPacketTimeout := nonFirstPacketTimeout * 100000
+		if firstPacketTimeout > time.Millisecond * 20 {
+			firstPacketTimeout = time.Millisecond * 20
+		}
+		conn.SetReadDeadline(time.Now().Add(firstPacketTimeout))
+	} else {
+		conn.SetReadDeadline(time.Now().Add(nonFirstPacketTimeout))
+	}
 	bytesRead, err := conn.Read(buf)
-	after := time.Now()
-	latency := after.Sub(before)
 	if err != nil {
 		if isFirstPacket {
 			_, err := conn.Write(mysqlGreeting)
@@ -155,20 +158,13 @@ func readRequest(ctx context.Context, conn *net.TCPConn, buf []byte, isFirstPack
 			}
 		}
 	} else {
-		if isFirstPacket {
-			nanoSeconds := (firstPacketTimeout.Nanoseconds() + (latency.Nanoseconds() * 1000)) / 2
-			globalTimeoutMutex.Lock()
-			firstPacketTimeout = time.Duration(nanoSeconds) * time.Nanosecond
-			fmt.Println("!!! firstPacketTimeout ", nonFirstPacketTimeout)
-			globalTimeoutMutex.Unlock()
-		}
 		request = append(request, buf[:bytesRead]...)
 	}
 	for {
-		before = time.Now()
+		before := time.Now()
 		conn.SetReadDeadline(time.Now().Add(nonFirstPacketTimeout))
-		after = time.Now()
-		latency = after.Sub(before)
+		after := time.Now()
+		latency := after.Sub(before)
 		bytesRead, err := conn.Read(buf)
 		if err != nil {
 			break
@@ -176,7 +172,6 @@ func readRequest(ctx context.Context, conn *net.TCPConn, buf []byte, isFirstPack
 		nanoSeconds := (nonFirstPacketTimeout.Nanoseconds() + (latency.Nanoseconds() * 500)) / 2
 		globalTimeoutMutex.Lock()
 		nonFirstPacketTimeout = time.Duration(nanoSeconds) * time.Nanosecond
-		fmt.Println("!!! nonFirstPacketTimeout ", nonFirstPacketTimeout)
 		globalTimeoutMutex.Unlock()
 		request = append(request, buf[:bytesRead]...)
 	}
