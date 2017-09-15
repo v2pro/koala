@@ -167,7 +167,7 @@ func readRequest(ctx context.Context, conn *net.TCPConn, buf []byte, isFirstPack
 		if err != nil {
 			break
 		}
-		nanoSeconds := (nonFirstPacketTimeout.Nanoseconds() + (latency.Nanoseconds() * 500)) / 2
+		nanoSeconds := (nonFirstPacketTimeout.Nanoseconds() + (latency.Nanoseconds() * 200)) / 2
 		globalTimeoutMutex.Lock()
 		nonFirstPacketTimeout = time.Duration(nanoSeconds) * time.Nanosecond
 		globalTimeoutMutex.Unlock()
