@@ -64,10 +64,6 @@ func setupConnectHook() {
 
 func setupAcceptHook() {
 	internal.RegisterOnAccept(func(serverSocketFD int, clientSocketFD int, sa syscall.Sockaddr) {
-		ipv4Addr, _ := sa.(*syscall.SockaddrInet4)
-		if ipv4Addr == nil {
-			return
-		}
 		if internal.GetCurrentGoRoutineIsKoala() {
 			countlog.Trace("event!internal.ignore_accept",
 				"threadID", internal.GetCurrentGoRoutineId(),
@@ -76,13 +72,48 @@ func setupAcceptHook() {
 			return
 		}
 		sut.GetThread(sut.ThreadID(internal.GetCurrentGoRoutineId())).OnAccept(
-			sut.SocketFD(serverSocketFD), sut.SocketFD(clientSocketFD), net.TCPAddr{
-				IP:   ipv4Addr.Addr[:],
-				Port: ipv4Addr.Port,
-			},
+			sut.SocketFD(serverSocketFD), sut.SocketFD(clientSocketFD), sockaddrToTCP(sa),
 		)
 	})
 }
+
+func sockaddrToTCP(sa syscall.Sockaddr) net.TCPAddr {
+	switch sa := sa.(type) {
+	case *syscall.SockaddrInet4:
+		return net.TCPAddr{IP: sa.Addr[0:], Port: sa.Port}
+	case *syscall.SockaddrInet6:
+		return net.TCPAddr{IP: sa.Addr[0:], Port: sa.Port, Zone: IP6ZoneToString(int(sa.ZoneId))}
+	}
+	return net.TCPAddr{}
+}
+
+func IP6ZoneToString(zone int) string {
+	if zone == 0 {
+		return ""
+	}
+	if ifi, err := net.InterfaceByIndex(zone); err == nil {
+		return ifi.Name
+	}
+	return itod(uint(zone))
+}
+
+// Convert i to decimal string.
+func itod(i uint) string {
+	if i == 0 {
+		return "0"
+	}
+
+	// Assemble decimal in reverse order.
+	var b [32]byte
+	bp := len(b)
+	for ; i > 0; i /= 10 {
+		bp--
+		b[bp] = byte(i%10) + '0'
+	}
+
+	return string(b[bp:])
+}
+
 
 func setupBindHook() {
 	internal.RegisterOnBind(func(fd int, sa syscall.Sockaddr) {
