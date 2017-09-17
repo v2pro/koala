@@ -148,6 +148,9 @@ func (session *Session) Shutdown(ctx context.Context) {
 	if session == nil {
 		return
 	}
+	if session.CallFromInbound == nil {
+		return
+	}
 	for _, recorder := range Recorders {
 		recorder.Record(session)
 	}

@@ -2,7 +2,9 @@
 
 package internal
 
-import "syscall"
+import (
+	"syscall"
+)
 
 func SetCurrentGoRoutineIsKoala() {
 }
@@ -31,5 +33,7 @@ func RegisterOnRecv(callback func(fd int, span []byte)) {
 }
 
 func RegisterOnSend(callback func(fd int, span []byte)) {
+}
 
+func RegisterOnGoRoutineExit(callback func(goid int64)) {
 }

@@ -214,9 +214,7 @@ func (thread *Thread) OnSendTo(socketFD SocketFD, span []byte, flags SendToFlags
 	body := helperInfo[newlinePos+1:]
 	switch helperType {
 	case helperThreadShutdown:
-		thread.recordingSession.Shutdown(thread)
-		countlog.Debug("event!sut.thread_shutdown",
-			"threadID", thread.threadID)
+		thread.OnShutdown()
 	case helperCallFunction:
 		thread.replayingSession.CallFunction(thread, body)
 	case helperReturnFunction:
@@ -317,4 +315,10 @@ func (thread *Thread) OnWrite(fileFD FileFD, content []byte) {
 		"content", content)
 	thread.recordingSession.AppendFile(thread, content, file.fileName)
 	thread.replayingSession.AppendFile(thread, content, file.fileName)
+}
+
+func (thread *Thread) OnShutdown() {
+	countlog.Trace("event!sut.shutdown",
+		"threadID", thread.threadID)
+	thread.recordingSession.Shutdown(thread)
 }

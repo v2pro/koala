@@ -17,6 +17,7 @@ func Start() {
 	setupRecvHook()
 	setupSendHook()
 	setupConnectHook()
+	setupGoRoutineExitHook()
 	if envarg.IsReplaying() {
 		inbound.Start()
 		outbound.Start()
@@ -38,7 +39,7 @@ func setupConnectHook() {
 			return
 		}
 		if internal.GetCurrentGoRoutineIsKoala() {
-			countlog.Trace("event!internal.ignore_connect",
+			countlog.Trace("event!gw4go.ignore_connect",
 				"threadID", internal.GetCurrentGoRoutineId(),
 				"fd", fd)
 			return
@@ -51,7 +52,7 @@ func setupConnectHook() {
 			sut.SocketFD(fd), origAddr,
 		)
 		if envarg.IsReplaying() {
-			countlog.Debug("event!internal.rewrite_connect_target",
+			countlog.Debug("event!gw4go.rewrite_connect_target",
 				"origAddr", origAddr,
 				"redirectTo", envarg.OutboundAddr())
 			for i := 0; i < 4; i++ {
@@ -65,7 +66,7 @@ func setupConnectHook() {
 func setupAcceptHook() {
 	internal.RegisterOnAccept(func(serverSocketFD int, clientSocketFD int, sa syscall.Sockaddr) {
 		if internal.GetCurrentGoRoutineIsKoala() {
-			countlog.Trace("event!internal.ignore_accept",
+			countlog.Trace("event!gw4go.ignore_accept",
 				"threadID", internal.GetCurrentGoRoutineId(),
 				"serverSocketFD", serverSocketFD,
 				"clientSocketFD", clientSocketFD)
@@ -122,7 +123,7 @@ func setupBindHook() {
 			return
 		}
 		if internal.GetCurrentGoRoutineIsKoala() {
-			countlog.Trace("event!internal.ignore_bind",
+			countlog.Trace("event!gw4go.ignore_bind",
 				"threadID", internal.GetCurrentGoRoutineId(),
 				"fd", fd)
 			return
@@ -139,7 +140,7 @@ func setupBindHook() {
 func setupRecvHook() {
 	internal.RegisterOnRecv(func(fd int, span []byte) {
 		if internal.GetCurrentGoRoutineIsKoala() {
-			countlog.Trace("event!internal.ignore_recv",
+			countlog.Trace("event!gw4go.ignore_recv",
 				"threadID", internal.GetCurrentGoRoutineId(),
 				"fd", fd)
 			return
@@ -152,12 +153,23 @@ func setupRecvHook() {
 func setupSendHook() {
 	internal.RegisterOnSend(func(fd int, span []byte) {
 		if internal.GetCurrentGoRoutineIsKoala() {
-			countlog.Trace("event!internal.ignore_send",
+			countlog.Trace("event!gw4go.ignore_send",
 				"threadID", internal.GetCurrentGoRoutineId(),
 				"fd", fd)
 			return
 		}
 		sut.GetThread(sut.ThreadID(internal.GetCurrentGoRoutineId())).OnSend(
 			sut.SocketFD(fd), span, 0)
+	})
+}
+
+func setupGoRoutineExitHook() {
+	internal.RegisterOnGoRoutineExit(func(goid int64) {
+		if internal.GetCurrentGoRoutineIsKoala() {
+			countlog.Trace("event!gw4go.ignore_goroutine_exit",
+				"threadID", goid)
+			return
+		}
+		sut.GetThread(sut.ThreadID(goid)).OnShutdown()
 	})
 }

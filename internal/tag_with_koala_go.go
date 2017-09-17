@@ -47,3 +47,7 @@ func RegisterOnRecv(callback func(fd int, span []byte)) {
 func RegisterOnSend(callback func(fd int, span []byte)) {
 	net.OnWrite = callback
 }
+
+func RegisterOnGoRoutineExit(callback func(goid int64)) {
+	runtime.OnGoRoutineExit = callback
+}
