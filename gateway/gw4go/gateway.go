@@ -138,28 +138,39 @@ func setupBindHook() {
 }
 
 func setupRecvHook() {
-	internal.RegisterOnRecv(func(fd int, span []byte) {
+	internal.RegisterOnRecv(func(fd int, network string, raddr net.Addr, span []byte) {
 		if internal.GetCurrentGoRoutineIsKoala() {
 			countlog.Trace("event!gw4go.ignore_recv",
 				"threadID", internal.GetCurrentGoRoutineId(),
 				"fd", fd)
 			return
 		}
-		sut.GetThread(sut.ThreadID(internal.GetCurrentGoRoutineId())).OnRecv(
-			sut.SocketFD(fd), span, 0)
+		switch network {
+		case "udp", "udp4", "udp6":
+		default:
+			sut.GetThread(sut.ThreadID(internal.GetCurrentGoRoutineId())).OnRecv(
+				sut.SocketFD(fd), span, 0)
+		}
 	})
 }
 
 func setupSendHook() {
-	internal.RegisterOnSend(func(fd int, span []byte) {
+	internal.RegisterOnSend(func(fd int, network string, raddr net.Addr, span []byte) {
 		if internal.GetCurrentGoRoutineIsKoala() {
 			countlog.Trace("event!gw4go.ignore_send",
 				"threadID", internal.GetCurrentGoRoutineId(),
 				"fd", fd)
 			return
 		}
-		sut.GetThread(sut.ThreadID(internal.GetCurrentGoRoutineId())).OnSend(
-			sut.SocketFD(fd), span, 0)
+		switch network {
+		case "udp", "udp4", "udp6":
+			udpAddr := raddr.(*net.UDPAddr)
+			sut.GetThread(sut.ThreadID(internal.GetCurrentGoRoutineId())).OnSendTo(
+				sut.SocketFD(fd), span, 0, *udpAddr)
+		default:
+			sut.GetThread(sut.ThreadID(internal.GetCurrentGoRoutineId())).OnSend(
+				sut.SocketFD(fd), span, 0)
+		}
 	})
 }
 

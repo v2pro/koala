@@ -40,11 +40,11 @@ func RegisterOnBind(callback func(fd int, sa syscall.Sockaddr)) {
 	syscall.OnBind = callback
 }
 
-func RegisterOnRecv(callback func(fd int, span []byte)) {
+func RegisterOnRecv(callback func(fd int, net string, raddr net.Addr, span []byte)) {
 	net.OnRead = callback
 }
 
-func RegisterOnSend(callback func(fd int, span []byte)) {
+func RegisterOnSend(callback func(fd int, net string, raddr net.Addr, span []byte)) {
 	net.OnWrite = callback
 }
 
