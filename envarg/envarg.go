@@ -14,6 +14,7 @@ var outboundAddr *net.TCPAddr
 var sutAddr *net.TCPAddr
 var logFile string
 var logLevel = countlog.LEVEL_DEBUG
+var logFormat string
 
 func init() {
 	initInboundAddr()
@@ -24,6 +25,10 @@ func init() {
 		logFile = "STDOUT"
 	}
 	initLogLevel()
+	logFormat = getenvFromC("KOALA_LOG_FORMAT")
+	if logFormat == "" {
+		logFormat = "HumanReadableFormat"
+	}
 }
 func initLogLevel() {
 	logLevelStr := strings.ToUpper(getenvFromC("KOALA_LOG_LEVEL"))
@@ -104,6 +109,10 @@ func LogFile() string {
 
 func LogLevel() int {
 	return logLevel
+}
+
+func LogFormat() string {
+	return logFormat
 }
 
 // getenvFromC to make getenv work in php-fpm child process
