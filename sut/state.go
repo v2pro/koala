@@ -60,8 +60,11 @@ func setGlobalSock(socketFD SocketFD, sock *socket) {
 func getGlobalSock(socketFD SocketFD) *socket {
 	globalSocksMutex.Lock()
 	defer globalSocksMutex.Unlock()
-	globalSocks[socketFD].lastAccessedAt = time.Now()
-	return globalSocks[socketFD]
+	sock := globalSocks[socketFD]
+	if sock != nil {
+		sock.lastAccessedAt = time.Now()
+	}
+	return sock
 }
 
 func GetThread(threadID ThreadID) *Thread {
