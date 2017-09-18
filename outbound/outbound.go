@@ -122,7 +122,7 @@ func handleOutbound(conn *net.TCPConn) {
 func readRequest(ctx context.Context, conn *net.TCPConn, buf []byte, isFirstPacket bool) []byte {
 	request := []byte{}
 	if isFirstPacket {
-		conn.SetReadDeadline(time.Now().Add(time.Millisecond * 30))
+		conn.SetReadDeadline(time.Now().Add(time.Millisecond * 5))
 	} else {
 		conn.SetReadDeadline(time.Now().Add(time.Second * 5))
 	}
