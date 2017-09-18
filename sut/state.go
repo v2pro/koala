@@ -81,6 +81,7 @@ func GetThread(threadID ThreadID) *Thread {
 		}
 		globalThreads[threadID] = thread
 	}
+	thread.OnAccess()
 	thread.lastAccessedAt = time.Now()
 	return thread
 }

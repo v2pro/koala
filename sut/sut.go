@@ -112,8 +112,10 @@ func (thread *Thread) OnRecv(socketFD SocketFD, span []byte, flags RecvFlags) {
 	event := "event!sut.inbound_recv"
 	if sock.isServer {
 		if thread.recordingSession.HasResponded() && bytes.HasPrefix(span, InboundRequestPrefix) {
-			thread.recordingSession.Shutdown(thread)
-			thread.recordingSession = recording.NewSession(int32(thread.threadID))
+			countlog.Trace("event!sut.recv_from_inbound_found_responded",
+				"threadID", thread.threadID,
+				"socketFD", socketFD)
+			thread.shutdownRecordingSession()
 		}
 		thread.recordingSession.RecvFromInbound(thread, span, sock.addr)
 		replayingSession := replaying.RetrieveTmp(sock.addr)
@@ -318,7 +320,27 @@ func (thread *Thread) OnWrite(fileFD FileFD, content []byte) {
 }
 
 func (thread *Thread) OnShutdown() {
-	countlog.Trace("event!sut.shutdown",
+	countlog.Trace("event!sut.shutdown_thread",
 		"threadID", thread.threadID)
+	thread.shutdownRecordingSession()
+}
+
+func (thread *Thread) OnAccess() {
+	if thread.recordingSession != nil && len(thread.recordingSession.Actions) > 500 {
+		countlog.Warn("event!sut.recorded_too_many_actions",
+			"threadID", thread.threadID,
+			"sessionId", thread.recordingSession.SessionId)
+		thread.shutdownRecordingSession()
+	}
+}
+
+func (thread *Thread) shutdownRecordingSession() {
+	if !envarg.IsRecording() {
+		return
+	}
+	countlog.Trace("event!sut.shutdown_recording_session",
+		"threadID", thread.threadID,
+		"sessionId", thread.recordingSession.SessionId)
 	thread.recordingSession.Shutdown(thread)
+	thread.recordingSession = recording.NewSession(int32(thread.threadID))
 }
