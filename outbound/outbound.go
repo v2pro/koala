@@ -119,17 +119,10 @@ func handleOutbound(conn *net.TCPConn) {
 	}
 }
 
-var globalTimeoutMutex = &sync.Mutex{}
-var nonFirstPacketTimeout = time.Millisecond * 10
-
 func readRequest(ctx context.Context, conn *net.TCPConn, buf []byte, isFirstPacket bool) []byte {
-	firstPacketTimeout := nonFirstPacketTimeout * 5
-	if firstPacketTimeout > time.Millisecond*30 {
-		firstPacketTimeout = time.Millisecond * 30
-	}
 	request := []byte{}
 	if isFirstPacket {
-		conn.SetReadDeadline(time.Now().Add(firstPacketTimeout))
+		conn.SetReadDeadline(time.Now().Add(time.Millisecond * 30))
 	} else {
 		conn.SetReadDeadline(time.Now().Add(time.Second * 5))
 	}
@@ -153,24 +146,15 @@ func readRequest(ctx context.Context, conn *net.TCPConn, buf []byte, isFirstPack
 		request = append(request, buf[:bytesRead]...)
 	}
 	for {
-		before := time.Now()
-		conn.SetReadDeadline(time.Now().Add(nonFirstPacketTimeout))
-		after := time.Now()
-		latency := after.Sub(before)
+		conn.SetReadDeadline(time.Now().Add(time.Millisecond * 2))
 		bytesRead, err := conn.Read(buf)
 		if err != nil {
 			break
 		}
-		nanoSeconds := (nonFirstPacketTimeout.Nanoseconds() + (latency.Nanoseconds() * 100)) / 2
-		globalTimeoutMutex.Lock()
-		nonFirstPacketTimeout = time.Duration(nanoSeconds) * time.Nanosecond
-		globalTimeoutMutex.Unlock()
 		request = append(request, buf[:bytesRead]...)
 	}
 	countlog.Debug("event!outbound.request",
 		"ctx", ctx,
-		"content", request,
-		"firstPacketTimeout", firstPacketTimeout,
-		"nonFirstPacketTimeout", nonFirstPacketTimeout)
+		"content", request)
 	return request
 }
