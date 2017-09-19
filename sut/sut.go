@@ -85,8 +85,13 @@ func (thread *Thread) OnSend(socketFD SocketFD, span []byte, flags SendFlags) {
 	} else {
 		event = "event!sut.outbound_send"
 		thread.recordingSession.SendToOutbound(thread, span, sock.addr, int(sock.socketFD))
-		if sock.localAddr != nil {
-			replaying.StoreTmp(*sock.localAddr, thread.replayingSession)
+		if thread.replayingSession != nil {
+			if sock.localAddr != nil {
+				replaying.StoreTmp(*sock.localAddr, thread.replayingSession)
+		 	} else {
+				countlog.Error("event!sut.can not store replaying session due to no local addr",
+					"threadID", thread.threadID)
+			}
 		}
 	}
 	countlog.Trace(event,
@@ -178,9 +183,7 @@ func (thread *Thread) OnConnect(socketFD SocketFD, remoteAddr net.TCPAddr) {
 			return
 		}
 		thread.socks[socketFD].localAddr = localAddr
-		if thread.replayingSession != nil {
-			replaying.StoreTmp(*localAddr, thread.replayingSession)
-		}
+		replaying.StoreTmp(*localAddr, thread.replayingSession)
 	}
 	countlog.Trace("event!sut.connect",
 		"threadID", thread.threadID,
