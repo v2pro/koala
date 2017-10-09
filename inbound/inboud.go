@@ -3,13 +3,13 @@ package inbound
 import (
 	"net/http"
 	"io/ioutil"
-	"github.com/v2pro/koala/countlog"
 	"net"
 	"time"
 	"github.com/v2pro/koala/replaying"
 	"github.com/v2pro/koala/envarg"
 	"encoding/json"
 	"github.com/v2pro/koala/internal"
+	"github.com/v2pro/plz/countlog"
 )
 
 func Start() {

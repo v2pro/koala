@@ -4,7 +4,7 @@ import (
 	"crypto/sha1"
 	"encoding/base32"
 	"io/ioutil"
-	"github.com/v2pro/koala/countlog"
+	"github.com/v2pro/plz/countlog"
 	"os"
 	"github.com/v2pro/koala/envarg"
 	"sync"

@@ -12,7 +12,7 @@ package gw4libc
 import "C"
 import (
 	"github.com/v2pro/koala/ch"
-	"github.com/v2pro/koala/countlog"
+	"github.com/v2pro/plz/countlog"
 	"github.com/v2pro/koala/envarg"
 	"github.com/v2pro/koala/gateway/gw4go"
 	"github.com/v2pro/koala/sut"

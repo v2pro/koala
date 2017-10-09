@@ -2,7 +2,7 @@ package envarg
 
 import (
 	"os"
-	"github.com/v2pro/koala/countlog"
+	"github.com/v2pro/plz/countlog"
 )
 
 func SetupLogging() {

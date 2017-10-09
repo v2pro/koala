@@ -4,7 +4,7 @@ package internal
 
 import (
 	"runtime"
-	"github.com/v2pro/koala/countlog"
+	"github.com/v2pro/plz/countlog"
 	"syscall"
 	"net"
 )

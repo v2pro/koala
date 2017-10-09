@@ -2,7 +2,7 @@ package outbound
 
 import (
 	"net"
-	"github.com/v2pro/koala/countlog"
+	"github.com/v2pro/plz/countlog"
 	"time"
 	"github.com/v2pro/koala/replaying"
 	"github.com/v2pro/koala/recording"

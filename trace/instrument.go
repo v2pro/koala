@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"fmt"
 	"io/ioutil"
-	"github.com/v2pro/koala/countlog"
+	"github.com/v2pro/plz/countlog"
 	"sync"
 	"os"
 	"time"

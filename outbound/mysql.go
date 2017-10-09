@@ -3,7 +3,7 @@ package outbound
 import (
 	"bytes"
 	"encoding/hex"
-	"github.com/v2pro/koala/countlog"
+	"github.com/v2pro/plz/countlog"
 	"context"
 )
 

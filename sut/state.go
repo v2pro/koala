@@ -8,7 +8,7 @@ import (
 	"github.com/v2pro/koala/recording"
 	"github.com/v2pro/koala/envarg"
 	"time"
-	"github.com/v2pro/koala/countlog"
+	"github.com/v2pro/plz/countlog"
 )
 
 type SocketFD int
