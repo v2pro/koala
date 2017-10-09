@@ -23,6 +23,14 @@ func init() {
 }
 
 func simulateMysql(ctx context.Context, request []byte) []byte {
+	resp := _simulateMysql(ctx, request)
+	if resp != nil {
+		resp[3] = request[3] + 1
+	}
+	return resp
+}
+
+func _simulateMysql(ctx context.Context, request []byte) []byte {
 	if bytes.Index(request, []byte("mysql_native_password")) != -1 {
 		countlog.Debug("event!outbound.simulated_mysql",
 			"ctx", ctx,
