@@ -20,18 +20,18 @@ func init() {
 	initInboundAddr()
 	initOutboundAddr()
 	initSutAddr()
-	logFile = getenvFromC("KOALA_LOG_FILE")
+	logFile = GetenvFromC("KOALA_LOG_FILE")
 	if logFile == "" {
 		logFile = "STDOUT"
 	}
 	initLogLevel()
-	logFormat = getenvFromC("KOALA_LOG_FORMAT")
+	logFormat = GetenvFromC("KOALA_LOG_FORMAT")
 	if logFormat == "" {
 		logFormat = "HumanReadableFormat"
 	}
 }
 func initLogLevel() {
-	logLevelStr := strings.ToUpper(getenvFromC("KOALA_LOG_LEVEL"))
+	logLevelStr := strings.ToUpper(GetenvFromC("KOALA_LOG_LEVEL"))
 	switch logLevelStr {
 	case "TRACE":
 		logLevel = countlog.LEVEL_TRACE
@@ -48,7 +48,7 @@ func initLogLevel() {
 	}
 }
 func initInboundAddr() {
-	addrStr := getenvFromC("KOALA_INBOUND_ADDR")
+	addrStr := GetenvFromC("KOALA_INBOUND_ADDR")
 	if addrStr == "" {
 		addrStr = ":2514"
 	}
@@ -60,7 +60,7 @@ func initInboundAddr() {
 }
 
 func initOutboundAddr() {
-	addrStr := getenvFromC("KOALA_OUTBOUND_ADDR")
+	addrStr := GetenvFromC("KOALA_OUTBOUND_ADDR")
 	if addrStr == "" {
 		addrStr = "127.0.0.1:2516"
 	}
@@ -72,7 +72,7 @@ func initOutboundAddr() {
 }
 
 func initSutAddr() {
-	addrStr := getenvFromC("KOALA_SUT_ADDR")
+	addrStr := GetenvFromC("KOALA_SUT_ADDR")
 	if addrStr == "" {
 		addrStr = "127.0.0.1:2515"
 	}
@@ -115,8 +115,8 @@ func LogFormat() string {
 	return logFormat
 }
 
-// getenvFromC to make getenv work in php-fpm child process
-func getenvFromC(key string) string {
+// GetenvFromC to make getenv work in php-fpm child process
+func GetenvFromC(key string) string {
 	keyc := C.CString(key)
 	defer C.free(unsafe.Pointer(keyc))
 	v := C.getenv(keyc)
