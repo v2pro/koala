@@ -118,6 +118,19 @@ func (session *Session) SendToOutbound(ctx context.Context, span []byte, peer ne
 			SocketFD: socketFD,
 		}
 		session.addAction(session.currentCallOutbound)
+	} else {
+		isTimeout := false
+		if session.currentCallOutbound != nil {
+			isTimeout = time.Now().UnixNano()-session.currentCallOutbound.ResponseTime > int64(time.Millisecond*50)
+		}
+		if len(session.currentCallOutbound.Response) == 0 && isTimeout {
+			session.currentCallOutbound = &CallOutbound{
+				action:   session.newAction("CallOutbound"),
+				Peer:     peer,
+				SocketFD: socketFD,
+			}
+			session.addAction(session.currentCallOutbound)
+		}
 	}
 
 	session.currentCallOutbound.Request = append(session.currentCallOutbound.Request, span...)
