@@ -77,7 +77,7 @@ func (session *Session) SendToInbound(ctx context.Context, span []byte, peer net
 	session.ReturnInbound.Response = append(session.ReturnInbound.Response, span...)
 }
 
-func (session *Session) RecvFromOutbound(ctx context.Context, span []byte, peer net.TCPAddr, socketFD int) {
+func (session *Session) RecvFromOutbound(ctx context.Context, span []byte, peer net.TCPAddr, local *net.TCPAddr, socketFD int) {
 	if session == nil {
 		return
 	}
@@ -85,6 +85,7 @@ func (session *Session) RecvFromOutbound(ctx context.Context, span []byte, peer 
 		session.currentCallOutbound = &CallOutbound{
 			action:   session.newAction("CallOutbound"),
 			Peer:     peer,
+			Local:    local,
 			SocketFD: socketFD,
 		}
 		session.addAction(session.currentCallOutbound)
@@ -94,6 +95,7 @@ func (session *Session) RecvFromOutbound(ctx context.Context, span []byte, peer 
 		session.currentCallOutbound = &CallOutbound{
 			action:   session.newAction("CallOutbound"),
 			Peer:     peer,
+			Local:    local,
 			SocketFD: socketFD,
 		}
 		session.addAction(session.currentCallOutbound)
@@ -104,7 +106,7 @@ func (session *Session) RecvFromOutbound(ctx context.Context, span []byte, peer 
 	session.currentCallOutbound.Response = append(session.currentCallOutbound.Response, span...)
 }
 
-func (session *Session) SendToOutbound(ctx context.Context, span []byte, peer net.TCPAddr, socketFD int) {
+func (session *Session) SendToOutbound(ctx context.Context, span []byte, peer net.TCPAddr, local *net.TCPAddr, socketFD int) {
 	if session == nil {
 		return
 	}
@@ -115,24 +117,20 @@ func (session *Session) SendToOutbound(ctx context.Context, span []byte, peer ne
 		session.currentCallOutbound = &CallOutbound{
 			action:   session.newAction("CallOutbound"),
 			Peer:     peer,
+			Local:    local,
 			SocketFD: socketFD,
 		}
 		session.addAction(session.currentCallOutbound)
-	} else {
-		isTimeout := false
-		if session.currentCallOutbound != nil {
-			isTimeout = time.Now().UnixNano()-session.currentCallOutbound.ResponseTime > int64(time.Millisecond*50)
+	} else if session.currentCallOutbound != nil && len(session.currentCallOutbound.Response) == 0 {
+		// last request get a bad response, e.g., timeout
+		session.currentCallOutbound = &CallOutbound{
+			action:   session.newAction("CallOutbound"),
+			Peer:     peer,
+			Local:    local,
+			SocketFD: socketFD,
 		}
-		if len(session.currentCallOutbound.Response) == 0 && isTimeout {
-			session.currentCallOutbound = &CallOutbound{
-				action:   session.newAction("CallOutbound"),
-				Peer:     peer,
-				SocketFD: socketFD,
-			}
-			session.addAction(session.currentCallOutbound)
-		}
+		session.addAction(session.currentCallOutbound)
 	}
-
 	session.currentCallOutbound.Request = append(session.currentCallOutbound.Request, span...)
 }
 
