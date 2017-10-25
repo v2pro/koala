@@ -65,7 +65,7 @@ type CallOutbound struct {
 	action
 	SocketFD     int
 	Peer         net.TCPAddr
-	Local        *net.TCPAddr
+	Local        *net.TCPAddr `json:"-"`
 	Request      []byte
 	ResponseTime int64
 	Response     []byte

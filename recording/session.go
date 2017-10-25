@@ -121,7 +121,7 @@ func (session *Session) SendToOutbound(ctx context.Context, span []byte, peer ne
 			SocketFD: socketFD,
 		}
 		session.addAction(session.currentCallOutbound)
-	} else if session.currentCallOutbound != nil && len(session.currentCallOutbound.Response) == 0 {
+	} else if session.currentCallOutbound != nil && session.currentCallOutbound.ResponseTime > 0 {
 		// last request get a bad response, e.g., timeout
 		session.currentCallOutbound = &CallOutbound{
 			action:   session.newAction("CallOutbound"),

@@ -104,9 +104,6 @@ func (thread *Thread) OnSend(socketFD SocketFD, span []byte, flags SendFlags) {
 type RecvFlags int
 
 func (thread *Thread) OnRecv(socketFD SocketFD, span []byte, flags RecvFlags) {
-	if len(span) == 0 {
-		return
-	}
 	sock := thread.lookupSocket(socketFD)
 	if sock == nil {
 		countlog.Warn("event!sut.unknown-recv",
