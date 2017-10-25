@@ -2,11 +2,11 @@ package sut
 
 import (
 	"bytes"
-	"github.com/v2pro/plz/countlog"
 	"github.com/v2pro/koala/envarg"
 	"github.com/v2pro/koala/recording"
 	"github.com/v2pro/koala/replaying"
 	"github.com/v2pro/koala/trace"
+	"github.com/v2pro/plz/countlog"
 	"net"
 	"os"
 	"strings"
@@ -84,11 +84,11 @@ func (thread *Thread) OnSend(socketFD SocketFD, span []byte, flags SendFlags) {
 		thread.recordingSession.SendToInbound(thread, span, sock.addr)
 	} else {
 		event = "event!sut.outbound_send"
-		thread.recordingSession.SendToOutbound(thread, span, sock.addr, int(sock.socketFD))
+		thread.recordingSession.SendToOutbound(thread, span, sock.addr, sock.localAddr, int(sock.socketFD))
 		if thread.replayingSession != nil {
 			if sock.localAddr != nil {
 				replaying.StoreTmp(*sock.localAddr, thread.replayingSession)
-		 	} else {
+			} else {
 				countlog.Error("event!sut.can not store replaying session due to no local addr",
 					"threadID", thread.threadID)
 			}
@@ -104,9 +104,6 @@ func (thread *Thread) OnSend(socketFD SocketFD, span []byte, flags SendFlags) {
 type RecvFlags int
 
 func (thread *Thread) OnRecv(socketFD SocketFD, span []byte, flags RecvFlags) {
-	if len(span) == 0 {
-		return
-	}
 	sock := thread.lookupSocket(socketFD)
 	if sock == nil {
 		countlog.Warn("event!sut.unknown-recv",
@@ -135,7 +132,7 @@ func (thread *Thread) OnRecv(socketFD SocketFD, span []byte, flags RecvFlags) {
 		}
 	} else {
 		event = "event!sut.outbound_recv"
-		thread.recordingSession.RecvFromOutbound(thread, span, sock.addr, int(sock.socketFD))
+		thread.recordingSession.RecvFromOutbound(thread, span, sock.addr, sock.localAddr, int(sock.socketFD))
 	}
 	countlog.Trace(event,
 		"threadID", thread.threadID,
