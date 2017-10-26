@@ -24,6 +24,7 @@ var InboundRequestPrefix = []byte{}
 var helperThreadShutdown = "to-koala!thread-shutdown"
 var helperCallFunction = "to-koala!call-function"
 var helperReturnFunction = "to-koala!return-function"
+var helperReadStorage = "to-koala!read-storage"
 
 func (thread *Thread) lookupSocket(socketFD SocketFD) *socket {
 	sock := thread.socks[socketFD]
@@ -221,6 +222,8 @@ func (thread *Thread) OnSendTo(socketFD SocketFD, span []byte, flags SendToFlags
 		thread.replayingSession.CallFunction(thread, body)
 	case helperReturnFunction:
 		thread.replayingSession.ReturnFunction(thread, body)
+	case helperReadStorage:
+		thread.recordingSession.ReadStorage(thread, body)
 	default:
 		countlog.Debug("event!sut.unknown_helper",
 			"threadID", thread.threadID, "helperType", helperType)

@@ -115,6 +115,21 @@ func (sendUDP *SendUDP) MarshalJSON() ([]byte, error) {
 	})
 }
 
+type ReadStorage struct {
+	action
+	Content []byte
+}
+
+func (readStorage *ReadStorage) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		ReadStorage
+		Content json.RawMessage
+	}{
+		ReadStorage: *readStorage,
+		Content:     encodeAnyByteArray(readStorage.Content),
+	})
+}
+
 // safeSet holds the value true if the ASCII character with the given array
 // position can be represented inside a JSON string without any further
 // escaping.
