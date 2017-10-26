@@ -2,14 +2,8 @@
 package koala
 
 import (
-	"github.com/v2pro/koala/gateway/gw4go"
 	"github.com/v2pro/koala/internal"
 )
-
-// Start koala for record or replay, put this in the first line of main()
-func Start() {
-	gw4go.Start()
-}
 
 // SetDelegatedFromGoRoutineId should be used when this goroutine is doing work for another goroutine,
 // for example multiplex protocol, the request is generated in one goroutine, but sent out from another one.

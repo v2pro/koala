@@ -2,17 +2,16 @@ package outbound
 
 import (
 	"net"
-	"github.com/v2pro/koala/countlog"
+	"github.com/v2pro/plz/countlog"
 	"time"
 	"github.com/v2pro/koala/replaying"
-	"io"
 	"github.com/v2pro/koala/recording"
 	"github.com/v2pro/koala/envarg"
 	"context"
 	"github.com/v2pro/koala/internal"
+	"io"
 )
 
-var mysqlGreeting = []byte{53, 0, 0, 0, 10, 53, 46, 48, 46, 53, 49, 98, 0, 1, 0, 0, 0, 47, 85, 62, 116, 80, 114, 109, 75, 0, 12, 162, 33, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 86, 76, 87, 84, 124, 52, 47, 46, 55, 107, 55, 110, 0}
 
 func Start() {
 	go server()
@@ -59,60 +58,41 @@ func handleOutbound(conn *net.TCPConn) {
 	buf := make([]byte, 1024)
 	lastMatchedIndex := -1
 	ctx := context.WithValue(context.Background(), "outboundSrc", tcpAddr.String())
+	protocol := ""
 	for i := 0; i < 1024; i++ {
-		request := []byte{}
-		conn.SetReadDeadline(time.Now().Add(time.Millisecond * 5))
-		bytesRead, err := conn.Read(buf)
-		if err != nil {
-			if i == 0 {
-				_, err := conn.Write(mysqlGreeting)
-				if err != nil {
-					countlog.Error("event!outbound.failed to write mysql greeting",
-						"ctx", ctx,
-						"err", err)
-					return
-				}
-			} else {
-				for {
-					conn.SetReadDeadline(time.Now().Add(time.Second * 1))
-					bytesRead, err := conn.Read(buf)
-					if err == io.EOF {
-						return
-					}
-					if err != nil {
-						countlog.Error("event!outbound.outbound wait for follow up timed out",
-							"ctx", ctx,
-							"err", err)
-						return
-					}
-					request = append(request, buf[:bytesRead]...)
-					break
-				}
-			}
-		} else {
-			request = append(request, buf[:bytesRead]...)
+		guessedProtocol, request := readRequest(ctx, conn, buf, i == 0)
+		if guessedProtocol != "" {
+			protocol = guessedProtocol
 		}
-		for {
-			conn.SetReadDeadline(time.Now().Add(time.Millisecond * 5))
-			bytesRead, err := conn.Read(buf)
-			if err != nil {
-				break
+		if len(request) == 0 {
+			if protocol == "mysql" && request != nil {
+				continue
 			}
-			request = append(request, buf[:bytesRead]...)
+			countlog.Warn("event!outbound.received empty request", "ctx", ctx)
+			return
 		}
 		replayingSession := replaying.RetrieveTmp(*tcpAddr)
 		if replayingSession == nil {
+			if len(request) == 0 {
+				countlog.Warn("event!outbound.read request empty", "ctx", ctx)
+				return
+			}
+			if protocol == "mysql" {
+				resp := simulateMysql(ctx, request)
+				if resp != nil {
+					_, err := conn.Write(resp)
+					if err != nil {
+						countlog.Error("event!outbound.failed to write back response from outbound",
+							"ctx", ctx, "err", err)
+						return
+					}
+					continue
+				}
+			}
 			countlog.Error("event!outbound.outbound can not find replaying session",
 				"ctx", ctx,
-				"addr", *tcpAddr)
-			return
-		}
-		countlog.Debug("event!outbound.request",
-			"ctx", ctx,
-			"content", request,
-			"replayingSession", replayingSession)
-		if len(request) == 0 {
-			countlog.Error("event!outbound.received empty request", "ctx", ctx)
+				"addr", *tcpAddr,
+				"content", request)
 			return
 		}
 		callOutbound := replaying.NewCallOutbound(*tcpAddr, request)
@@ -120,7 +100,7 @@ func handleOutbound(conn *net.TCPConn) {
 		var mark float64
 		lastMatchedIndex, mark, matchedTalk = replayingSession.MatchOutboundTalk(ctx, lastMatchedIndex, request)
 		if matchedTalk == nil && lastMatchedIndex != 0 {
-			lastMatchedIndex, mark, matchedTalk = replayingSession.MatchOutboundTalk(ctx,-1, request)
+			lastMatchedIndex, mark, matchedTalk = replayingSession.MatchOutboundTalk(ctx, -1, request)
 		}
 		if matchedTalk == nil {
 			callOutbound.MatchedRequest = nil
@@ -134,17 +114,29 @@ func handleOutbound(conn *net.TCPConn) {
 		callOutbound.MatchedMark = mark
 		replayingSession.CallOutbound(ctx, callOutbound)
 		if matchedTalk == nil {
+			if protocol == "mysql" {
+				resp := simulateMysql(ctx, request)
+				if resp != nil {
+					_, err := conn.Write(resp)
+					if err != nil {
+						countlog.Error("event!outbound.failed to write back response from outbound",
+							"ctx", ctx, "err", err)
+						return
+					}
+					continue
+				}
+			}
 			countlog.Error("event!outbound.failed to find matching talk", "ctx", ctx)
 			return
 		}
-		_, err = conn.Write(matchedTalk.Response)
+		_, err := conn.Write(matchedTalk.Response)
 		if err != nil {
 			countlog.Error("event!outbound.failed to write back response from outbound",
 				"ctx", ctx, "err", err)
 			return
 		}
 		countlog.Debug("event!outbound.response",
-			"addr", *tcpAddr,
+			"ctx", ctx,
 			"matchedMark", mark,
 			"matchedActionIndex", matchedTalk.ActionIndex,
 			"matchedIndex", lastMatchedIndex,
@@ -152,4 +144,46 @@ func handleOutbound(conn *net.TCPConn) {
 			"matchedResponse", matchedTalk.Response,
 			"replayingSession", replayingSession)
 	}
+}
+
+func readRequest(ctx context.Context, conn *net.TCPConn, buf []byte, isFirstPacket bool) (string, []byte) {
+	request := []byte{}
+	if isFirstPacket {
+		conn.SetReadDeadline(time.Now().Add(time.Millisecond * 5))
+	} else {
+		conn.SetReadDeadline(time.Now().Add(time.Second * 5))
+	}
+	bytesRead, err := conn.Read(buf)
+	if err == io.EOF {
+		return "", nil
+	}
+	protocol := ""
+	if err != nil {
+		if isFirstPacket {
+			countlog.Debug("event!outbound.write_mysql_greeting",
+				"ctx", ctx)
+			_, err := conn.Write(mysqlGreeting)
+			if err != nil {
+				countlog.Error("event!outbound.failed to write mysql greeting",
+					"ctx", ctx,
+					"err", err)
+				return "",nil
+			}
+			protocol = "mysql"
+		}
+	} else {
+		request = append(request, buf[:bytesRead]...)
+	}
+	for {
+		conn.SetReadDeadline(time.Now().Add(time.Millisecond * 2))
+		bytesRead, err := conn.Read(buf)
+		if err != nil {
+			break
+		}
+		request = append(request, buf[:bytesRead]...)
+	}
+	countlog.Debug("event!outbound.request",
+		"ctx", ctx,
+		"content", request)
+	return protocol, request
 }

@@ -2,11 +2,11 @@ package sut
 
 import (
 	"bytes"
-	"github.com/v2pro/koala/countlog"
 	"github.com/v2pro/koala/envarg"
 	"github.com/v2pro/koala/recording"
 	"github.com/v2pro/koala/replaying"
 	"github.com/v2pro/koala/trace"
+	"github.com/v2pro/plz/countlog"
 	"net"
 	"os"
 	"strings"
@@ -84,9 +84,14 @@ func (thread *Thread) OnSend(socketFD SocketFD, span []byte, flags SendFlags) {
 		thread.recordingSession.SendToInbound(thread, span, sock.addr)
 	} else {
 		event = "event!sut.outbound_send"
-		thread.recordingSession.SendToOutbound(thread, span, sock.addr, int(sock.socketFD))
-		if sock.localAddr != nil {
-			replaying.StoreTmp(*sock.localAddr, thread.replayingSession)
+		thread.recordingSession.SendToOutbound(thread, span, sock.addr, sock.localAddr, int(sock.socketFD))
+		if thread.replayingSession != nil {
+			if sock.localAddr != nil {
+				replaying.StoreTmp(*sock.localAddr, thread.replayingSession)
+			} else {
+				countlog.Error("event!sut.can not store replaying session due to no local addr",
+					"threadID", thread.threadID)
+			}
 		}
 	}
 	countlog.Trace(event,
@@ -99,9 +104,6 @@ func (thread *Thread) OnSend(socketFD SocketFD, span []byte, flags SendFlags) {
 type RecvFlags int
 
 func (thread *Thread) OnRecv(socketFD SocketFD, span []byte, flags RecvFlags) {
-	if len(span) == 0 {
-		return
-	}
 	sock := thread.lookupSocket(socketFD)
 	if sock == nil {
 		countlog.Warn("event!sut.unknown-recv",
@@ -112,8 +114,10 @@ func (thread *Thread) OnRecv(socketFD SocketFD, span []byte, flags RecvFlags) {
 	event := "event!sut.inbound_recv"
 	if sock.isServer {
 		if thread.recordingSession.HasResponded() && bytes.HasPrefix(span, InboundRequestPrefix) {
-			thread.recordingSession.Shutdown(thread)
-			thread.recordingSession = recording.NewSession(int32(thread.threadID))
+			countlog.Trace("event!sut.recv_from_inbound_found_responded",
+				"threadID", thread.threadID,
+				"socketFD", socketFD)
+			thread.shutdownRecordingSession()
 		}
 		thread.recordingSession.RecvFromInbound(thread, span, sock.addr)
 		replayingSession := replaying.RetrieveTmp(sock.addr)
@@ -128,7 +132,7 @@ func (thread *Thread) OnRecv(socketFD SocketFD, span []byte, flags RecvFlags) {
 		}
 	} else {
 		event = "event!sut.outbound_recv"
-		thread.recordingSession.RecvFromOutbound(thread, span, sock.addr, int(sock.socketFD))
+		thread.recordingSession.RecvFromOutbound(thread, span, sock.addr, sock.localAddr, int(sock.socketFD))
 	}
 	countlog.Trace(event,
 		"threadID", thread.threadID,
@@ -176,11 +180,9 @@ func (thread *Thread) OnConnect(socketFD SocketFD, remoteAddr net.TCPAddr) {
 			return
 		}
 		thread.socks[socketFD].localAddr = localAddr
-		if thread.replayingSession != nil {
-			replaying.StoreTmp(*localAddr, thread.replayingSession)
-		}
+		replaying.StoreTmp(*localAddr, thread.replayingSession)
 	}
-	countlog.Debug("event!sut.connect",
+	countlog.Trace("event!sut.connect",
 		"threadID", thread.threadID,
 		"socketFD", socketFD,
 		"addr", &remoteAddr,
@@ -214,9 +216,7 @@ func (thread *Thread) OnSendTo(socketFD SocketFD, span []byte, flags SendToFlags
 	body := helperInfo[newlinePos+1:]
 	switch helperType {
 	case helperThreadShutdown:
-		thread.recordingSession.Shutdown(thread)
-		countlog.Debug("event!sut.thread_shutdown",
-			"threadID", thread.threadID)
+		thread.OnShutdown()
 	case helperCallFunction:
 		thread.replayingSession.CallFunction(thread, body)
 	case helperReturnFunction:
@@ -235,33 +235,55 @@ func (thread *Thread) OnOpeningFile(fileName string, flags int) string {
 	if thread.replayingSession == nil {
 		return ""
 	}
+	shouldTrace := thread.replayingSession.ShouldTraceFile(fileName)
+	fileName = thread.tryMockFile(fileName)
+	if shouldTrace {
+		fileName = thread.instrumentFile(fileName)
+	}
+	fileName = thread.tryRedirectFile(fileName)
+	shouldTrace = thread.replayingSession.ShouldTraceFile(fileName)
+	fileName = thread.tryMockFile(fileName)
+	if shouldTrace {
+		fileName = thread.instrumentFile(fileName)
+	}
+	return fileName
+}
+
+func (thread *Thread) tryRedirectFile(fileName string) string {
+	for redirectFrom, redirectTo := range thread.replayingSession.RedirectDirs {
+		if strings.HasPrefix(fileName, redirectFrom) {
+			redirectedFileName := strings.Replace(fileName, redirectFrom,
+				redirectTo, 1)
+			if redirectedFileName != "" {
+				return redirectedFileName
+			}
+		}
+	}
+	return fileName
+}
+
+func (thread *Thread) instrumentFile(fileName string) string {
+	instrumentedFileName := trace.InstrumentFile(fileName)
+	if instrumentedFileName != "" {
+		return instrumentedFileName
+	}
+	return fileName
+}
+
+func (thread *Thread) tryMockFile(fileName string) string {
 	if thread.replayingSession.MockFiles != nil {
 		mockContent := thread.replayingSession.MockFiles[fileName]
 		if mockContent != nil {
 			countlog.Trace("event!sut.mock_file",
 				"fileName", fileName,
 				"content", mockContent)
-			return mockFile(mockContent)
+			mockedFileName := mockFile(mockContent)
+			if mockedFileName != "" {
+				return mockedFileName
+			}
 		}
 	}
-	var redirectedFileName string
-	for redirectFrom, redirectTo := range thread.replayingSession.RedirectDirs {
-		if strings.HasPrefix(fileName, redirectFrom) {
-			redirectedFileName = strings.Replace(fileName, redirectFrom,
-				redirectTo, 1)
-			break
-		}
-	}
-	if redirectedFileName != "" {
-		fileName = redirectedFileName
-	}
-	if thread.replayingSession.ShouldTraceFile(fileName) {
-		instrumentedFileName := trace.InstrumentFile(fileName)
-		if instrumentedFileName != "" {
-			return instrumentedFileName
-		}
-	}
-	return redirectedFileName
+	return fileName
 }
 
 func (thread *Thread) OnOpenedFile(fileFD FileFD, fileName string, flags int) {
@@ -295,4 +317,30 @@ func (thread *Thread) OnWrite(fileFD FileFD, content []byte) {
 		"content", content)
 	thread.recordingSession.AppendFile(thread, content, file.fileName)
 	thread.replayingSession.AppendFile(thread, content, file.fileName)
+}
+
+func (thread *Thread) OnShutdown() {
+	countlog.Trace("event!sut.shutdown_thread",
+		"threadID", thread.threadID)
+	thread.shutdownRecordingSession()
+}
+
+func (thread *Thread) OnAccess() {
+	if thread.recordingSession != nil && len(thread.recordingSession.Actions) > 500 {
+		countlog.Warn("event!sut.recorded_too_many_actions",
+			"threadID", thread.threadID,
+			"sessionId", thread.recordingSession.SessionId)
+		thread.shutdownRecordingSession()
+	}
+}
+
+func (thread *Thread) shutdownRecordingSession() {
+	if !envarg.IsRecording() {
+		return
+	}
+	countlog.Trace("event!sut.shutdown_recording_session",
+		"threadID", thread.threadID,
+		"sessionId", thread.recordingSession.SessionId)
+	thread.recordingSession.Shutdown(thread)
+	thread.recordingSession = recording.NewSession(int32(thread.threadID))
 }

@@ -4,7 +4,7 @@ package internal
 
 import (
 	"runtime"
-	"github.com/v2pro/koala/countlog"
+	"github.com/v2pro/plz/countlog"
 	"syscall"
 	"net"
 )
@@ -40,10 +40,14 @@ func RegisterOnBind(callback func(fd int, sa syscall.Sockaddr)) {
 	syscall.OnBind = callback
 }
 
-func RegisterOnRecv(callback func(fd int, span []byte)) {
+func RegisterOnRecv(callback func(fd int, net string, raddr net.Addr, span []byte)) {
 	net.OnRead = callback
 }
 
-func RegisterOnSend(callback func(fd int, span []byte)) {
+func RegisterOnSend(callback func(fd int, net string, raddr net.Addr, span []byte)) {
 	net.OnWrite = callback
+}
+
+func RegisterOnGoRoutineExit(callback func(goid int64)) {
+	runtime.OnGoRoutineExit = callback
 }

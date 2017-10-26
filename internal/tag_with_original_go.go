@@ -2,7 +2,10 @@
 
 package internal
 
-import "syscall"
+import (
+	"syscall"
+	"net"
+)
 
 func SetCurrentGoRoutineIsKoala() {
 }
@@ -27,9 +30,11 @@ func RegisterOnAccept(callback func(serverSocketFD int, clientSocketFD int, sa s
 func RegisterOnBind(callback func(fd int, sa syscall.Sockaddr)) {
 }
 
-func RegisterOnRecv(callback func(fd int, span []byte)) {
+func RegisterOnRecv(callback func(fd int, net string, raddr net.Addr, span []byte)) {
 }
 
-func RegisterOnSend(callback func(fd int, span []byte)) {
+func RegisterOnSend(callback func(fd int, net string, raddr net.Addr, span []byte)) {
+}
 
+func RegisterOnGoRoutineExit(callback func(goid int64)) {
 }

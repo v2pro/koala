@@ -3,11 +3,10 @@ package main
 import (
 	"net/http"
 	"github.com/v2pro/koala"
-	"github.com/v2pro/koala/countlog"
+	"github.com/v2pro/plz/countlog"
 )
 
 func main() {
-	koala.Start()
 	http.HandleFunc("/", func(respWriter http.ResponseWriter, req *http.Request) {
 		countlog.Info("event!test_server.enter_handler",
 			"threadID", koala.GetCurrentGoRoutineId(),
