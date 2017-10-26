@@ -51,6 +51,16 @@ func (session *Session) AppendFile(ctx context.Context, content []byte, fileName
 	appendFile.Content = append(appendFile.Content, content...)
 }
 
+func (session *Session) ReadStorage(ctx context.Context, span []byte) {
+	if session == nil {
+		return
+	}
+	session.addAction(&ReadStorage{
+		action:  session.newAction("ReadStorage"),
+		Content: span,
+	})
+}
+
 func (session *Session) RecvFromInbound(ctx context.Context, span []byte, peer net.TCPAddr) {
 	if session == nil {
 		return
