@@ -8,7 +8,6 @@ import (
 	"github.com/v2pro/koala/sut"
 	"github.com/v2pro/plz/countlog"
 	"net"
-	"sync"
 	"syscall"
 )
 
@@ -211,11 +210,7 @@ func setupGoRoutineExitHook() {
 	})
 }
 
-var gidMutex = &sync.Mutex{}
-
 func getGoIDAndIsKoala() (sut.ThreadID, bool) {
-	gidMutex.Lock()
-	defer gidMutex.Unlock()
 	gid := internal.GetCurrentGoRoutineId()
 	isKoala := internal.GetCurrentGoRoutineIsKoala()
 	return sut.ThreadID(gid), isKoala
