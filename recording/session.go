@@ -172,7 +172,7 @@ func (session *Session) Shutdown(ctx context.Context) {
 	if session.CallFromInbound == nil {
 		return
 	}
-	if len(session.currentCallOutbound.Request) == 0 {
+	if len(session.CallFromInbound.Request) == 0 {
 		return
 	}
 	for _, recorder := range Recorders {
