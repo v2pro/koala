@@ -58,12 +58,12 @@ func setGlobalSock(socketFD SocketFD, sock *socket) {
 	globalSocks[socketFD] = sock
 }
 
-func getGlobalSock(socketFD SocketFD) *socket {
+func removeGlobalSock(socketFD SocketFD) *socket {
 	globalSocksMutex.Lock()
 	defer globalSocksMutex.Unlock()
 	sock := globalSocks[socketFD]
 	if sock != nil {
-		sock.lastAccessedAt = time.Now()
+		delete(globalSocks, socketFD)
 	}
 	return sock
 }
