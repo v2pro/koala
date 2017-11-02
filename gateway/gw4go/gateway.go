@@ -1,14 +1,14 @@
 package gw4go
 
 import (
-	"github.com/v2pro/plz/countlog"
 	"github.com/v2pro/koala/envarg"
 	"github.com/v2pro/koala/inbound"
-	"github.com/v2pro/koala/outbound"
-	"syscall"
-	"github.com/v2pro/koala/sut"
-	"net"
 	"github.com/v2pro/koala/internal"
+	"github.com/v2pro/koala/outbound"
+	"github.com/v2pro/koala/sut"
+	"github.com/v2pro/plz/countlog"
+	"net"
+	"syscall"
 )
 
 func Start() {
@@ -36,13 +36,14 @@ func Start() {
 
 func setupConnectHook() {
 	internal.RegisterOnConnect(func(fd int, sa syscall.Sockaddr) {
+		gid, isKoala := getGoIDAndIsKoala()
 		ipv4Addr, _ := sa.(*syscall.SockaddrInet4)
 		if ipv4Addr == nil {
 			return
 		}
-		if internal.GetCurrentGoRoutineIsKoala() {
+		if isKoala {
 			countlog.Trace("event!gw4go.ignore_connect",
-				"threadID", internal.GetCurrentGoRoutineId(),
+				"threadID", gid,
 				"fd", fd)
 			return
 		}
@@ -50,7 +51,8 @@ func setupConnectHook() {
 			IP:   ipv4Addr.Addr[:],
 			Port: ipv4Addr.Port,
 		}
-		sut.OperateThread(sut.ThreadID(internal.GetCurrentGoRoutineId()), func(thread *sut.Thread) {
+
+		sut.OperateThread(gid, func(thread *sut.Thread) {
 			thread.OnConnect(
 				sut.SocketFD(fd), origAddr,
 			)
@@ -75,14 +77,15 @@ func setupCloseHook() {
 
 func setupAcceptHook() {
 	internal.RegisterOnAccept(func(serverSocketFD int, clientSocketFD int, sa syscall.Sockaddr) {
-		if internal.GetCurrentGoRoutineIsKoala() {
+		gid, isKoala := getGoIDAndIsKoala()
+		if isKoala {
 			countlog.Trace("event!gw4go.ignore_accept",
-				"threadID", internal.GetCurrentGoRoutineId(),
+				"threadID", gid,
 				"serverSocketFD", serverSocketFD,
 				"clientSocketFD", clientSocketFD)
 			return
 		}
-		sut.OperateThread(sut.ThreadID(internal.GetCurrentGoRoutineId()), func(thread *sut.Thread) {
+		sut.OperateThread(gid, func(thread *sut.Thread) {
 			thread.OnAccept(
 				sut.SocketFD(serverSocketFD), sut.SocketFD(clientSocketFD), sockaddrToTCP(sa),
 			)
@@ -133,13 +136,14 @@ func setupBindHook() {
 		if ipv4Addr == nil {
 			return
 		}
-		if internal.GetCurrentGoRoutineIsKoala() {
+		gid, isKoala := getGoIDAndIsKoala()
+		if isKoala {
 			countlog.Trace("event!gw4go.ignore_bind",
-				"threadID", internal.GetCurrentGoRoutineId(),
+				"threadID", gid,
 				"fd", fd)
 			return
 		}
-		sut.OperateThread(sut.ThreadID(internal.GetCurrentGoRoutineId()), func(thread *sut.Thread) {
+		sut.OperateThread(gid, func(thread *sut.Thread) {
 			thread.OnBind(
 				sut.SocketFD(fd), net.TCPAddr{
 					IP:   ipv4Addr.Addr[:],
@@ -152,16 +156,17 @@ func setupBindHook() {
 
 func setupRecvHook() {
 	internal.RegisterOnRecv(func(fd int, network string, raddr net.Addr, span []byte) {
-		if internal.GetCurrentGoRoutineIsKoala() {
+		gid, isKoala := getGoIDAndIsKoala()
+		if isKoala {
 			countlog.Trace("event!gw4go.ignore_recv",
-				"threadID", internal.GetCurrentGoRoutineId(),
+				"threadID", gid,
 				"fd", fd)
 			return
 		}
 		switch network {
 		case "udp", "udp4", "udp6":
 		default:
-			sut.OperateThread(sut.ThreadID(internal.GetCurrentGoRoutineId()), func(thread *sut.Thread) {
+			sut.OperateThread(gid, func(thread *sut.Thread) {
 				thread.OnRecv(sut.SocketFD(fd), span, 0)
 			})
 		}
@@ -170,20 +175,21 @@ func setupRecvHook() {
 
 func setupSendHook() {
 	internal.RegisterOnSend(func(fd int, network string, raddr net.Addr, span []byte) {
-		if internal.GetCurrentGoRoutineIsKoala() {
+		gid, isKoala := getGoIDAndIsKoala()
+		if isKoala {
 			countlog.Trace("event!gw4go.ignore_send",
-				"threadID", internal.GetCurrentGoRoutineId(),
+				"threadID", gid,
 				"fd", fd)
 			return
 		}
 		switch network {
 		case "udp", "udp4", "udp6":
 			udpAddr := raddr.(*net.UDPAddr)
-			sut.OperateThread(sut.ThreadID(internal.GetCurrentGoRoutineId()), func(thread *sut.Thread) {
+			sut.OperateThread(gid, func(thread *sut.Thread) {
 				thread.OnSendTo(sut.SocketFD(fd), span, 0, *udpAddr)
 			})
 		default:
-			sut.OperateThread(sut.ThreadID(internal.GetCurrentGoRoutineId()), func(thread *sut.Thread) {
+			sut.OperateThread(gid, func(thread *sut.Thread) {
 				thread.OnSend(sut.SocketFD(fd), span, 0)
 			})
 		}
@@ -192,7 +198,8 @@ func setupSendHook() {
 
 func setupGoRoutineExitHook() {
 	internal.RegisterOnGoRoutineExit(func(goid int64) {
-		if internal.GetCurrentGoRoutineIsKoala() {
+		_, isKoala := getGoIDAndIsKoala()
+		if isKoala {
 			countlog.Trace("event!gw4go.ignore_goroutine_exit",
 				"threadID", goid)
 			return
@@ -201,4 +208,10 @@ func setupGoRoutineExitHook() {
 			thread.OnShutdown()
 		})
 	})
+}
+
+func getGoIDAndIsKoala() (sut.ThreadID, bool) {
+	gid := internal.GetCurrentGoRoutineId()
+	isKoala := internal.GetCurrentGoRoutineIsKoala()
+	return sut.ThreadID(gid), isKoala
 }
