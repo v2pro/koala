@@ -48,9 +48,11 @@ func setupConnectHook() {
 			IP:   ipv4Addr.Addr[:],
 			Port: ipv4Addr.Port,
 		}
-		sut.GetThread(sut.ThreadID(internal.GetCurrentGoRoutineId())).OnConnect(
-			sut.SocketFD(fd), origAddr,
-		)
+		sut.OperateThread(sut.ThreadID(internal.GetCurrentGoRoutineId()), func(thread *sut.Thread) {
+			thread.OnConnect(
+				sut.SocketFD(fd), origAddr,
+			)
+		})
 		if envarg.IsReplaying() {
 			countlog.Debug("event!gw4go.rewrite_connect_target",
 				"origAddr", origAddr,
@@ -72,9 +74,11 @@ func setupAcceptHook() {
 				"clientSocketFD", clientSocketFD)
 			return
 		}
-		sut.GetThread(sut.ThreadID(internal.GetCurrentGoRoutineId())).OnAccept(
-			sut.SocketFD(serverSocketFD), sut.SocketFD(clientSocketFD), sockaddrToTCP(sa),
-		)
+		sut.OperateThread(sut.ThreadID(internal.GetCurrentGoRoutineId()), func(thread *sut.Thread) {
+			thread.OnAccept(
+				sut.SocketFD(serverSocketFD), sut.SocketFD(clientSocketFD), sockaddrToTCP(sa),
+			)
+		})
 	})
 }
 
@@ -115,7 +119,6 @@ func itod(i uint) string {
 	return string(b[bp:])
 }
 
-
 func setupBindHook() {
 	internal.RegisterOnBind(func(fd int, sa syscall.Sockaddr) {
 		ipv4Addr, _ := sa.(*syscall.SockaddrInet4)
@@ -128,12 +131,14 @@ func setupBindHook() {
 				"fd", fd)
 			return
 		}
-		sut.GetThread(sut.ThreadID(internal.GetCurrentGoRoutineId())).OnBind(
-			sut.SocketFD(fd), net.TCPAddr{
-				IP:   ipv4Addr.Addr[:],
-				Port: ipv4Addr.Port,
-			},
-		)
+		sut.OperateThread(sut.ThreadID(internal.GetCurrentGoRoutineId()), func(thread *sut.Thread) {
+			thread.OnBind(
+				sut.SocketFD(fd), net.TCPAddr{
+					IP:   ipv4Addr.Addr[:],
+					Port: ipv4Addr.Port,
+				},
+			)
+		})
 	})
 }
 
@@ -148,8 +153,9 @@ func setupRecvHook() {
 		switch network {
 		case "udp", "udp4", "udp6":
 		default:
-			sut.GetThread(sut.ThreadID(internal.GetCurrentGoRoutineId())).OnRecv(
-				sut.SocketFD(fd), span, 0)
+			sut.OperateThread(sut.ThreadID(internal.GetCurrentGoRoutineId()), func(thread *sut.Thread) {
+				thread.OnRecv(sut.SocketFD(fd), span, 0)
+			})
 		}
 	})
 }
@@ -165,11 +171,13 @@ func setupSendHook() {
 		switch network {
 		case "udp", "udp4", "udp6":
 			udpAddr := raddr.(*net.UDPAddr)
-			sut.GetThread(sut.ThreadID(internal.GetCurrentGoRoutineId())).OnSendTo(
-				sut.SocketFD(fd), span, 0, *udpAddr)
+			sut.OperateThread(sut.ThreadID(internal.GetCurrentGoRoutineId()), func(thread *sut.Thread) {
+				thread.OnSendTo(sut.SocketFD(fd), span, 0, *udpAddr)
+			})
 		default:
-			sut.GetThread(sut.ThreadID(internal.GetCurrentGoRoutineId())).OnSend(
-				sut.SocketFD(fd), span, 0)
+			sut.OperateThread(sut.ThreadID(internal.GetCurrentGoRoutineId()), func(thread *sut.Thread) {
+				thread.OnSend(sut.SocketFD(fd), span, 0)
+			})
 		}
 	})
 }
@@ -181,6 +189,8 @@ func setupGoRoutineExitHook() {
 				"threadID", goid)
 			return
 		}
-		sut.GetThread(sut.ThreadID(goid)).OnShutdown()
+		sut.OperateThread(sut.ThreadID(goid), func(thread *sut.Thread) {
+			thread.OnShutdown()
+		})
 	})
 }

@@ -52,8 +52,9 @@ func on_connect(threadID C.pid_t, socketFD C.int, remoteAddr *C.struct_sockaddr_
 	if origAddr.String() == "127.0.0.1:18500" {
 		return
 	}
-	sut.GetThread(sut.ThreadID(threadID)).
-		OnConnect(sut.SocketFD(socketFD), origAddr)
+	sut.OperateThread(sut.ThreadID(threadID), func(thread *sut.Thread) {
+		thread.OnConnect(sut.SocketFD(socketFD), origAddr)
+	})
 	if envarg.IsReplaying() {
 		countlog.Trace("event!gw4libc.redirect_connect_target",
 			"origAddr", origAddr,
@@ -72,11 +73,12 @@ func on_bind(threadID C.pid_t, socketFD C.int, addr *C.struct_sockaddr_in) {
 				"stacktrace", countlog.ProvideStacktrace)
 		}
 	}()
-	sut.GetThread(sut.ThreadID(threadID)).
-		OnBind(sut.SocketFD(socketFD), net.TCPAddr{
+	sut.OperateThread(sut.ThreadID(threadID), func(thread *sut.Thread) {
+		thread.OnBind(sut.SocketFD(socketFD), net.TCPAddr{
 			IP:   ch.Int2ip(sockaddr_in_sin_addr_get(addr)),
 			Port: int(ch.Ntohs(sockaddr_in_sin_port_get(addr))),
 		})
+	})
 }
 
 //export on_accept
@@ -91,11 +93,13 @@ func on_accept(threadID C.pid_t, serverSocketFD C.int, clientSocketFD C.int, add
 	if sockaddr_in_sin_family_get(addr) != syscall.AF_INET {
 		panic("expect ipv4 addr")
 	}
-	sut.GetThread(sut.ThreadID(threadID)).
-		OnAccept(sut.SocketFD(serverSocketFD), sut.SocketFD(clientSocketFD), net.TCPAddr{
+	sut.OperateThread(sut.ThreadID(threadID), func(thread *sut.Thread) {
+		thread.OnAccept(sut.SocketFD(serverSocketFD), sut.SocketFD(clientSocketFD), net.TCPAddr{
 			IP:   ch.Int2ip(sockaddr_in_sin_addr_get(addr)),
 			Port: int(ch.Ntohs(sockaddr_in_sin_port_get(addr))),
 		})
+	})
+
 }
 
 //export on_send
@@ -107,8 +111,9 @@ func on_send(threadID C.pid_t, socketFD C.int, span C.struct_ch_span, flags C.in
 				"stacktrace", countlog.ProvideStacktrace)
 		}
 	}()
-	sut.GetThread(sut.ThreadID(threadID)).
-		OnSend(sut.SocketFD(socketFD), ch_span_to_bytes(span), sut.SendFlags(flags))
+	sut.OperateThread(sut.ThreadID(threadID), func(thread *sut.Thread) {
+		thread.OnSend(sut.SocketFD(socketFD), ch_span_to_bytes(span), sut.SendFlags(flags))
+	})
 }
 
 //export on_recv
@@ -120,8 +125,9 @@ func on_recv(threadID C.pid_t, socketFD C.int, span C.struct_ch_span, flags C.in
 				"stacktrace", countlog.ProvideStacktrace)
 		}
 	}()
-	sut.GetThread(sut.ThreadID(threadID)).
-		OnRecv(sut.SocketFD(socketFD), ch_span_to_bytes(span), sut.RecvFlags(flags))
+	sut.OperateThread(sut.ThreadID(threadID), func(thread *sut.Thread) {
+		thread.OnRecv(sut.SocketFD(socketFD), ch_span_to_bytes(span), sut.RecvFlags(flags))
+	})
 }
 
 //export on_sendto
@@ -133,11 +139,12 @@ func on_sendto(threadID C.pid_t, socketFD C.int, span C.struct_ch_span, flags C.
 				"stacktrace", countlog.ProvideStacktrace)
 		}
 	}()
-	sut.GetThread(sut.ThreadID(threadID)).
-		OnSendTo(sut.SocketFD(socketFD), ch_span_to_bytes(span), sut.SendToFlags(flags), net.UDPAddr{
+	sut.OperateThread(sut.ThreadID(threadID), func(thread *sut.Thread) {
+		thread.OnSendTo(sut.SocketFD(socketFD), ch_span_to_bytes(span), sut.SendToFlags(flags), net.UDPAddr{
 			IP:   ch.Int2ip(sockaddr_in_sin_addr_get(addr)),
 			Port: int(ch.Ntohs(sockaddr_in_sin_port_get(addr))),
 		})
+	})
 }
 
 //export on_fopening_file
@@ -151,8 +158,10 @@ func on_fopening_file(threadID C.pid_t,
 				"stacktrace", countlog.ProvideStacktrace)
 		}
 	}()
-	redirectTo := sut.GetThread(sut.ThreadID(threadID)).
-		OnOpeningFile(ch_span_to_string(filename), ch_span_to_open_flags(opentype))
+	redirectTo := ""
+	sut.OperateThread(sut.ThreadID(threadID), func(thread *sut.Thread) {
+		redirectTo = thread.OnOpeningFile(ch_span_to_string(filename), ch_span_to_open_flags(opentype))
+	})
 	if redirectTo != "" {
 		return C.struct_ch_allocated_string{C.CString(redirectTo)}
 	}
@@ -171,8 +180,9 @@ func on_fopened_file(threadID C.pid_t,
 				"stacktrace", countlog.ProvideStacktrace)
 		}
 	}()
-	sut.GetThread(sut.ThreadID(threadID)).
-		OnOpenedFile(sut.FileFD(fileFD), ch_span_to_string(filename), ch_span_to_open_flags(opentype))
+	sut.OperateThread(sut.ThreadID(threadID), func(thread *sut.Thread) {
+		thread.OnOpenedFile(sut.FileFD(fileFD), ch_span_to_string(filename), ch_span_to_open_flags(opentype))
+	})
 }
 
 //export on_opening_file
@@ -186,8 +196,10 @@ func on_opening_file(threadID C.pid_t,
 				"stacktrace", countlog.ProvideStacktrace)
 		}
 	}()
-	redirectTo := sut.GetThread(sut.ThreadID(threadID)).
-		OnOpeningFile(ch_span_to_string(filename), int(flags))
+	redirectTo := ""
+	sut.OperateThread(sut.ThreadID(threadID), func(thread *sut.Thread) {
+		redirectTo = thread.OnOpeningFile(ch_span_to_string(filename), int(flags))
+	})
 	if redirectTo != "" {
 		return C.struct_ch_allocated_string{C.CString(redirectTo)}
 	}
@@ -206,8 +218,9 @@ func on_opened_file(threadID C.pid_t,
 				"stacktrace", countlog.ProvideStacktrace)
 		}
 	}()
-	sut.GetThread(sut.ThreadID(threadID)).
-		OnOpenedFile(sut.FileFD(fileFD), ch_span_to_string(filename), int(flags))
+	sut.OperateThread(sut.ThreadID(threadID), func(thread *sut.Thread) {
+		thread.OnOpenedFile(sut.FileFD(fileFD), ch_span_to_string(filename), int(flags))
+	})
 }
 
 //export on_write
@@ -221,8 +234,9 @@ func on_write(threadID C.pid_t,
 				"stacktrace", countlog.ProvideStacktrace)
 		}
 	}()
-	sut.GetThread(sut.ThreadID(threadID)).
-		OnWrite(sut.FileFD(fileFD), ch_span_to_bytes(span))
+	sut.OperateThread(sut.ThreadID(threadID), func(thread *sut.Thread) {
+		thread.OnWrite(sut.FileFD(fileFD), ch_span_to_bytes(span))
+	})
 }
 
 //export redirect_path
@@ -235,8 +249,10 @@ func redirect_path(threadID C.pid_t,
 				"stacktrace", countlog.ProvideStacktrace)
 		}
 	}()
-	redirectTo := sut.GetThread(sut.ThreadID(threadID)).
-		OnOpeningFile(ch_span_to_string(pathname), 0)
+	redirectTo := ""
+	sut.OperateThread(sut.ThreadID(threadID), func(thread *sut.Thread) {
+		redirectTo = thread.OnOpeningFile(ch_span_to_string(pathname), 0)
+	})
 	if redirectTo != "" {
 		return C.struct_ch_allocated_string{C.CString(redirectTo)}
 	}
