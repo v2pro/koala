@@ -68,6 +68,16 @@ func RemoveGlobalSock(socketFD SocketFD) *socket {
 	return sock
 }
 
+func getGlobalSock(socketFD SocketFD) *socket {
+	globalSocksMutex.Lock()
+	defer globalSocksMutex.Unlock()
+	sock := globalSocks[socketFD]
+	if sock != nil {
+		sock.lastAccessedAt = time.Now()
+	}
+	return sock
+}
+
 func OperateThread(threadID ThreadID, op func(thread *Thread)) {
 	thread := getThread(threadID)
 	thread.mutex.Lock()

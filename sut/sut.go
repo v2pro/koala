@@ -28,7 +28,7 @@ var helperReadStorage = "to-koala!read-storage"
 func (thread *Thread) lookupSocket(socketFD SocketFD) *socket {
 	sock := thread.socks[socketFD]
 	if sock == nil {
-		sock = RemoveGlobalSock(socketFD)
+		sock = getGlobalSock(socketFD)
 		if sock == nil {
 			return nil
 		}
