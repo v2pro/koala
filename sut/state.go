@@ -58,7 +58,7 @@ func setGlobalSock(socketFD SocketFD, sock *socket) {
 	globalSocks[socketFD] = sock
 }
 
-func removeGlobalSock(socketFD SocketFD) *socket {
+func RemoveGlobalSock(socketFD SocketFD) *socket {
 	globalSocksMutex.Lock()
 	defer globalSocksMutex.Unlock()
 	sock := globalSocks[socketFD]

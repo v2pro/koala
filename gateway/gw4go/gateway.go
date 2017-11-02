@@ -17,6 +17,7 @@ func Start() {
 	setupRecvHook()
 	setupSendHook()
 	setupConnectHook()
+	setupCloseHook()
 	setupGoRoutineExitHook()
 	if envarg.IsReplaying() {
 		inbound.Start()
@@ -32,6 +33,7 @@ func Start() {
 			"mode", "recording")
 	}
 }
+
 func setupConnectHook() {
 	internal.RegisterOnConnect(func(fd int, sa syscall.Sockaddr) {
 		ipv4Addr, _ := sa.(*syscall.SockaddrInet4)
@@ -62,6 +64,12 @@ func setupConnectHook() {
 			}
 			ipv4Addr.Port = envarg.OutboundAddr().Port
 		}
+	})
+}
+
+func setupCloseHook() {
+	internal.RegisterOnClose(func(fd int) {
+		sut.RemoveGlobalSock(sut.SocketFD(fd))
 	})
 }
 

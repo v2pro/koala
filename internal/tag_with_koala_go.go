@@ -48,6 +48,10 @@ func RegisterOnSend(callback func(fd int, net string, raddr net.Addr, span []byt
 	net.OnWrite = callback
 }
 
+func RegisterOnClose(callback func(fd int)) {
+	net.OnClose = callback
+}
+
 func RegisterOnGoRoutineExit(callback func(goid int64)) {
 	runtime.OnGoRoutineExit = callback
 }

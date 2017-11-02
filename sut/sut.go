@@ -10,7 +10,6 @@ import (
 	"net"
 	"os"
 	"strings"
-	"syscall"
 	"time"
 )
 
@@ -29,7 +28,7 @@ var helperReadStorage = "to-koala!read-storage"
 func (thread *Thread) lookupSocket(socketFD SocketFD) *socket {
 	sock := thread.socks[socketFD]
 	if sock == nil {
-		sock = removeGlobalSock(socketFD)
+		sock = RemoveGlobalSock(socketFD)
 		if sock == nil {
 			return nil
 		}
@@ -46,39 +45,10 @@ func (thread *Thread) OnSend(socketFD SocketFD, span []byte, flags SendFlags) {
 	}
 	sock := thread.lookupSocket(socketFD)
 	if sock == nil {
-		localAddr, err := syscall.Getsockname(int(socketFD))
-		if err != nil {
-			countlog.Error("event!sut.failed to find local address of new socket",
-				"ctx", thread, "err", err)
-			return
-		}
-		localAddr4, _ := localAddr.(*syscall.SockaddrInet4)
-		remoteAddr, err := syscall.Getpeername(int(socketFD))
-		if err != nil {
-			countlog.Error("event!sut.failed to find remote address of new socket",
-				"ctx", thread, "err", err)
-			return
-		}
-		remoteAddr4, _ := remoteAddr.(*syscall.SockaddrInet4)
-		if remoteAddr4 == nil {
-			return
-		}
-		countlog.Debug("event!sut.found_new_socket_on_send",
+		countlog.Warn("event!sut.unknown-send",
 			"threadID", thread.threadID,
 			"socketFD", socketFD)
-		sock = &socket{
-			socketFD: socketFD,
-			isServer: false,
-			addr: net.TCPAddr{
-				IP:   remoteAddr4.Addr[:],
-				Port: remoteAddr4.Port,
-			},
-			localAddr: &net.TCPAddr{
-				IP:   localAddr4.Addr[:],
-				Port: localAddr4.Port,
-			},
-		}
-		thread.socks[socketFD] = sock
+		return
 	}
 	event := "event!sut.inbound_send"
 	if sock.isServer {
@@ -174,6 +144,7 @@ func (thread *Thread) OnConnect(socketFD SocketFD, remoteAddr net.TCPAddr) {
 		isServer: false,
 		addr:     remoteAddr,
 	}
+	setGlobalSock(socketFD, thread.socks[socketFD])
 	if envarg.IsReplaying() {
 		localAddr, err := replaying.BindFDToLocalAddr(int(socketFD))
 		if err != nil {

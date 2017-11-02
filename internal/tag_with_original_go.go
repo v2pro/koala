@@ -36,5 +36,8 @@ func RegisterOnRecv(callback func(fd int, net string, raddr net.Addr, span []byt
 func RegisterOnSend(callback func(fd int, net string, raddr net.Addr, span []byte)) {
 }
 
+func RegisterOnClose(callback func(fd int)) {
+}
+
 func RegisterOnGoRoutineExit(callback func(goid int64)) {
 }
