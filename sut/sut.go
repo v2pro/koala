@@ -10,8 +10,8 @@ import (
 	"net"
 	"os"
 	"strings"
-	"time"
 	"syscall"
+	"time"
 )
 
 // InboundRequestPrefix is used to recognize php-fpm FCGI_BEGIN_REQUEST packet.
@@ -356,10 +356,14 @@ func (thread *Thread) shutdownRecordingSession() {
 	if !envarg.IsRecording() {
 		return
 	}
+	newSession := recording.NewSession(int32(thread.threadID))
 	countlog.Trace("event!sut.shutdown_recording_session",
 		"threadID", thread.threadID,
-		"sessionId", thread.recordingSession.SessionId)
+		"sessionId", thread.recordingSession.SessionId,
+		"nextSessionId", newSession.SessionId,
+		"sessionSummary", thread.recordingSession.Summary())
+	thread.recordingSession.NextSessionId = newSession.SessionId
 	thread.recordingSession.Shutdown(thread)
 	thread.socks = map[SocketFD]*socket{} // socks on thread is a temp cache
-	thread.recordingSession = recording.NewSession(int32(thread.threadID))
+	thread.recordingSession = newSession
 }
