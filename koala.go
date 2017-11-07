@@ -16,3 +16,7 @@ func SetDelegatedFromGoRoutineId(goid int64) {
 func GetCurrentGoRoutineId() int64 {
 	return internal.GetCurrentGoRoutineId()
 }
+
+func ExcludeCurrentGoRoutineFromRecording() {
+	internal.SetCurrentGoRoutineIsKoala()
+}

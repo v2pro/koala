@@ -42,9 +42,6 @@ func setupConnectHook() {
 			return
 		}
 		if isKoala {
-			countlog.Trace("event!gw4go.ignore_connect",
-				"threadID", gid,
-				"fd", fd)
 			return
 		}
 		origAddr := net.TCPAddr{
@@ -79,10 +76,6 @@ func setupAcceptHook() {
 	internal.RegisterOnAccept(func(serverSocketFD int, clientSocketFD int, sa syscall.Sockaddr) {
 		gid, isKoala := getGoIDAndIsKoala()
 		if isKoala {
-			countlog.Trace("event!gw4go.ignore_accept",
-				"threadID", gid,
-				"serverSocketFD", serverSocketFD,
-				"clientSocketFD", clientSocketFD)
 			return
 		}
 		sut.OperateThread(gid, func(thread *sut.Thread) {
@@ -138,9 +131,6 @@ func setupBindHook() {
 		}
 		gid, isKoala := getGoIDAndIsKoala()
 		if isKoala {
-			countlog.Trace("event!gw4go.ignore_bind",
-				"threadID", gid,
-				"fd", fd)
 			return
 		}
 		sut.OperateThread(gid, func(thread *sut.Thread) {
@@ -158,9 +148,6 @@ func setupRecvHook() {
 	internal.RegisterOnRecv(func(fd int, network string, raddr net.Addr, span []byte) {
 		gid, isKoala := getGoIDAndIsKoala()
 		if isKoala {
-			countlog.Trace("event!gw4go.ignore_recv",
-				"threadID", gid,
-				"fd", fd)
 			return
 		}
 		switch network {
@@ -177,9 +164,6 @@ func setupSendHook() {
 	internal.RegisterOnSend(func(fd int, network string, raddr net.Addr, span []byte) {
 		gid, isKoala := getGoIDAndIsKoala()
 		if isKoala {
-			countlog.Trace("event!gw4go.ignore_send",
-				"threadID", gid,
-				"fd", fd)
 			return
 		}
 		switch network {
@@ -200,8 +184,6 @@ func setupGoRoutineExitHook() {
 	internal.RegisterOnGoRoutineExit(func(goid int64) {
 		_, isKoala := getGoIDAndIsKoala()
 		if isKoala {
-			countlog.Trace("event!gw4go.ignore_goroutine_exit",
-				"threadID", goid)
 			return
 		}
 		sut.OperateThread(sut.ThreadID(goid), func(thread *sut.Thread) {
