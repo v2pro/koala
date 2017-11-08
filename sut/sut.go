@@ -170,18 +170,6 @@ func (thread *Thread) OnAccept(serverSocketFD SocketFD, clientSocketFD SocketFD,
 		"addr", &addr)
 }
 
-func (thread *Thread) OnBind(socketFD SocketFD, addr net.TCPAddr) {
-	thread.socks[socketFD] = &socket{
-		socketFD: socketFD,
-		isServer: false,
-		addr:     addr,
-	}
-	countlog.Debug("event!sut.bind",
-		"threadID", thread.threadID,
-		"socketFD", socketFD,
-		"addr", &addr)
-}
-
 func (thread *Thread) OnConnect(socketFD SocketFD, remoteAddr net.TCPAddr) {
 	thread.socks[socketFD] = &socket{
 		socketFD: socketFD,

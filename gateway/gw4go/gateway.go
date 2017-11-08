@@ -12,7 +12,6 @@ import (
 )
 
 func Start() {
-	setupBindHook()
 	setupAcceptHook()
 	setupRecvHook()
 	setupSendHook()
@@ -121,27 +120,6 @@ func itod(i uint) string {
 	}
 
 	return string(b[bp:])
-}
-
-func setupBindHook() {
-	internal.RegisterOnBind(func(fd int, sa syscall.Sockaddr) {
-		ipv4Addr, _ := sa.(*syscall.SockaddrInet4)
-		if ipv4Addr == nil {
-			return
-		}
-		gid, isKoala := getGoIDAndIsKoala()
-		if isKoala {
-			return
-		}
-		sut.OperateThread(gid, func(thread *sut.Thread) {
-			thread.OnBind(
-				sut.SocketFD(fd), net.TCPAddr{
-					IP:   ipv4Addr.Addr[:],
-					Port: ipv4Addr.Port,
-				},
-			)
-		})
-	})
 }
 
 func setupRecvHook() {
