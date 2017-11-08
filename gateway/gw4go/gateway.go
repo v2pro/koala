@@ -38,13 +38,16 @@ func setupConnectHook() {
 		gid, isKoala := getGoIDAndIsKoala()
 		ipv4Addr, _ := sa.(*syscall.SockaddrInet4)
 		if ipv4Addr == nil {
+			countlog.Trace("event!discard non-ipv4 addr on connect", "addr", sa)
 			return
 		}
 		if isKoala {
 			return
 		}
+		origIP := make([]byte, 4)
+		copy(origIP, ipv4Addr.Addr[:]) // ipv4Addr.Addr will be reused
 		origAddr := net.TCPAddr{
-			IP:   ipv4Addr.Addr[:],
+			IP:   origIP,
 			Port: ipv4Addr.Port,
 		}
 
