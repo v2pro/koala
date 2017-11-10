@@ -33,7 +33,11 @@ func init() {
 		C.set_time_offset(C.int(offset))
 	}
 	gw4go.Start()
-	C.go_initialized()
+	isTracing := C.int(0)
+	if envarg.IsTracing() {
+		isTracing = 1
+	}
+	C.go_initialized(isTracing)
 }
 
 //export on_connect
@@ -102,6 +106,25 @@ func on_accept(threadID C.pid_t, serverSocketFD C.int, clientSocketFD C.int, add
 
 }
 
+//export before_send
+func before_send(threadID C.pid_t, socketFD C.int, span C.struct_ch_span, flags C.int) C.struct_ch_allocated_string {
+	defer func() {
+		recovered := recover()
+		if recovered != nil {
+			countlog.Fatal("event!gw4libc.before_send.panic", "err", recovered,
+				"stacktrace", countlog.ProvideStacktrace)
+		}
+	}()
+	var extraHeader []byte
+	sut.OperateThread(sut.ThreadID(threadID), func(thread *sut.Thread) {
+		extraHeader = thread.BeforeSend(sut.SocketFD(socketFD), ch_span_to_bytes(span), sut.SendFlags(flags))
+	})
+	if extraHeader == nil {
+		return C.struct_ch_allocated_string{nil, 0}
+	}
+	return C.struct_ch_allocated_string{(*C.char)(C.CBytes(extraHeader)), C.size_t(len(extraHeader))}
+}
+
 //export on_send
 func on_send(threadID C.pid_t, socketFD C.int, span C.struct_ch_span, flags C.int) {
 	defer func() {
@@ -114,6 +137,11 @@ func on_send(threadID C.pid_t, socketFD C.int, span C.struct_ch_span, flags C.in
 	sut.OperateThread(sut.ThreadID(threadID), func(thread *sut.Thread) {
 		thread.OnSend(sut.SocketFD(socketFD), ch_span_to_bytes(span), sut.SendFlags(flags))
 	})
+}
+
+//export after_send
+func after_send(threadID C.pid_t, socketFD C.int, extraHeaderSentSize int, bodySentSize int) {
+
 }
 
 //export on_recv
@@ -163,9 +191,9 @@ func on_fopening_file(threadID C.pid_t,
 		redirectTo = thread.OnOpeningFile(ch_span_to_string(filename), ch_span_to_open_flags(opentype))
 	})
 	if redirectTo != "" {
-		return C.struct_ch_allocated_string{C.CString(redirectTo)}
+		return C.struct_ch_allocated_string{C.CString(redirectTo), C.size_t(len(redirectTo))}
 	}
-	return C.struct_ch_allocated_string{nil}
+	return C.struct_ch_allocated_string{nil, 0}
 }
 
 //export on_fopened_file
@@ -201,9 +229,9 @@ func on_opening_file(threadID C.pid_t,
 		redirectTo = thread.OnOpeningFile(ch_span_to_string(filename), int(flags))
 	})
 	if redirectTo != "" {
-		return C.struct_ch_allocated_string{C.CString(redirectTo)}
+		return C.struct_ch_allocated_string{C.CString(redirectTo), C.size_t(len(redirectTo))}
 	}
-	return C.struct_ch_allocated_string{nil}
+	return C.struct_ch_allocated_string{nil, 0}
 }
 
 //export on_opened_file
@@ -254,7 +282,7 @@ func redirect_path(threadID C.pid_t,
 		redirectTo = thread.OnOpeningFile(ch_span_to_string(pathname), 0)
 	})
 	if redirectTo != "" {
-		return C.struct_ch_allocated_string{C.CString(redirectTo)}
+		return C.struct_ch_allocated_string{C.CString(redirectTo), C.size_t(len(redirectTo))}
 	}
-	return C.struct_ch_allocated_string{nil}
+	return C.struct_ch_allocated_string{nil, 0}
 }

@@ -1,10 +1,8 @@
 package sut
 
 import (
-	"net"
 	"sync"
 	"context"
-	"github.com/v2pro/koala/replaying"
 	"github.com/v2pro/koala/recording"
 	"github.com/v2pro/koala/envarg"
 	"time"
@@ -17,29 +15,10 @@ type FileFD int
 
 type ThreadID int32
 
-type socket struct {
-	socketFD       SocketFD
-	isServer       bool
-	addr           net.TCPAddr
-	localAddr      *net.TCPAddr
-	lastAccessedAt time.Time
-}
-
 type file struct {
 	fileFD   FileFD
 	fileName string
 	flags    int
-}
-
-type Thread struct {
-	context.Context
-	mutex            *sync.Mutex
-	threadID         ThreadID
-	socks            map[SocketFD]*socket
-	files            map[FileFD]*file
-	recordingSession *recording.Session
-	replayingSession *replaying.ReplayingSession
-	lastAccessedAt   time.Time
 }
 
 var globalSocks = map[SocketFD]*socket{}
@@ -144,7 +123,7 @@ func gcGlobalSocks() int {
 	newMap := map[SocketFD]*socket{}
 	expiredSocksCount := 0
 	for fd, sock := range globalSocks {
-		if now.Sub(sock.lastAccessedAt) < time.Second*5 {
+		if now.Sub(sock.lastAccessedAt) < time.Minute*5 {
 			newMap[fd] = sock
 		} else {
 			expiredSocksCount++

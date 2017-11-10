@@ -5,6 +5,7 @@
 
 struct ch_allocated_string {
     char *Ptr;
+    size_t Len;
 };
 
 #endif

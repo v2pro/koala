@@ -91,6 +91,10 @@ func IsRecording() bool {
 	return isRecording
 }
 
+func IsTracing() bool {
+	return isTracing
+}
+
 func InboundAddr() *net.TCPAddr {
 	return inboundAddr
 }

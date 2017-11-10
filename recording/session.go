@@ -10,6 +10,7 @@ import (
 
 type Session struct {
 	SessionId           string
+	TraceHeader             []byte
 	CallFromInbound     *CallFromInbound
 	ReturnInbound       *ReturnInbound
 	Actions             []Action
@@ -189,4 +190,20 @@ func (session *Session) addAction(action Action) {
 		return
 	}
 	session.Actions = append(session.Actions, action)
+}
+
+var GenerateTraceHeader = func(callFromInboundRequest []byte) []byte {
+	id := newID()
+	return id[:]
+}
+
+func (session *Session) GetTraceHeader() []byte {
+	if session.TraceHeader == nil {
+		var request []byte
+		if session.CallFromInbound != nil {
+			request = session.CallFromInbound.Request
+		}
+		session.TraceHeader = GenerateTraceHeader(request)
+	}
+	return session.TraceHeader
 }

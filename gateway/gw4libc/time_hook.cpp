@@ -1,4 +1,4 @@
-#ifdef KOALA_REPLAYER
+#ifdef KOALA_LIBC
 #include <dlfcn.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -55,4 +55,4 @@ extern "C" {
     void set_time_offset(int val) {
     }
 }
-#endif // KOALA_REPLAYER
+#endif // KOALA_LIBC

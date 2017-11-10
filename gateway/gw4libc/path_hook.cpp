@@ -1,4 +1,4 @@
-#ifdef KOALA_REPLAYER
+#ifdef KOALA_LIBC
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
@@ -219,4 +219,4 @@ INTERPOSE(utimes)(const char *path, const struct timeval times[2]){
     auto result = real::utimes(path, times);
     PATH_HOOK_EXIT
 }
-#endif // KOALA_REPLAYER
+#endif // KOALA_LIBC
