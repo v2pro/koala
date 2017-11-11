@@ -9,9 +9,7 @@ import (
 
 func ch_span_to_bytes(span C.struct_ch_span) []byte {
 	buf := (*[math.MaxInt32]byte)(span.Ptr)[:span.Len]
-	copyOfBuf := make([]byte, len(buf))
-	copy(copyOfBuf, buf)
-	return copyOfBuf
+	return buf
 }
 
 func ch_span_to_string(span C.struct_ch_span) string {

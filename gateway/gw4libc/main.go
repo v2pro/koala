@@ -18,6 +18,7 @@ import (
 	"github.com/v2pro/koala/sut"
 	"net"
 	"syscall"
+	"unsafe"
 )
 
 func init() {
@@ -126,7 +127,7 @@ func before_send(threadID C.pid_t, socketFD C.int, span C.struct_ch_span, flags 
 }
 
 //export on_send
-func on_send(threadID C.pid_t, socketFD C.int, span C.struct_ch_span, flags C.int) {
+func on_send(threadID C.pid_t, socketFD C.int, span C.struct_ch_span, flags C.int, extraHeaderSentSize int) {
 	defer func() {
 		recovered := recover()
 		if recovered != nil {
@@ -135,17 +136,12 @@ func on_send(threadID C.pid_t, socketFD C.int, span C.struct_ch_span, flags C.in
 		}
 	}()
 	sut.OperateThread(sut.ThreadID(threadID), func(thread *sut.Thread) {
-		thread.OnSend(sut.SocketFD(socketFD), ch_span_to_bytes(span), sut.SendFlags(flags))
+		thread.OnSend(sut.SocketFD(socketFD), ch_span_to_bytes(span), sut.SendFlags(flags), extraHeaderSentSize)
 	})
 }
 
-//export after_send
-func after_send(threadID C.pid_t, socketFD C.int, extraHeaderSentSize int, bodySentSize int) {
-
-}
-
 //export on_recv
-func on_recv(threadID C.pid_t, socketFD C.int, span C.struct_ch_span, flags C.int) {
+func on_recv(threadID C.pid_t, socketFD C.int, span C.struct_ch_span, flags C.int) C.struct_ch_span {
 	defer func() {
 		recovered := recover()
 		if recovered != nil {
@@ -153,9 +149,22 @@ func on_recv(threadID C.pid_t, socketFD C.int, span C.struct_ch_span, flags C.in
 				"stacktrace", countlog.ProvideStacktrace)
 		}
 	}()
+	var body []byte
 	sut.OperateThread(sut.ThreadID(threadID), func(thread *sut.Thread) {
-		thread.OnRecv(sut.SocketFD(socketFD), ch_span_to_bytes(span), sut.RecvFlags(flags))
+		body = thread.OnRecv(sut.SocketFD(socketFD), ch_span_to_bytes(span), sut.RecvFlags(flags))
 	})
+	if body == nil {
+		return C.struct_ch_span{nil, 0}
+	}
+	ptr := (*sliceHeader)((unsafe.Pointer)(&body)).Data
+	return C.struct_ch_span{ptr, C.size_t(len(body))}
+}
+
+// sliceHeader is a safe version of SliceHeader used within this package.
+type sliceHeader struct {
+	Data unsafe.Pointer
+	Len  int
+	Cap  int
 }
 
 //export on_sendto

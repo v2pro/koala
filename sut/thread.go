@@ -53,8 +53,7 @@ func (thread *Thread) BeforeSend(socketFD SocketFD, span []byte, flags SendFlags
 	if sock.isServer {
 		return nil
 	}
-	traceHeader := thread.recordingSession.GetTraceHeader()
-	extraHeader := sock.beforeSend(traceHeader, span)
+	extraHeader := sock.beforeSend(thread.recordingSession, span)
 	if extraHeader != nil {
 		countlog.Trace("event!sut.before_send",
 			"socketFD", socketFD,
@@ -65,7 +64,7 @@ func (thread *Thread) BeforeSend(socketFD SocketFD, span []byte, flags SendFlags
 	return extraHeader
 }
 
-func (thread *Thread) OnSend(socketFD SocketFD, span []byte, flags SendFlags) {
+func (thread *Thread) OnSend(socketFD SocketFD, span []byte, flags SendFlags, extraHeaderSentSize int) {
 	if len(span) == 0 {
 		return
 	}
@@ -109,47 +108,57 @@ func (thread *Thread) AfterSend(socketFD SocketFD, extraHeaderSentSize int, body
 			"socketFD", socketFD)
 		return
 	}
-	sock.afterSend(extraHeaderSentSize, bodySentSize)
+	sock.afterSend(thread.recordingSession, extraHeaderSentSize, bodySentSize)
 }
 
 type RecvFlags int
 
-func (thread *Thread) OnRecv(socketFD SocketFD, span []byte, flags RecvFlags) {
+func (thread *Thread) OnRecv(socketFD SocketFD, span []byte, flags RecvFlags) []byte {
 	sock := thread.lookupSocket(socketFD)
 	if sock == nil {
 		countlog.Warn("event!sut.unknown-recv",
 			"threadID", thread.threadID,
 			"socketFD", socketFD)
-		return
+		return nil
 	}
-	event := "event!sut.inbound_recv"
-	if sock.isServer {
-		if thread.recordingSession.HasResponded() && bytes.HasPrefix(span, InboundRequestPrefix) {
-			countlog.Trace("event!sut.recv_from_inbound_found_responded",
-				"threadID", thread.threadID,
-				"socketFD", socketFD)
-			thread.shutdownRecordingSession()
-		}
-		thread.recordingSession.RecvFromInbound(thread, span, sock.addr)
-		replayingSession := replaying.RetrieveTmp(sock.addr)
-		if replayingSession != nil {
-			nanoOffset := replayingSession.CallFromInbound.GetOccurredAt() - time.Now().UnixNano()
-			SetTimeOffset(int(time.Duration(nanoOffset) / time.Second))
-			thread.replayingSession = replayingSession
-			countlog.Trace("event!sut.received_replaying_session",
-				"threadID", thread.threadID,
-				"replayingSession", thread.replayingSession,
-				"addr", sock.addr)
-		}
-	} else {
-		event = "event!sut.outbound_recv"
+	if !sock.isServer {
+		countlog.Trace("event!sut.outbound_recv",
+			"threadID", thread.threadID,
+			"socketFD", socketFD,
+			"addr", &sock.addr,
+			"content", span)
 		thread.recordingSession.RecvFromOutbound(thread, span, sock.addr, sock.localAddr, int(sock.socketFD))
+		return nil
 	}
-	countlog.Trace(event,
+	countlog.Trace("event!sut.inbound_recv",
 		"threadID", thread.threadID,
 		"socketFD", socketFD,
 		"addr", &sock.addr,
 		"content", span)
+	if envarg.IsTracing() && thread.recordingSession != nil {
+		span = sock.onRecv(thread.recordingSession, span)
+		if span == nil {
+			return nil
+		}
+	}
+	if thread.recordingSession.HasResponded() && bytes.HasPrefix(span, InboundRequestPrefix) {
+		countlog.Trace("event!sut.recv_from_inbound_found_responded",
+			"threadID", thread.threadID,
+			"socketFD", socketFD)
+		thread.shutdownRecordingSession()
+	}
+	thread.recordingSession.RecvFromInbound(thread, span, sock.addr)
+	replayingSession := replaying.RetrieveTmp(sock.addr)
+	if replayingSession != nil {
+		nanoOffset := replayingSession.CallFromInbound.GetOccurredAt() - time.Now().UnixNano()
+		SetTimeOffset(int(time.Duration(nanoOffset) / time.Second))
+		thread.replayingSession = replayingSession
+		countlog.Trace("event!sut.received_replaying_session",
+			"threadID", thread.threadID,
+			"replayingSession", thread.replayingSession,
+			"addr", sock.addr)
+	}
+	return span
 }
 
 func (thread *Thread) OnAccept(serverSocketFD SocketFD, clientSocketFD SocketFD, addr net.TCPAddr) {

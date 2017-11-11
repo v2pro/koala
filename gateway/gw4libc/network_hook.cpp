@@ -38,7 +38,7 @@ INTERPOSE(send)(int socketFD, const void *buffer, size_t size, int flags) {
         if (body_sent_size >= 0) {
             span.Ptr = buffer;
             span.Len = body_sent_size;
-            on_send(thread_id, socketFD, span, flags);
+            on_send(thread_id, socketFD, span, flags, 0);
         }
         return body_sent_size;
     }
@@ -52,7 +52,9 @@ INTERPOSE(send)(int socketFD, const void *buffer, size_t size, int flags) {
         while (remaining_len > 0) {
             ssize_t sent_size = real::send(socketFD, remaining_ptr, remaining_len, flags);
             if (sent_size <= 0) {
-                after_send(thread_id, socketFD, extra_header.Len - remaining_len, 0);
+                span.Ptr = NULL;
+                span.Len = 0;
+                on_send(thread_id, socketFD, span, flags, extra_header.Len - remaining_len);
                 return sent_size;
             }
             remaining_ptr += sent_size;
@@ -64,22 +66,43 @@ INTERPOSE(send)(int socketFD, const void *buffer, size_t size, int flags) {
     if (body_sent_size >= 0) {
         span.Ptr = buffer;
         span.Len = body_sent_size;
-        on_send(thread_id, socketFD, span, flags);
+    } else {
+        span.Ptr = NULL;
+        span.Len = 0;
     }
-    after_send(thread_id, socketFD, extra_header.Len, body_sent_size > 0 ? body_sent_size : 0);
+    on_send(thread_id, socketFD, span, flags, extra_header.Len);
     return body_sent_size;
 }
 
 INTERPOSE(recv)(int socketFD, void *buffer, size_t size, int flags) {
-    ssize_t received_size = real::recv(socketFD, buffer, size, flags);
-    if (received_size >= 0) {
-        struct ch_span span;
-        span.Ptr = buffer;
-        span.Len = received_size;
-        pid_t thread_id = get_thread_id();
-        on_recv(thread_id, socketFD, span, flags);
+    pid_t thread_id = get_thread_id();
+    struct ch_span span;
+    if (!is_tracing()) {
+        ssize_t body_received_size = real::recv(socketFD, buffer, size, flags);
+        if (body_received_size >= 0) {
+            span.Ptr = buffer;
+            span.Len = body_received_size;
+            on_recv(thread_id, socketFD, span, flags);
+        }
+        return body_received_size;
     }
-    return received_size;
+    // tracing might add extra_header before body
+    for(;;) {
+        ssize_t received_size = real::recv(socketFD, buffer, size, flags);
+        if (received_size >= 0) {
+            struct ch_span span;
+            span.Ptr = buffer;
+            span.Len = received_size;
+            pid_t thread_id = get_thread_id();
+            span = on_recv(thread_id, socketFD, span, flags);
+            if (span.Ptr != NULL) {
+                memmove((char *)buffer, span.Ptr, span.Len);
+                return span.Len;
+            }
+            // continue receive more header
+        }
+        return received_size;
+    }
 }
 
 INTERPOSE(sendto)(int socketFD, const void *buffer, size_t buffer_size, int flags,

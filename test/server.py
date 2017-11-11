@@ -12,7 +12,7 @@ logFile = open('/tmp/server.log', 'a')
 
 class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     def do_GET(self):
-        print(self.path)
+        print('!!!', self.path)
         if self.path == '/':
             s = requests.Session()
             s.get('http://127.0.0.1:2515/leaf')

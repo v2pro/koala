@@ -174,7 +174,7 @@ func setupSendHook() {
 			})
 		default:
 			sut.OperateThread(gid, func(thread *sut.Thread) {
-				thread.OnSend(sut.SocketFD(fd), span, 0)
+				thread.OnSend(sut.SocketFD(fd), span, 0, 0)
 			})
 		}
 	})
