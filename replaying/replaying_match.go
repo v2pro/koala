@@ -12,21 +12,21 @@ func (replayingSession *ReplayingSession) MatchOutboundTalk(
 	ctx context.Context, lastMatchedIndex int, request []byte) (int, float64, *recording.CallOutbound) {
 	unit := 16
 	chunks := cutToChunks(request, unit)
-	keys := replayingSession.loadKeys()
+	reqCandidates := replayingSession.loadKeys()
 	scores := make([]int, len(replayingSession.CallOutbounds))
 	maxScore := 0
 	maxScoreIndex := 0
 	for chunkIndex, chunk := range chunks {
-		for j, key := range keys {
+		for j, reqCandidate := range reqCandidates {
 			if j <= lastMatchedIndex {
 				continue
 			}
-			if len(key) < len(chunk) {
+			if len(reqCandidate) < len(chunk) {
 				continue
 			}
-			pos := bytes.Index(key, chunk)
+			pos := bytes.Index(reqCandidate, chunk)
 			if pos >= 0 {
-				keys[j] = key[pos:]
+				reqCandidates[j] = reqCandidate[pos:]
 				if chunkIndex == 0 && lastMatchedIndex == -1 {
 					scores[j] += len(chunks) // first chunk has more weight
 				} else {
@@ -105,6 +105,7 @@ func cutToChunks(key []byte, unit int) [][]byte {
 	return chunks
 }
 
+// findReadableChunk returns: the starting index of the trunk, length of the trunk
 func findReadableChunk(key []byte) (int, int) {
 	start := bytes.IndexFunc(key, func(r rune) bool {
 		return r > 31 && r < 127
@@ -118,5 +119,5 @@ func findReadableChunk(key []byte) (int, int) {
 	if end == -1 {
 		return start, len(key) - start
 	}
-	return start, end
+	return start, end-start
 }
