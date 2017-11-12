@@ -40,7 +40,7 @@ def test_koala_go():
 
 def test_java():
     env = os.environ.copy()
-    env['CGO_CFLAGS'] = '-DKOALA_LIBC_NETWORK_HOOK'
+    env['CGO_CFLAGS'] = '-DKOALA_LIBC_NETWORK_HOOK -DKOALA_LIBC_FILE_HOOK'
     env['CGO_CPPFLAGS'] = env['CGO_CFLAGS']
     shell_execute(
         'go install -tags="koala_recorder koala_tracer" -buildmode=c-shared '
@@ -55,7 +55,7 @@ def test_java():
     env['GOTRACEBACK'] = 'all'
     server = subprocess.Popen(
         [
-            # 'strace', '-e', 'trace=network',
+            # 'strace', '-f','-e', 'trace=network,read',
             'java', '-cp', 'java', 'Server'
         ],
         env=env,

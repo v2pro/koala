@@ -89,6 +89,9 @@ func (thread *Thread) OnSend(socketFD SocketFD, span []byte, flags SendFlags, ex
 					"threadID", thread.threadID)
 			}
 		}
+		if thread.recordingSession != nil && envarg.IsTracing() {
+			sock.afterSend(thread.recordingSession, extraHeaderSentSize, len(span))
+		}
 	}
 	countlog.Trace(event,
 		"threadID", thread.threadID,
@@ -137,9 +140,9 @@ func (thread *Thread) OnRecv(socketFD SocketFD, span []byte, flags RecvFlags) []
 		"content", span)
 	if envarg.IsTracing() && thread.recordingSession != nil {
 		span = sock.onRecv(thread.recordingSession, span)
-		if span == nil {
-			return nil
-		}
+	}
+	if span == nil {
+		return nil
 	}
 	if thread.recordingSession.HasResponded() && bytes.HasPrefix(span, InboundRequestPrefix) {
 		countlog.Trace("event!sut.recv_from_inbound_found_responded",
@@ -158,7 +161,7 @@ func (thread *Thread) OnRecv(socketFD SocketFD, span []byte, flags RecvFlags) []
 			"replayingSession", thread.replayingSession,
 			"addr", sock.addr)
 	}
-	return span
+	return sock.onRecv(thread.recordingSession, span)
 }
 
 func (thread *Thread) OnAccept(serverSocketFD SocketFD, clientSocketFD SocketFD, addr net.TCPAddr) {

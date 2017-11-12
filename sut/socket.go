@@ -163,6 +163,9 @@ func (sock *socket) onRecv(session *recording.Session, span []byte) []byte {
 			"threadID", session.ThreadId)
 		return body
 	}
+	if !sock.tracerState.isTraced {
+		return span
+	}
 	prevAction := sock.tracerState.nextAction
 	var body []byte
 	switch sock.tracerState.nextAction {
@@ -177,7 +180,7 @@ func (sock *socket) onRecv(session *recording.Session, span []byte) []byte {
 	case "readMagic":
 		body = sock.onRecv_readMagic(session, span)
 	default:
-		countlog.Error("event!sock.onRecv_dispatch",
+		countlog.Error("event!sock.onRecv_unknown_action",
 			"nextAction", sock.tracerState.nextAction,
 			"socketFD", sock.socketFD,
 			"threadID", session.ThreadId)

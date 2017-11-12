@@ -151,7 +151,7 @@ func before_send(threadID C.pid_t, socketFD C.int, spanPtr *C.struct_ch_span, fl
 }
 
 //export on_send
-func on_send(threadID C.pid_t, socketFD C.int, span C.struct_ch_span, flags C.int, extraHeaderSentSize int) {
+func on_send(threadID C.pid_t, socketFD C.int, span C.struct_ch_span, flags C.int, extraHeaderSentSize C.int) {
 	defer func() {
 		recovered := recover()
 		if recovered != nil {
@@ -160,7 +160,7 @@ func on_send(threadID C.pid_t, socketFD C.int, span C.struct_ch_span, flags C.in
 		}
 	}()
 	sut.OperateThread(sut.ThreadID(threadID), func(thread *sut.Thread) {
-		thread.OnSend(sut.SocketFD(socketFD), ch_span_to_bytes(span), sut.SendFlags(flags), extraHeaderSentSize)
+		thread.OnSend(sut.SocketFD(socketFD), ch_span_to_bytes(span), sut.SendFlags(flags), int(extraHeaderSentSize))
 	})
 }
 

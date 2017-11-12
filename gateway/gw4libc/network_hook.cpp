@@ -76,6 +76,8 @@ INTERPOSE(send)(int socketFD, const void *buffer, size_t size, int flags) {
 }
 
 INTERPOSE(recv)(int socketFD, void *buffer, size_t size, int flags) {
+    fprintf(stderr, "recv!!!\n");
+    fflush(stderr);
     pid_t thread_id = get_thread_id();
     struct ch_span span;
     if (!is_tracing()) {
