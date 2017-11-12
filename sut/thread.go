@@ -36,7 +36,7 @@ type Thread struct {
 
 type SendFlags int
 
-func (thread *Thread) BeforeSend(socketFD SocketFD, span []byte, flags SendFlags) []byte {
+func (thread *Thread) BeforeSend(socketFD SocketFD, span *[]byte, flags SendFlags) []byte {
 	if !envarg.IsTracing() {
 		return nil
 	}

@@ -9,8 +9,9 @@ import (
 )
 
 type Session struct {
+	ThreadId            int32
 	SessionId           string
-	TraceHeader             []byte
+	TraceHeader         []byte
 	CallFromInbound     *CallFromInbound
 	ReturnInbound       *ReturnInbound
 	Actions             []Action
@@ -18,9 +19,10 @@ type Session struct {
 	currentCallOutbound *CallOutbound          `json:"-"`
 }
 
-func NewSession(suffix int32) *Session {
+func NewSession(threadId int32) *Session {
 	return &Session{
-		SessionId: fmt.Sprintf("%d-%d", time.Now().UnixNano(), suffix),
+		ThreadId:  threadId,
+		SessionId: fmt.Sprintf("%d-%d", time.Now().UnixNano(), threadId),
 	}
 }
 

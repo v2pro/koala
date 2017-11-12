@@ -45,7 +45,8 @@ INTERPOSE(send)(int socketFD, const void *buffer, size_t size, int flags) {
     // tracing might add extra_header before body
     span.Ptr = buffer;
     span.Len = size;
-    struct ch_allocated_string extra_header = before_send(thread_id, socketFD, span, flags);
+    struct ch_allocated_string extra_header = before_send(thread_id, socketFD, &span, flags);
+    size = span.Len; // might require send less data this time due to previous header sent
     if (extra_header.Ptr != NULL) {
         char *remaining_ptr = extra_header.Ptr;
         size_t remaining_len = extra_header.Len;
