@@ -12,15 +12,19 @@ logFile = open('/tmp/server.log', 'a')
 
 class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     def do_GET(self):
-        print('!!!', self.path)
         if self.path == '/':
+            s = requests.Session()
+            s.get('http://127.0.0.1:2515/branch')
+            self.send_response(200)
+            self.wfile.write(str(datetime.datetime.now()))
+        if self.path == '/branch':
             s = requests.Session()
             s.get('http://127.0.0.1:2515/leaf')
             self.send_response(200)
-            self.wfile.write(str(datetime.datetime.now()))
+            self.wfile.write('branch')
         elif self.path == '/leaf':
             self.send_response(200)
-            self.wfile.write('hello')
+            self.wfile.write('leaf')
 
 
 class ThreadingMixIn:
