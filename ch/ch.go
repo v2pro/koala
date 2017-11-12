@@ -65,6 +65,22 @@ func SetUint32(ptr unsafe.Pointer, field *reflect.StructField, val uint32) {
 	*(*uint32)(fieldPtr) = val
 }
 
+func Get16ElementsByteArray(ptr unsafe.Pointer, field *reflect.StructField) [16]byte {
+	if field.Type.Kind() != reflect.Array || field.Type.Elem().Kind() != reflect.Uint8 || field.Type.Len() != 16 {
+		panic("kind mismatch")
+	}
+	fieldPtr := unsafe.Pointer(uintptr(ptr) + field.Offset)
+	return *(*[16]byte)(fieldPtr)
+}
+
+func Set16ElementsByteArray(ptr unsafe.Pointer, field *reflect.StructField, val [16]byte) {
+	if field.Type.Kind() != reflect.Array || field.Type.Elem().Kind() != reflect.Uint8 || field.Type.Len() != 16 {
+		panic("kind mismatch")
+	}
+	fieldPtr := unsafe.Pointer(uintptr(ptr) + field.Offset)
+	*(*[16]byte)(fieldPtr) = val
+}
+
 func GetPtr(ptr unsafe.Pointer, field *reflect.StructField) unsafe.Pointer {
 	return unsafe.Pointer(uintptr(ptr) + field.Offset)
 }

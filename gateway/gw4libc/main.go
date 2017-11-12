@@ -19,8 +19,8 @@ import (
 	"github.com/v2pro/koala/gateway/gw4go"
 	"github.com/v2pro/koala/sut"
 	"net"
-	"syscall"
 	"unsafe"
+	"syscall"
 )
 
 func init() {
@@ -106,7 +106,27 @@ func on_accept(threadID C.pid_t, serverSocketFD C.int, clientSocketFD C.int, add
 			Port: int(ch.Ntohs(sockaddr_in_sin_port_get(addr))),
 		})
 	})
+}
 
+//export on_accept6
+func on_accept6(threadID C.pid_t, serverSocketFD C.int, clientSocketFD C.int, addr *C.struct_sockaddr_in6) {
+	defer func() {
+		recovered := recover()
+		if recovered != nil {
+			countlog.Fatal("event!gw4libc.accept.panic", "err", recovered,
+				"stacktrace", countlog.ProvideStacktrace)
+		}
+	}()
+	if sockaddr_in6_sin_family_get(addr) != syscall.AF_INET6 {
+		panic("expect ipv6 addr")
+	}
+	sut.OperateThread(sut.ThreadID(threadID), func(thread *sut.Thread) {
+		ip := sockaddr_in6_sin_addr_get(addr)
+		thread.OnAccept(sut.SocketFD(serverSocketFD), sut.SocketFD(clientSocketFD), net.TCPAddr{
+			IP:   ip[:],
+			Port: int(ch.Ntohs(sockaddr_in6_sin_port_get(addr))),
+		})
+	})
 }
 
 //export before_send

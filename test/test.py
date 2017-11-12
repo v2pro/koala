@@ -12,7 +12,8 @@ import base64
 
 def main():
     # test_koala_go()
-    test_ld_preload()
+    # test_ld_preload()
+    test_java()
 
 
 def test_koala_go():
@@ -36,6 +37,46 @@ def test_koala_go():
     server.send_signal(signal.SIGTERM)
     print(server.communicate()[0])
 
+
+def test_java():
+    env = os.environ.copy()
+    env['CGO_CFLAGS'] = '-DKOALA_LIBC_NETWORK_HOOK'
+    env['CGO_CPPFLAGS'] = env['CGO_CFLAGS']
+    shell_execute(
+        'go install -tags="koala_recorder koala_tracer" -buildmode=c-shared '
+        'github.com/v2pro/koala/cmd/replayer', env=env)
+    shell_execute(
+        'go build -tags="koala_recorder koala_tracer" -buildmode=c-shared -o koala-replayer.so '
+        'github.com/v2pro/koala/cmd/replayer', env=env)
+    shell_execute('javac java/Server.java')
+    env = os.environ.copy()
+    # env['LD_DEBUG'] = 'bindings'
+    env['LD_PRELOAD'] = '%s/koala-replayer.so' % os.path.abspath('.')
+    env['GOTRACEBACK'] = 'all'
+    server = subprocess.Popen(
+        [
+            # 'strace', '-e', 'trace=network',
+            'java', '-cp', 'java', 'Server'
+        ],
+        env=env,
+    )
+    time.sleep(1)
+
+    # print('send SIGTERM')
+    # server.send_signal(signal.SIGTERM)
+    # print(server.communicate()[0])
+    # return
+
+    thread1 = threading.Thread(target=call_server)
+    thread1.start()
+    thread1.join()
+    # thread2 = threading.Thread(target=replay)
+    # thread2.start()
+    # thread2.join()
+    time.sleep(1)
+    # print('send SIGTERM')
+    # server.send_signal(signal.SIGTERM)
+    print(server.communicate()[0])
 
 def test_ld_preload():
     env = os.environ.copy()

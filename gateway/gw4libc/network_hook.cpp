@@ -131,10 +131,16 @@ INTERPOSE(connect)(int socketFD, const struct sockaddr *remote_addr, socklen_t r
 
 INTERPOSE(accept)(int serverSocketFD, struct sockaddr *addr, socklen_t *addrlen) {
     int clientSocketFD = real::accept(serverSocketFD, addr, addrlen);
-    if (clientSocketFD > 0 && addr->sa_family == AF_INET) {
-        struct sockaddr_in *typed_addr = (struct sockaddr_in *)(addr);
-        pid_t thread_id = get_thread_id();
-        on_accept(thread_id, serverSocketFD, clientSocketFD, typed_addr);
+    if (clientSocketFD > 0) {
+        if (addr->sa_family == AF_INET) {
+            struct sockaddr_in *typed_addr = (struct sockaddr_in *)(addr);
+            pid_t thread_id = get_thread_id();
+            on_accept(thread_id, serverSocketFD, clientSocketFD, typed_addr);
+        } else if (addr->sa_family == AF_INET6) {
+            struct sockaddr_in6 *typed_addr = (struct sockaddr_in6 *)(addr);
+            pid_t thread_id = get_thread_id();
+            on_accept6(thread_id, serverSocketFD, clientSocketFD, typed_addr);
+        }
     }
     return clientSocketFD;
 }
