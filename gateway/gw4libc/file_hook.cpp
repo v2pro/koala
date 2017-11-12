@@ -192,4 +192,4 @@ INTERPOSE(write)(int fileFD, const void *buffer, size_t size) {
     }
     return written_size;
 }
-#endif // KOALA_LIBC
+#endif // KOALA_LIBC_FILE_HOOK

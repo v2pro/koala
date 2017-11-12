@@ -55,4 +55,4 @@ extern "C" {
     void set_time_offset(int val) {
     }
 }
-#endif // KOALA_LIBC
+#endif // KOALA_LIBC_TIME_HOOK

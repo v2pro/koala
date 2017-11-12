@@ -302,9 +302,6 @@ func (thread *Thread) OnOpenedFile(fileFD FileFD, fileName string, flags int) {
 }
 
 func (thread *Thread) OnWrite(fileFD FileFD, content []byte) {
-	countlog.Trace("event!sut.write",
-		"threadID", thread.threadID,
-		"fileFD", fileFD)
 	file := thread.files[fileFD]
 	if file == nil {
 		return

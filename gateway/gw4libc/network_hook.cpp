@@ -146,4 +146,4 @@ INTERPOSE(accept)(int serverSocketFD, struct sockaddr *addr, socklen_t *addrlen)
     }
     return clientSocketFD;
 }
-#endif // KOALA_LIBC
+#endif // KOALA_LIBC_NETWORK_HOOK

@@ -1,7 +1,6 @@
 package gw4libc
 
-// #cgo CFLAGS: -DPTHREAD -DPTHREAD_SINGLETHREADED_TIME
-// #cgo CXXFLAGS: -DPTHREAD -DPTHREAD_SINGLETHREADED_TIME --std=c++11 -Wno-ignored-attributes
+// #cgo CXXFLAGS: --std=c++11 -Wno-ignored-attributes
 // #cgo LDFLAGS: -ldl -lm
 // #include <stddef.h>
 // #include <netinet/in.h>

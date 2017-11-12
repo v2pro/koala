@@ -219,4 +219,4 @@ INTERPOSE(utimes)(const char *path, const struct timeval times[2]){
     auto result = real::utimes(path, times);
     PATH_HOOK_EXIT
 }
-#endif // KOALA_LIBC
+#endif // KOALA_LIBC_PATH_HOOK
