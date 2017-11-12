@@ -1,4 +1,4 @@
-#ifdef KOALA_LIBC
+#ifdef KOALA_LIBC_PATH_HOOK
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif

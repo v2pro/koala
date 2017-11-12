@@ -38,12 +38,15 @@ def test_koala_go():
 
 
 def test_ld_preload():
+    env = os.environ.copy()
+    env['CGO_CFLAGS'] = '-DKOALA_LIBC_NETWORK_HOOK'
+    env['CGO_CPPFLAGS'] = env['CGO_CFLAGS']
     shell_execute(
-        'go install -tags="koala_libc koala_recorder koala_tracer" -buildmode=c-shared '
-        'github.com/v2pro/koala/cmd/replayer')
+        'go install -tags="koala_recorder koala_tracer" -buildmode=c-shared '
+        'github.com/v2pro/koala/cmd/replayer', env=env)
     shell_execute(
-        'go build -tags="koala_libc koala_recorder koala_tracer" -buildmode=c-shared -o koala-replayer.so '
-        'github.com/v2pro/koala/cmd/replayer')
+        'go build -tags="koala_recorder koala_tracer" -buildmode=c-shared -o koala-replayer.so '
+        'github.com/v2pro/koala/cmd/replayer', env=env)
     env = os.environ.copy()
     env['LD_PRELOAD'] = '%s/koala-replayer.so' % os.path.abspath('.')
     env['SERVER_MODE'] = 'MULTI_THREADS'

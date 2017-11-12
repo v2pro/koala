@@ -1,4 +1,4 @@
-#ifdef KOALA_LIBC
+#ifdef KOALA_LIBC_TIME_HOOK
 #include <dlfcn.h>
 #include <stddef.h>
 #include <stdio.h>
