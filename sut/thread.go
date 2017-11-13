@@ -161,9 +161,6 @@ func (thread *Thread) OnRecv(socketFD SocketFD, span []byte, flags RecvFlags) []
 			"replayingSession", thread.replayingSession,
 			"addr", sock.addr)
 	}
-	if envarg.IsTracing() && thread.recordingSession != nil {
-		return sock.onRecv(thread.recordingSession, span)
-	}
 	return span
 }
 
