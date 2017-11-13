@@ -6,6 +6,7 @@ import (
 	"unsafe"
 	"encoding/binary"
 	"net"
+	"github.com/v2pro/plz/countlog"
 )
 
 func Dump(typ reflect.Type) {
@@ -22,7 +23,8 @@ func FieldOf(typ reflect.Type, name string) *reflect.StructField {
 			return &field
 		}
 	}
-	panic(name + " not found in " + typ.String())
+	countlog.Error("event!ch.field not found", "type", typ.String(), "name", name)
+	return nil
 }
 
 func GetUint8(ptr unsafe.Pointer, field *reflect.StructField) uint8 {

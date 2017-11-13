@@ -60,7 +60,7 @@ func (session *Session) ReadStorage(ctx context.Context, span []byte) {
 	}
 	session.addAction(&ReadStorage{
 		action:  session.newAction("ReadStorage"),
-		Content: span,
+		Content: append([]byte(nil), span...),
 	})
 }
 
@@ -154,7 +154,7 @@ func (session *Session) SendUDP(ctx context.Context, span []byte, peer net.UDPAd
 	session.addAction(&SendUDP{
 		action:  session.newAction("SendUDP"),
 		Peer:    peer,
-		Content: span,
+		Content: append([]byte(nil), span...),
 	})
 }
 

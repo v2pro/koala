@@ -26,6 +26,9 @@ var in6_addr_type = reflect.TypeOf((*C.struct_in6_addr)(nil)).Elem()
 var in6_addr_s_addr_field = ch.FieldOf(in6_addr_type, "__in6_u")
 
 func init() {
+	if in6_addr_s_addr_field == nil {
+		in6_addr_s_addr_field = ch.FieldOf(in6_addr_type, "__u6_addr")
+	}
 	//ch.Dump(in6_addr_type)
 	//ch.Dump(ch.FieldOf(sockaddr_in_type, "sin_addr").Type)
 }
