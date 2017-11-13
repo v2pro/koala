@@ -36,10 +36,6 @@ func RegisterOnAccept(callback func(serverSocketFD int, clientSocketFD int, sa s
 	syscall.OnAccept = callback
 }
 
-func RegisterOnBind(callback func(fd int, sa syscall.Sockaddr)) {
-	syscall.OnBind = callback
-}
-
 func RegisterOnRecv(callback func(fd int, net string, raddr net.Addr, span []byte)) {
 	net.OnRead = callback
 }

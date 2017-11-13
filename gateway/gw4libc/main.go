@@ -72,19 +72,6 @@ func on_connect(threadID C.pid_t, socketFD C.int, remoteAddr *C.struct_sockaddr_
 
 //export on_bind
 func on_bind(threadID C.pid_t, socketFD C.int, addr *C.struct_sockaddr_in) {
-	defer func() {
-		recovered := recover()
-		if recovered != nil {
-			countlog.Fatal("event!gw4libc.bind.panic", "err", recovered,
-				"stacktrace", countlog.ProvideStacktrace)
-		}
-	}()
-	sut.OperateThread(sut.ThreadID(threadID), func(thread *sut.Thread) {
-		thread.OnBind(sut.SocketFD(socketFD), net.TCPAddr{
-			IP:   ch.Int2ip(sockaddr_in_sin_addr_get(addr)),
-			Port: int(ch.Ntohs(sockaddr_in_sin_port_get(addr))),
-		})
-	})
 }
 
 //export on_accept

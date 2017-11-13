@@ -12,7 +12,6 @@ import (
 )
 
 func Start() {
-	setupBindHook()
 	setupAcceptHook()
 	setupRecvHook()
 	setupSendHook()
@@ -39,13 +38,16 @@ func setupConnectHook() {
 		gid, isKoala := getGoIDAndIsKoala()
 		ipv4Addr, _ := sa.(*syscall.SockaddrInet4)
 		if ipv4Addr == nil {
+			countlog.Trace("event!discard non-ipv4 addr on connect", "addr", sa)
 			return
 		}
 		if isKoala {
 			return
 		}
+		origIP := make([]byte, 4)
+		copy(origIP, ipv4Addr.Addr[:]) // ipv4Addr.Addr will be reused
 		origAddr := net.TCPAddr{
-			IP:   ipv4Addr.Addr[:],
+			IP:   origIP,
 			Port: ipv4Addr.Port,
 		}
 
@@ -121,27 +123,6 @@ func itod(i uint) string {
 	}
 
 	return string(b[bp:])
-}
-
-func setupBindHook() {
-	internal.RegisterOnBind(func(fd int, sa syscall.Sockaddr) {
-		ipv4Addr, _ := sa.(*syscall.SockaddrInet4)
-		if ipv4Addr == nil {
-			return
-		}
-		gid, isKoala := getGoIDAndIsKoala()
-		if isKoala {
-			return
-		}
-		sut.OperateThread(gid, func(thread *sut.Thread) {
-			thread.OnBind(
-				sut.SocketFD(fd), net.TCPAddr{
-					IP:   ipv4Addr.Addr[:],
-					Port: ipv4Addr.Port,
-				},
-			)
-		})
-	})
 }
 
 func setupRecvHook() {

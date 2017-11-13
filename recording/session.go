@@ -12,6 +12,7 @@ type Session struct {
 	ThreadId            int32
 	SessionId           string
 	TraceHeader         []byte
+	NextSessionId       string
 	CallFromInbound     *CallFromInbound
 	ReturnInbound       *ReturnInbound
 	Actions             []Action
@@ -24,6 +25,19 @@ func NewSession(threadId int32) *Session {
 		ThreadId:  threadId,
 		SessionId: fmt.Sprintf("%d-%d", time.Now().UnixNano(), threadId),
 	}
+}
+
+func (session *Session) Summary() string {
+	reqLen := 0
+	resLen := 0
+	if session.CallFromInbound != nil {
+		reqLen = len(session.CallFromInbound.Request)
+	}
+	if session.ReturnInbound != nil {
+		resLen = len(session.ReturnInbound.Response)
+	}
+	return fmt.Sprintf("CallFromInbound: %d bytes, ReturnInbound: %d bytes, actions: %d",
+		reqLen, resLen, len(session.Actions))
 }
 
 func (session *Session) newAction(actionType string) action {
