@@ -1,1 +1,1 @@
-char* library_version = { "KOALA-VERSION: 2.4.1" };
+char* library_version = { "KOALA-VERSION: 2.4.2" };
