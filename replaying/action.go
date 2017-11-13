@@ -4,6 +4,8 @@ import (
 	"time"
 	"strconv"
 	"net"
+	"encoding/json"
+	"github.com/v2pro/koala/recording"
 )
 
 type replayedAction struct {
@@ -46,10 +48,32 @@ type CallFromInbound struct {
 	OriginalRequest     []byte
 }
 
+func (callFromInbound *CallFromInbound) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		CallFromInbound
+		OriginalRequest json.RawMessage
+	}{
+		CallFromInbound: *callFromInbound,
+		OriginalRequest: recording.EncodeAnyByteArray(callFromInbound.OriginalRequest),
+	})
+}
+
 type ReturnInbound struct {
 	replayedAction
 	OriginalResponse []byte
 	Response         []byte
+}
+
+func (returnInbound *ReturnInbound) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		ReturnInbound
+		OriginalResponse json.RawMessage
+		Response json.RawMessage
+	}{
+		ReturnInbound: *returnInbound,
+		OriginalResponse: recording.EncodeAnyByteArray(returnInbound.OriginalResponse),
+		Response: recording.EncodeAnyByteArray(returnInbound.Response),
+	})
 }
 
 type CallOutbound struct {
@@ -60,6 +84,20 @@ type CallOutbound struct {
 	MatchedMark        float64
 	Request            []byte
 	Peer               net.TCPAddr
+}
+
+func (callOutbound *CallOutbound) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		CallOutbound
+		MatchedRequest json.RawMessage
+		MatchedResponse json.RawMessage
+		Request json.RawMessage
+	}{
+		CallOutbound: *callOutbound,
+		MatchedRequest: recording.EncodeAnyByteArray(callOutbound.MatchedRequest),
+		MatchedResponse: recording.EncodeAnyByteArray(callOutbound.MatchedResponse),
+		Request: recording.EncodeAnyByteArray(callOutbound.Request),
+	})
 }
 
 func NewCallOutbound(peer net.TCPAddr, request []byte) *CallOutbound {
@@ -90,8 +128,28 @@ type AppendFile struct {
 	Content  []byte
 }
 
+func (appendFile *AppendFile) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		AppendFile
+		Content json.RawMessage
+	}{
+		AppendFile: *appendFile,
+		Content: recording.EncodeAnyByteArray(appendFile.Content),
+	})
+}
+
 type SendUDP struct {
 	replayedAction
-	Peer net.UDPAddr
+	Peer    net.UDPAddr
 	Content []byte
+}
+
+func (sendUDP *SendUDP) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		SendUDP
+		Content json.RawMessage
+	}{
+		SendUDP: *sendUDP,
+		Content: recording.EncodeAnyByteArray(sendUDP.Content),
+	})
 }

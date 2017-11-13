@@ -76,7 +76,7 @@ func handleInbound(respWriter http.ResponseWriter, req *http.Request) {
 		return
 	}
 	replayedSession := replayingSession.Finish(response)
-	marshaledReplayedSession, err := json.Marshal(replayedSession)
+	marshaledReplayedSession, err := json.MarshalIndent(replayedSession,  "", "  ")
 	if err != nil {
 		countlog.Error("event!inbound.marshal replaying session failed", "err", err)
 		return
