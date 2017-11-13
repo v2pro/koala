@@ -161,7 +161,10 @@ func (thread *Thread) OnRecv(socketFD SocketFD, span []byte, flags RecvFlags) []
 			"replayingSession", thread.replayingSession,
 			"addr", sock.addr)
 	}
-	return sock.onRecv(thread.recordingSession, span)
+	if envarg.IsTracing() && thread.recordingSession != nil {
+		return sock.onRecv(thread.recordingSession, span)
+	}
+	return span
 }
 
 func (thread *Thread) OnAccept(serverSocketFD SocketFD, clientSocketFD SocketFD, addr net.TCPAddr) {
