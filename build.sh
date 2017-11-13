@@ -11,4 +11,6 @@ echo "compile output/koala-replayer.so"
 go get github.com/Masterminds/glide
 cd /tmp/build-golang/src/github.com/v2pro/koala
 /tmp/build-golang/bin/glide i
+export CGO_CFLAGS="-DKOALA_LIBC_NETWORK_HOOK -DKOALA_LIBC_FILE_HOOK -DKOALA_LIBC_TIME_HOOK -DKOALA_LIBC_PATH_HOOK"
+export CGO_CPPFLAGS=$CGO_CFLAGS
 go build -tags="koala_replayer" -buildmode=c-shared -o output/koala-replayer.so github.com/v2pro/koala/cmd/replayer
