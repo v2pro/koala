@@ -6,6 +6,7 @@ package gw4libc
 // #include <netinet/in.h>
 // #include <sys/types.h>
 // #include <sys/socket.h>
+// #include <sys/un.h>
 // #include "span.h"
 // #include "allocated_string.h"
 // #include "time_hook.h"
@@ -13,10 +14,10 @@ package gw4libc
 import "C"
 import (
 	"github.com/v2pro/koala/ch"
-	"github.com/v2pro/plz/countlog"
 	"github.com/v2pro/koala/envarg"
 	"github.com/v2pro/koala/gateway/gw4go"
 	"github.com/v2pro/koala/sut"
+	"github.com/v2pro/plz/countlog"
 	"net"
 	"unsafe"
 	"syscall"
@@ -70,8 +71,39 @@ func on_connect(threadID C.pid_t, socketFD C.int, remoteAddr *C.struct_sockaddr_
 	}
 }
 
+//export on_connect_unix
+func on_connect_unix(threadID C.pid_t, socketFD C.int, remoteAddr *C.char) {
+	defer func() {
+		recovered := recover()
+		if recovered != nil {
+			countlog.Fatal("event!gw4libc.connect_unix.panic", "err", recovered,
+				"stacktrace", countlog.ProvideStacktrace)
+		}
+	}()
+	origAddr := net.UnixAddr{
+		Name: C.GoString(remoteAddr),
+		Net:  "unix",
+	}
+
+	sut.OperateThread(sut.ThreadID(threadID), func(thread *sut.Thread) {
+		thread.OnConnectUnix(sut.SocketFD(socketFD), origAddr)
+	})
+	//TODO replaying
+	if envarg.IsReplaying() {
+		countlog.Trace("event!gw4libc.redirect_connect_unix_target",
+			"origAddr", origAddr,
+			"redirectTo", envarg.OutboundAddr())
+		//sockaddr_in_sin_addr_set(remoteAddr, ch.Ip2int(envarg.OutboundAddr().IP))
+		//sockaddr_in_sin_port_set(remoteAddr, ch.Htons(uint16(envarg.OutboundAddr().Port)))
+	}
+}
+
 //export on_bind
 func on_bind(threadID C.pid_t, socketFD C.int, addr *C.struct_sockaddr_in) {
+}
+
+//export on_bind_unix
+func on_bind_unix(threadID C.pid_t, socketFD C.int, addr *C.char) {
 }
 
 //export on_accept
@@ -134,6 +166,25 @@ func before_send(threadID C.pid_t, socketFD C.int, spanPtr *C.struct_ch_span, fl
 		return C.struct_ch_allocated_string{nil, 0}
 	}
 	return C.struct_ch_allocated_string{(*C.char)(C.CBytes(extraHeader)), C.size_t(len(extraHeader))}
+}
+
+//export on_accept_unix
+func on_accept_unix(threadID C.pid_t, serverSocketFD C.int, clientSocketFD C.int, addr *C.char) {
+	defer func() {
+		recovered := recover()
+		if recovered != nil {
+			countlog.Fatal("event!gw4libc.accept.panic", "err", recovered,
+				"stacktrace", countlog.ProvideStacktrace)
+		}
+	}()
+
+	sut.OperateThread(sut.ThreadID(threadID), func(thread *sut.Thread) {
+		name := C.GoString(addr)
+		thread.OnAcceptUnix(sut.SocketFD(serverSocketFD), sut.SocketFD(clientSocketFD), net.UnixAddr{
+			Name: name,
+			Net:  "unix",
+		})
+	})
 }
 
 //export on_send

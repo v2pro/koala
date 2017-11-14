@@ -15,6 +15,7 @@ type socket struct {
 	isServer       bool
 	addr           net.TCPAddr
 	localAddr      *net.TCPAddr
+	unixAddr       net.UnixAddr
 	lastAccessedAt time.Time
 	tracerState    *tracerState
 }

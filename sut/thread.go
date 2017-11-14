@@ -150,7 +150,7 @@ func (thread *Thread) OnRecv(socketFD SocketFD, span []byte, flags RecvFlags) []
 			"socketFD", socketFD)
 		thread.shutdownRecordingSession()
 	}
-	thread.recordingSession.RecvFromInbound(thread, span, sock.addr)
+	thread.recordingSession.RecvFromInbound(thread, span, sock.addr, sock.unixAddr)
 	replayingSession := replaying.RetrieveTmp(sock.addr)
 	if replayingSession != nil {
 		nanoOffset := replayingSession.CallFromInbound.GetOccurredAt() - time.Now().UnixNano()
@@ -178,6 +178,44 @@ func (thread *Thread) OnAccept(serverSocketFD SocketFD, clientSocketFD SocketFD,
 		"addr", &addr)
 }
 
+func (thread *Thread) OnAcceptUnix(serverSocketFD SocketFD, clientSocketFD SocketFD, addr net.UnixAddr) {
+	thread.socks[clientSocketFD] = &socket{
+		socketFD: clientSocketFD,
+		isServer: true,
+		unixAddr: addr,
+	}
+	setGlobalSock(clientSocketFD, thread.socks[clientSocketFD])
+	countlog.Debug("event!sut.accept_unix",
+		"threadID", thread.threadID,
+		"serverSocketFD", serverSocketFD,
+		"clientSocketFD", clientSocketFD,
+		"unixAddr", addr)
+}
+
+func (thread *Thread) OnBind(socketFD SocketFD, addr net.TCPAddr) {
+	thread.socks[socketFD] = &socket{
+		socketFD: socketFD,
+		isServer: false,
+		addr:     addr,
+	}
+	countlog.Debug("event!sut.bind",
+		"threadID", thread.threadID,
+		"socketFD", socketFD,
+		"addr", &addr)
+}
+
+func (thread *Thread) OnBindUnix(socketFD SocketFD, addr net.UnixAddr) {
+	thread.socks[socketFD] = &socket{
+		socketFD: socketFD,
+		isServer: false,
+		unixAddr: addr,
+	}
+	countlog.Debug("event!sut.bind",
+		"threadID", thread.threadID,
+		"socketFD", socketFD,
+		"unixAddr", addr)
+}
+
 func (thread *Thread) OnConnect(socketFD SocketFD, remoteAddr net.TCPAddr) {
 	thread.socks[socketFD] = &socket{
 		socketFD: socketFD,
@@ -199,6 +237,29 @@ func (thread *Thread) OnConnect(socketFD SocketFD, remoteAddr net.TCPAddr) {
 		"socketFD", socketFD,
 		"addr", &remoteAddr,
 		"localAddr", thread.socks[socketFD].localAddr)
+}
+
+func (thread *Thread) OnConnectUnix(socketFD SocketFD, remoteAddr net.UnixAddr) {
+	thread.socks[socketFD] = &socket{
+		socketFD: socketFD,
+		isServer: false,
+		unixAddr: remoteAddr,
+	}
+	setGlobalSock(socketFD, thread.socks[socketFD])
+	//TODO: replaying
+	if envarg.IsReplaying() {
+		localAddr, err := bindFDToLocalAddr(int(socketFD))
+		if err != nil {
+			countlog.Error("event!sut.failed to bind local addr", "err", err)
+			return
+		}
+		thread.socks[socketFD].localAddr = localAddr
+		replaying.StoreTmp(*localAddr, thread.replayingSession)
+	}
+	countlog.Trace("event!sut.connect",
+		"threadID", thread.threadID,
+		"socketFD", socketFD,
+		"unixAddr", thread.socks[socketFD].unixAddr)
 }
 
 type SendToFlags int
