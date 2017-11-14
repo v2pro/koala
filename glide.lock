@@ -1,5 +1,5 @@
 hash: 9b5ffb96d051edbf339bb653ad3fe2471cabeef02c5a568d85e1bccb61aa5e4c
-updated: 2017-11-13T09:53:58.958795737+08:00
+updated: 2017-11-14T22:01:29.740214784+08:00
 imports:
 - name: github.com/json-iterator/go
   version: 9fddff05f0b5cfe038f1802add248f3f0d08a015
@@ -8,7 +8,7 @@ imports:
   subpackages:
   - fs
 - name: github.com/v2pro/plz
-  version: ecfd27d2a4cde7a701ebea220fffe050106fccd6
+  version: b392bdc05b9a9ecf9d209b8dea038180813e2b09
   subpackages:
   - countlog
   - witch

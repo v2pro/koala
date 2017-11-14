@@ -137,6 +137,9 @@ func (sock *socket) beforeSend_addMagicSameTrace(span []byte) []byte {
 }
 
 func (sock *socket) afterSend(session *recording.Session, extraHeaderSentSize int, bodySentSize int) {
+	if sock.tracerState == nil {
+		return
+	}
 	if len(sock.tracerState.buffered) != 0 {
 		sock.tracerState.buffered = sock.tracerState.buffered[extraHeaderSentSize:]
 	}

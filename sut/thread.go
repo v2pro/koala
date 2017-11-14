@@ -97,6 +97,7 @@ func (thread *Thread) OnSend(socketFD SocketFD, span []byte, flags SendFlags, ex
 		"threadID", thread.threadID,
 		"socketFD", socketFD,
 		"addr", &sock.addr,
+		"flags", flags,
 		"content", span)
 }
 
