@@ -96,6 +96,10 @@ func handleOutbound(conn *net.TCPConn) {
 		if err := applySimulation(simulateHttp, ctx, request, conn, callOutbound); err != nil {
 			return
 		}
+		// some mysql connection setup interaction might not recorded
+		if err := applySimulation(simulateMysql, ctx, request, conn, callOutbound); err != nil {
+			return
+		}
 		var matchedTalk *recording.CallOutbound
 		var mark float64
 		if callOutbound.MatchedActionIndex != fakeIndexSimulated {
@@ -114,12 +118,6 @@ func handleOutbound(conn *net.TCPConn) {
 			}
 			callOutbound.MatchedMark = mark
 			if matchedTalk == nil {
-				if protocol == "mysql" {
-					// some mysql connection setup interaction might not recorded
-					if err := applySimulation(simulateMysql, ctx, request, conn, callOutbound); err != nil {
-						return
-					}
-				}
 				countlog.Error("event!outbound.failed to find matching talk", "ctx", ctx)
 				return
 			}
