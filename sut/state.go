@@ -33,6 +33,7 @@ type file struct {
 
 type Thread struct {
 	context.Context
+	mutex            *sync.Mutex
 	threadID         ThreadID
 	socks            map[SocketFD]*socket
 	files            map[FileFD]*file
@@ -57,6 +58,16 @@ func setGlobalSock(socketFD SocketFD, sock *socket) {
 	globalSocks[socketFD] = sock
 }
 
+func RemoveGlobalSock(socketFD SocketFD) *socket {
+	globalSocksMutex.Lock()
+	defer globalSocksMutex.Unlock()
+	sock := globalSocks[socketFD]
+	if sock != nil {
+		delete(globalSocks, socketFD)
+	}
+	return sock
+}
+
 func getGlobalSock(socketFD SocketFD) *socket {
 	globalSocksMutex.Lock()
 	defer globalSocksMutex.Unlock()
@@ -67,13 +78,23 @@ func getGlobalSock(socketFD SocketFD) *socket {
 	return sock
 }
 
-func GetThread(threadID ThreadID) *Thread {
+func OperateThread(threadID ThreadID, op func(thread *Thread)) {
+	thread := getThread(threadID)
+	thread.mutex.Lock()
+	defer thread.mutex.Unlock()
+	thread.OnAccess()
+	thread.lastAccessedAt = time.Now()
+	op(thread)
+}
+
+func getThread(threadID ThreadID) *Thread {
 	globalThreadsMutex.Lock()
 	defer globalThreadsMutex.Unlock()
 	thread := globalThreads[threadID]
 	if thread == nil {
 		thread = &Thread{
 			Context:        context.WithValue(context.Background(), "threadID", threadID),
+			mutex:          &sync.Mutex{},
 			threadID:       threadID,
 			socks:          map[SocketFD]*socket{},
 			files:          map[FileFD]*file{},
@@ -84,8 +105,6 @@ func GetThread(threadID ThreadID) *Thread {
 		}
 		globalThreads[threadID] = thread
 	}
-	thread.OnAccess()
-	thread.lastAccessedAt = time.Now()
 	return thread
 }
 

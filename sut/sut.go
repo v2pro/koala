@@ -28,13 +28,56 @@ var helperReadStorage = "to-koala!read-storage"
 
 func (thread *Thread) lookupSocket(socketFD SocketFD) *socket {
 	sock := thread.socks[socketFD]
-	if sock == nil {
-		sock = getGlobalSock(socketFD)
-		if sock == nil {
-			return nil
-		}
-		thread.socks[socketFD] = sock
+	if sock != nil {
+		return sock
 	}
+	sock = getGlobalSock(socketFD)
+	if sock == nil {
+		return nil
+	}
+	remoteAddr, err := syscall.Getpeername(int(socketFD))
+	if err != nil {
+		countlog.Error("event!failed to get peer name", "err", err, "socketFD", socketFD)
+		return nil
+	}
+	remoteAddr4, _ := remoteAddr.(*syscall.SockaddrInet4)
+	// if remote address changed, the fd must be closed and reused
+	if remoteAddr4 != nil && (remoteAddr4.Port != sock.addr.Port ||
+		remoteAddr4.Addr[0] != sock.addr.IP[0] ||
+		remoteAddr4.Addr[1] != sock.addr.IP[1] ||
+		remoteAddr4.Addr[2] != sock.addr.IP[2] ||
+		remoteAddr4.Addr[3] != sock.addr.IP[3]) {
+		sock = &socket{
+			socketFD: socketFD,
+			isServer: false,
+			addr: net.TCPAddr{
+				Port: remoteAddr4.Port,
+				IP:   net.IP(remoteAddr4.Addr[:]),
+			},
+			lastAccessedAt: time.Now(),
+		}
+		setGlobalSock(socketFD, sock)
+	}
+	remoteAddr6, _ := remoteAddr.(*syscall.SockaddrInet6)
+	if remoteAddr6 != nil && (remoteAddr6.Port != sock.addr.Port ||
+		remoteAddr6.Addr[0] != sock.addr.IP[0] ||
+		remoteAddr6.Addr[1] != sock.addr.IP[1] ||
+		remoteAddr6.Addr[2] != sock.addr.IP[2] ||
+		remoteAddr6.Addr[3] != sock.addr.IP[3] ||
+		remoteAddr6.Addr[4] != sock.addr.IP[4] ||
+		remoteAddr6.Addr[5] != sock.addr.IP[5]) {
+		sock = &socket{
+			socketFD: socketFD,
+			isServer: false,
+			addr: net.TCPAddr{
+				Port: remoteAddr6.Port,
+				IP:   net.IP(remoteAddr6.Addr[:]),
+			},
+			lastAccessedAt: time.Now(),
+		}
+		setGlobalSock(socketFD, sock)
+	}
+	thread.socks[socketFD] = sock
 	return sock
 }
 
@@ -46,39 +89,10 @@ func (thread *Thread) OnSend(socketFD SocketFD, span []byte, flags SendFlags) {
 	}
 	sock := thread.lookupSocket(socketFD)
 	if sock == nil {
-		localAddr, err := syscall.Getsockname(int(socketFD))
-		if err != nil {
-			countlog.Error("event!sut.failed to find local address of new socket",
-				"ctx", thread, "err", err)
-			return
-		}
-		localAddr4, _ := localAddr.(*syscall.SockaddrInet4)
-		remoteAddr, err := syscall.Getpeername(int(socketFD))
-		if err != nil {
-			countlog.Error("event!sut.failed to find remote address of new socket",
-				"ctx", thread, "err", err)
-			return
-		}
-		remoteAddr4, _ := remoteAddr.(*syscall.SockaddrInet4)
-		if remoteAddr4 == nil {
-			return
-		}
-		countlog.Debug("event!sut.found_new_socket_on_send",
+		countlog.Warn("event!sut.unknown-send",
 			"threadID", thread.threadID,
 			"socketFD", socketFD)
-		sock = &socket{
-			socketFD: socketFD,
-			isServer: false,
-			addr: net.TCPAddr{
-				IP:   remoteAddr4.Addr[:],
-				Port: remoteAddr4.Port,
-			},
-			localAddr: &net.TCPAddr{
-				IP:   localAddr4.Addr[:],
-				Port: localAddr4.Port,
-			},
-		}
-		thread.socks[socketFD] = sock
+		return
 	}
 	event := "event!sut.inbound_send"
 	if sock.isServer {
@@ -156,24 +170,13 @@ func (thread *Thread) OnAccept(serverSocketFD SocketFD, clientSocketFD SocketFD,
 		"addr", &addr)
 }
 
-func (thread *Thread) OnBind(socketFD SocketFD, addr net.TCPAddr) {
-	thread.socks[socketFD] = &socket{
-		socketFD: socketFD,
-		isServer: false,
-		addr:     addr,
-	}
-	countlog.Debug("event!sut.bind",
-		"threadID", thread.threadID,
-		"socketFD", socketFD,
-		"addr", &addr)
-}
-
 func (thread *Thread) OnConnect(socketFD SocketFD, remoteAddr net.TCPAddr) {
 	thread.socks[socketFD] = &socket{
 		socketFD: socketFD,
 		isServer: false,
 		addr:     remoteAddr,
 	}
+	setGlobalSock(socketFD, thread.socks[socketFD])
 	if envarg.IsReplaying() {
 		localAddr, err := replaying.BindFDToLocalAddr(int(socketFD))
 		if err != nil {
@@ -341,9 +344,14 @@ func (thread *Thread) shutdownRecordingSession() {
 	if !envarg.IsRecording() {
 		return
 	}
+	newSession := recording.NewSession(int32(thread.threadID))
 	countlog.Trace("event!sut.shutdown_recording_session",
 		"threadID", thread.threadID,
-		"sessionId", thread.recordingSession.SessionId)
+		"sessionId", thread.recordingSession.SessionId,
+		"nextSessionId", newSession.SessionId,
+		"sessionSummary", thread.recordingSession.Summary())
+	thread.recordingSession.NextSessionId = newSession.SessionId
 	thread.recordingSession.Shutdown(thread)
-	thread.recordingSession = recording.NewSession(int32(thread.threadID))
+	thread.socks = map[SocketFD]*socket{} // socks on thread is a temp cache
+	thread.recordingSession = newSession
 }

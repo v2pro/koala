@@ -1,22 +1,22 @@
 package gw4go
 
 import (
-	"github.com/v2pro/plz/countlog"
 	"github.com/v2pro/koala/envarg"
 	"github.com/v2pro/koala/inbound"
-	"github.com/v2pro/koala/outbound"
-	"syscall"
-	"github.com/v2pro/koala/sut"
-	"net"
 	"github.com/v2pro/koala/internal"
+	"github.com/v2pro/koala/outbound"
+	"github.com/v2pro/koala/sut"
+	"github.com/v2pro/plz/countlog"
+	"net"
+	"syscall"
 )
 
 func Start() {
-	setupBindHook()
 	setupAcceptHook()
 	setupRecvHook()
 	setupSendHook()
 	setupConnectHook()
+	setupCloseHook()
 	setupGoRoutineExitHook()
 	if envarg.IsReplaying() {
 		inbound.Start()
@@ -32,25 +32,30 @@ func Start() {
 			"mode", "recording")
 	}
 }
+
 func setupConnectHook() {
 	internal.RegisterOnConnect(func(fd int, sa syscall.Sockaddr) {
+		gid, isKoala := getGoIDAndIsKoala()
 		ipv4Addr, _ := sa.(*syscall.SockaddrInet4)
 		if ipv4Addr == nil {
+			countlog.Trace("event!discard non-ipv4 addr on connect", "addr", sa)
 			return
 		}
-		if internal.GetCurrentGoRoutineIsKoala() {
-			countlog.Trace("event!gw4go.ignore_connect",
-				"threadID", internal.GetCurrentGoRoutineId(),
-				"fd", fd)
+		if isKoala {
 			return
 		}
+		origIP := make([]byte, 4)
+		copy(origIP, ipv4Addr.Addr[:]) // ipv4Addr.Addr will be reused
 		origAddr := net.TCPAddr{
-			IP:   ipv4Addr.Addr[:],
+			IP:   origIP,
 			Port: ipv4Addr.Port,
 		}
-		sut.GetThread(sut.ThreadID(internal.GetCurrentGoRoutineId())).OnConnect(
-			sut.SocketFD(fd), origAddr,
-		)
+
+		sut.OperateThread(gid, func(thread *sut.Thread) {
+			thread.OnConnect(
+				sut.SocketFD(fd), origAddr,
+			)
+		})
 		if envarg.IsReplaying() {
 			countlog.Debug("event!gw4go.rewrite_connect_target",
 				"origAddr", origAddr,
@@ -63,18 +68,23 @@ func setupConnectHook() {
 	})
 }
 
+func setupCloseHook() {
+	internal.RegisterOnClose(func(fd int) {
+		sut.RemoveGlobalSock(sut.SocketFD(fd))
+	})
+}
+
 func setupAcceptHook() {
 	internal.RegisterOnAccept(func(serverSocketFD int, clientSocketFD int, sa syscall.Sockaddr) {
-		if internal.GetCurrentGoRoutineIsKoala() {
-			countlog.Trace("event!gw4go.ignore_accept",
-				"threadID", internal.GetCurrentGoRoutineId(),
-				"serverSocketFD", serverSocketFD,
-				"clientSocketFD", clientSocketFD)
+		gid, isKoala := getGoIDAndIsKoala()
+		if isKoala {
 			return
 		}
-		sut.GetThread(sut.ThreadID(internal.GetCurrentGoRoutineId())).OnAccept(
-			sut.SocketFD(serverSocketFD), sut.SocketFD(clientSocketFD), sockaddrToTCP(sa),
-		)
+		sut.OperateThread(gid, func(thread *sut.Thread) {
+			thread.OnAccept(
+				sut.SocketFD(serverSocketFD), sut.SocketFD(clientSocketFD), sockaddrToTCP(sa),
+			)
+		})
 	})
 }
 
@@ -115,72 +125,56 @@ func itod(i uint) string {
 	return string(b[bp:])
 }
 
-
-func setupBindHook() {
-	internal.RegisterOnBind(func(fd int, sa syscall.Sockaddr) {
-		ipv4Addr, _ := sa.(*syscall.SockaddrInet4)
-		if ipv4Addr == nil {
-			return
-		}
-		if internal.GetCurrentGoRoutineIsKoala() {
-			countlog.Trace("event!gw4go.ignore_bind",
-				"threadID", internal.GetCurrentGoRoutineId(),
-				"fd", fd)
-			return
-		}
-		sut.GetThread(sut.ThreadID(internal.GetCurrentGoRoutineId())).OnBind(
-			sut.SocketFD(fd), net.TCPAddr{
-				IP:   ipv4Addr.Addr[:],
-				Port: ipv4Addr.Port,
-			},
-		)
-	})
-}
-
 func setupRecvHook() {
 	internal.RegisterOnRecv(func(fd int, network string, raddr net.Addr, span []byte) {
-		if internal.GetCurrentGoRoutineIsKoala() {
-			countlog.Trace("event!gw4go.ignore_recv",
-				"threadID", internal.GetCurrentGoRoutineId(),
-				"fd", fd)
+		gid, isKoala := getGoIDAndIsKoala()
+		if isKoala {
 			return
 		}
 		switch network {
 		case "udp", "udp4", "udp6":
 		default:
-			sut.GetThread(sut.ThreadID(internal.GetCurrentGoRoutineId())).OnRecv(
-				sut.SocketFD(fd), span, 0)
+			sut.OperateThread(gid, func(thread *sut.Thread) {
+				thread.OnRecv(sut.SocketFD(fd), span, 0)
+			})
 		}
 	})
 }
 
 func setupSendHook() {
 	internal.RegisterOnSend(func(fd int, network string, raddr net.Addr, span []byte) {
-		if internal.GetCurrentGoRoutineIsKoala() {
-			countlog.Trace("event!gw4go.ignore_send",
-				"threadID", internal.GetCurrentGoRoutineId(),
-				"fd", fd)
+		gid, isKoala := getGoIDAndIsKoala()
+		if isKoala {
 			return
 		}
 		switch network {
 		case "udp", "udp4", "udp6":
 			udpAddr := raddr.(*net.UDPAddr)
-			sut.GetThread(sut.ThreadID(internal.GetCurrentGoRoutineId())).OnSendTo(
-				sut.SocketFD(fd), span, 0, *udpAddr)
+			sut.OperateThread(gid, func(thread *sut.Thread) {
+				thread.OnSendTo(sut.SocketFD(fd), span, 0, *udpAddr)
+			})
 		default:
-			sut.GetThread(sut.ThreadID(internal.GetCurrentGoRoutineId())).OnSend(
-				sut.SocketFD(fd), span, 0)
+			sut.OperateThread(gid, func(thread *sut.Thread) {
+				thread.OnSend(sut.SocketFD(fd), span, 0)
+			})
 		}
 	})
 }
 
 func setupGoRoutineExitHook() {
 	internal.RegisterOnGoRoutineExit(func(goid int64) {
-		if internal.GetCurrentGoRoutineIsKoala() {
-			countlog.Trace("event!gw4go.ignore_goroutine_exit",
-				"threadID", goid)
+		_, isKoala := getGoIDAndIsKoala()
+		if isKoala {
 			return
 		}
-		sut.GetThread(sut.ThreadID(goid)).OnShutdown()
+		sut.OperateThread(sut.ThreadID(goid), func(thread *sut.Thread) {
+			thread.OnShutdown()
+		})
 	})
+}
+
+func getGoIDAndIsKoala() (sut.ThreadID, bool) {
+	gid := internal.GetCurrentGoRoutineId()
+	isKoala := internal.GetCurrentGoRoutineIsKoala()
+	return sut.ThreadID(gid), isKoala
 }

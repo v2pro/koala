@@ -16,7 +16,7 @@ func SetupLogging() {
 			StringLengthCap:      512,
 		}
 	case "CompactFormat":
-		logWriter.LogFormatter = &countlog.CompactFormat{}
+		logWriter.LogFormatter = &countlog.CompactFormat{StringLengthCap: 512}
 	default:
 		os.Stderr.WriteString("unknown LogFormat: " + LogFormat() + "\n")
 		os.Stderr.Sync()

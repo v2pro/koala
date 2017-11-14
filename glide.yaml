@@ -1,0 +1,11 @@
+package: github.com/v2pro/koala
+import:
+- package: github.com/v2pro/plz
+  version: master
+  subpackages:
+  - countlog
+testImport:
+- package: github.com/stretchr/testify
+  version: ^1.1.4
+  subpackages:
+  - require

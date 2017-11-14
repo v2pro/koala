@@ -112,13 +112,12 @@ func handleOutbound(conn *net.TCPConn) {
 			callOutbound.MatchedActionIndex = matchedTalk.ActionIndex
 		}
 		callOutbound.MatchedMark = mark
-		replayingSession.CallOutbound(ctx, callOutbound)
 		if matchedTalk == nil {
 			if protocol == "mysql" {
-				resp := simulateMysql(ctx, request)
-				if resp != nil {
-					_, err := conn.Write(resp)
-					if err != nil {
+				if resp := simulateMysql(ctx, request); resp != nil {
+					callOutbound.MatchedActionIndex = -2 // to be ignored
+					replayingSession.CallOutbound(ctx, callOutbound)
+					if _, err := conn.Write(resp); err != nil {
 						countlog.Error("event!outbound.failed to write back response from outbound",
 							"ctx", ctx, "err", err)
 						return
@@ -129,6 +128,7 @@ func handleOutbound(conn *net.TCPConn) {
 			countlog.Error("event!outbound.failed to find matching talk", "ctx", ctx)
 			return
 		}
+		replayingSession.CallOutbound(ctx, callOutbound)
 		_, err := conn.Write(matchedTalk.Response)
 		if err != nil {
 			countlog.Error("event!outbound.failed to write back response from outbound",

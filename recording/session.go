@@ -10,6 +10,7 @@ import (
 
 type Session struct {
 	SessionId           string
+	NextSessionId       string
 	CallFromInbound     *CallFromInbound
 	ReturnInbound       *ReturnInbound
 	Actions             []Action
@@ -21,6 +22,19 @@ func NewSession(suffix int32) *Session {
 	return &Session{
 		SessionId: fmt.Sprintf("%d-%d", time.Now().UnixNano(), suffix),
 	}
+}
+
+func (session *Session) Summary() string {
+	reqLen := 0
+	resLen := 0
+	if session.CallFromInbound != nil {
+		reqLen = len(session.CallFromInbound.Request)
+	}
+	if session.ReturnInbound != nil {
+		resLen = len(session.ReturnInbound.Response)
+	}
+	return fmt.Sprintf("CallFromInbound: %d bytes, ReturnInbound: %d bytes, actions: %d",
+		reqLen, resLen, len(session.Actions))
 }
 
 func (session *Session) newAction(actionType string) action {
@@ -170,6 +184,9 @@ func (session *Session) Shutdown(ctx context.Context) {
 		return
 	}
 	if session.CallFromInbound == nil {
+		return
+	}
+	if len(session.CallFromInbound.Request) == 0 {
 		return
 	}
 	for _, recorder := range Recorders {
