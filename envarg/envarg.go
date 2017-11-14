@@ -13,7 +13,7 @@ var inboundAddr *net.TCPAddr
 var outboundAddr *net.TCPAddr
 var sutAddr *net.TCPAddr
 var logFile string
-var logLevel = countlog.LEVEL_DEBUG
+var logLevel = countlog.LevelDebug
 var logFormat string
 
 func init() {
@@ -34,17 +34,17 @@ func initLogLevel() {
 	logLevelStr := strings.ToUpper(GetenvFromC("KOALA_LOG_LEVEL"))
 	switch logLevelStr {
 	case "TRACE":
-		logLevel = countlog.LEVEL_TRACE
+		logLevel = countlog.LevelTrace
 	case "DEBUG":
-		logLevel = countlog.LEVEL_DEBUG
+		logLevel = countlog.LevelDebug
 	case "INFO":
-		logLevel = countlog.LEVEL_INFO
+		logLevel = countlog.LevelInfo
 	case "WARN":
-		logLevel = countlog.LEVEL_WARN
+		logLevel = countlog.LevelWarn
 	case "ERROR":
-		logLevel = countlog.LEVEL_ERROR
+		logLevel = countlog.LevelError
 	case "FATAL":
-		logLevel = countlog.LEVEL_FATAL
+		logLevel = countlog.LevelFatal
 	}
 }
 func initInboundAddr() {
