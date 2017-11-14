@@ -75,14 +75,15 @@ func (session *Session) ReadStorage(ctx context.Context, span []byte) {
 	})
 }
 
-func (session *Session) RecvFromInbound(ctx context.Context, span []byte, peer net.TCPAddr) {
+func (session *Session) RecvFromInbound(ctx context.Context, span []byte, peer net.TCPAddr, unix net.UnixAddr) {
 	if session == nil {
 		return
 	}
 	if session.CallFromInbound == nil {
 		session.CallFromInbound = &CallFromInbound{
-			action: session.newAction("CallFromInbound"),
-			Peer:   peer,
+			action:   session.newAction("CallFromInbound"),
+			Peer:     peer,
+			UnixAddr: unix,
 		}
 	}
 	session.CallFromInbound.Request = append(session.CallFromInbound.Request, span...)
