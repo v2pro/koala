@@ -178,18 +178,6 @@ func (thread *Thread) OnAccept(serverSocketFD SocketFD, clientSocketFD SocketFD,
 		"addr", &addr)
 }
 
-func (thread *Thread) OnBind(socketFD SocketFD, addr net.TCPAddr) {
-	thread.socks[socketFD] = &socket{
-		socketFD: socketFD,
-		isServer: false,
-		addr:     addr,
-	}
-	countlog.Debug("event!sut.bind",
-		"threadID", thread.threadID,
-		"socketFD", socketFD,
-		"addr", &addr)
-}
-
 func (thread *Thread) OnConnect(socketFD SocketFD, remoteAddr net.TCPAddr) {
 	thread.socks[socketFD] = &socket{
 		socketFD: socketFD,
@@ -337,10 +325,14 @@ func (thread *Thread) shutdownRecordingSession() {
 	if !envarg.IsRecording() {
 		return
 	}
+	newSession := recording.NewSession(int32(thread.threadID))
 	countlog.Trace("event!sut.shutdown_recording_session",
 		"threadID", thread.threadID,
-		"sessionId", thread.recordingSession.SessionId)
+		"sessionId", thread.recordingSession.SessionId,
+		"nextSessionId", newSession.SessionId,
+		"sessionSummary", thread.recordingSession.Summary())
+	thread.recordingSession.NextSessionId = newSession.SessionId
 	thread.recordingSession.Shutdown(thread)
 	thread.socks = map[SocketFD]*socket{} // socks on thread is a temp cache
-	thread.recordingSession = recording.NewSession(int32(thread.threadID))
+	thread.recordingSession = newSession
 }

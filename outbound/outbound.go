@@ -12,6 +12,8 @@ import (
 	"io"
 )
 
+const fakeIndexNotMatched = -1
+const fakeIndexSimulated = -2
 
 func Start() {
 	go server()
@@ -78,15 +80,9 @@ func handleOutbound(conn *net.TCPConn) {
 				return
 			}
 			if protocol == "mysql" {
-				resp := simulateMysql(ctx, request)
-				if resp != nil {
-					_, err := conn.Write(resp)
-					if err != nil {
-						countlog.Error("event!outbound.failed to write back response from outbound",
-							"ctx", ctx, "err", err)
-						return
-					}
-					continue
+				// when mysql connection setup at application startup
+				if err := applySimulation(simulateMysql, ctx, request, conn, nil); err != nil {
+					return
 				}
 			}
 			countlog.Error("event!outbound.outbound can not find replaying session",
@@ -96,53 +92,49 @@ func handleOutbound(conn *net.TCPConn) {
 			return
 		}
 		callOutbound := replaying.NewCallOutbound(*tcpAddr, request)
+		// fix http 100 continue
+		if err := applySimulation(simulateHttp, ctx, request, conn, callOutbound); err != nil {
+			return
+		}
+		// some mysql connection setup interaction might not recorded
+		if err := applySimulation(simulateMysql, ctx, request, conn, callOutbound); err != nil {
+			return
+		}
 		var matchedTalk *recording.CallOutbound
 		var mark float64
-		lastMatchedIndex, mark, matchedTalk = replayingSession.MatchOutboundTalk(ctx, lastMatchedIndex, request)
-		if matchedTalk == nil && lastMatchedIndex != 0 {
-			lastMatchedIndex, mark, matchedTalk = replayingSession.MatchOutboundTalk(ctx, -1, request)
-		}
-		if matchedTalk == nil {
-			callOutbound.MatchedRequest = nil
-			callOutbound.MatchedResponse = nil
-			callOutbound.MatchedActionIndex = -1
-		} else {
-			callOutbound.MatchedRequest = matchedTalk.Request
-			callOutbound.MatchedResponse = matchedTalk.Response
-			callOutbound.MatchedActionIndex = matchedTalk.ActionIndex
-		}
-		callOutbound.MatchedMark = mark
-		replayingSession.CallOutbound(ctx, callOutbound)
-		if matchedTalk == nil {
-			if protocol == "mysql" {
-				resp := simulateMysql(ctx, request)
-				if resp != nil {
-					_, err := conn.Write(resp)
-					if err != nil {
-						countlog.Error("event!outbound.failed to write back response from outbound",
-							"ctx", ctx, "err", err)
-						return
-					}
-					continue
-				}
+		if callOutbound.MatchedActionIndex != fakeIndexSimulated {
+			lastMatchedIndex, mark, matchedTalk = replayingSession.MatchOutboundTalk(ctx, lastMatchedIndex, request)
+			if matchedTalk == nil && lastMatchedIndex != 0 {
+				lastMatchedIndex, mark, matchedTalk = replayingSession.MatchOutboundTalk(ctx, -1, request)
 			}
-			countlog.Error("event!outbound.failed to find matching talk", "ctx", ctx)
-			return
+			if matchedTalk == nil {
+				callOutbound.MatchedRequest = nil
+				callOutbound.MatchedResponse = nil
+				callOutbound.MatchedActionIndex = fakeIndexNotMatched
+			} else {
+				callOutbound.MatchedRequest = matchedTalk.Request
+				callOutbound.MatchedResponse = matchedTalk.Response
+				callOutbound.MatchedActionIndex = matchedTalk.ActionIndex
+			}
+			callOutbound.MatchedMark = mark
+			if matchedTalk == nil {
+				countlog.Error("event!outbound.failed to find matching talk", "ctx", ctx)
+				return
+			}
+			if _, err := conn.Write(matchedTalk.Response); err != nil {
+				countlog.Error("event!outbound.failed to write back response from outbound",
+					"ctx", ctx, "err", err)
+				return
+			}
 		}
-		_, err := conn.Write(matchedTalk.Response)
-		if err != nil {
-			countlog.Error("event!outbound.failed to write back response from outbound",
-				"ctx", ctx, "err", err)
-			return
-		}
+		replayingSession.CallOutbound(ctx, callOutbound)
 		countlog.Debug("event!outbound.response",
 			"ctx", ctx,
 			"matchedMark", mark,
-			"matchedActionIndex", matchedTalk.ActionIndex,
-			"matchedIndex", lastMatchedIndex,
-			"matchedRequest", matchedTalk.Request,
-			"matchedResponse", matchedTalk.Response,
-			"replayingSession", replayingSession)
+			"actionId", callOutbound.ActionId,
+			"matchedActionIndex", callOutbound.MatchedActionIndex,
+			"matchedRequest", callOutbound.MatchedRequest,
+			"matchedResponse", callOutbound.MatchedResponse)
 	}
 }
 
@@ -167,7 +159,7 @@ func readRequest(ctx context.Context, conn *net.TCPConn, buf []byte, isFirstPack
 				countlog.Error("event!outbound.failed to write mysql greeting",
 					"ctx", ctx,
 					"err", err)
-				return "",nil
+				return "", nil
 			}
 			protocol = "mysql"
 		}
@@ -186,4 +178,23 @@ func readRequest(ctx context.Context, conn *net.TCPConn, buf []byte, isFirstPack
 		"ctx", ctx,
 		"content", request)
 	return protocol, request
+}
+
+func applySimulation(sim func(ctx context.Context, request []byte) []byte, ctx context.Context,
+	request []byte, conn net.Conn, callOutbound *replaying.CallOutbound) error {
+	resp := sim(ctx, request) // mysql connection setup might not in the recorded session
+	if resp != nil {
+		if callOutbound != nil {
+			callOutbound.MatchedActionIndex = fakeIndexSimulated // to be ignored
+			callOutbound.MatchedResponse = resp
+		}
+		_, err := conn.Write(resp)
+		if err != nil {
+			countlog.Error("event!outbound.failed to write back response from outbound",
+				"ctx", ctx, "err", err)
+			return err
+		}
+		return nil
+	}
+	return nil
 }
