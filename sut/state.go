@@ -1,14 +1,14 @@
 package sut
 
 import (
+	"context"
+	"github.com/v2pro/koala/envarg"
+	"github.com/v2pro/koala/recording"
+	"github.com/v2pro/koala/replaying"
+	"github.com/v2pro/plz/countlog"
 	"net"
 	"sync"
-	"context"
-	"github.com/v2pro/koala/replaying"
-	"github.com/v2pro/koala/recording"
-	"github.com/v2pro/koala/envarg"
 	"time"
-	"github.com/v2pro/plz/countlog"
 )
 
 type SocketFD int
@@ -23,6 +23,7 @@ type socket struct {
 	addr           net.TCPAddr
 	localAddr      *net.TCPAddr
 	lastAccessedAt time.Time
+	unixAddr       net.UnixAddr
 }
 
 type file struct {

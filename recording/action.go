@@ -32,8 +32,9 @@ func (action *action) GetOccurredAt() int64 {
 
 type CallFromInbound struct {
 	action
-	Peer    net.TCPAddr
-	Request []byte
+	Peer     net.TCPAddr
+	Request  []byte
+	UnixAddr net.UnixAddr
 }
 
 func (callFromInbound *CallFromInbound) MarshalJSON() ([]byte, error) {
@@ -69,6 +70,7 @@ type CallOutbound struct {
 	Request      []byte
 	ResponseTime int64
 	Response     []byte
+	UnixAddr     net.UnixAddr
 }
 
 func (callOutbound *CallOutbound) MarshalJSON() ([]byte, error) {
