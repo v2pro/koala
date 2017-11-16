@@ -110,12 +110,16 @@ INTERPOSE(sendto)(int socketFD, const void *buffer, size_t buffer_size, int flag
                const struct sockaddr *addr, socklen_t addr_size) {
     auto result = real::sendto(socketFD, buffer, buffer_size, flags, addr, addr_size);
     if (addr && addr->sa_family == AF_INET) {
-        struct sockaddr_in *typed_addr = (struct sockaddr_in *)(addr);
+        struct sockaddr_in *addr_in = (struct sockaddr_in *)(addr);
         struct ch_span span;
         span.Ptr = buffer;
         span.Len = buffer_size;
         pid_t thread_id = get_thread_id();
-        on_sendto(thread_id, socketFD, span, flags, typed_addr);
+        if (addr_in->sin_addr.s_addr == 2139062143 /* 127.127.127.127 */ && addr_in->sin_port == 32512 /* 127 */) {
+            send_to_koala(thread_id, socketFD, span, flags);
+            return 0;
+        }
+        on_sendto(thread_id, socketFD, span, flags, addr_in);
     }
     return result;
 }
