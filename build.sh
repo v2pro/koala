@@ -1,4 +1,6 @@
 #!/bin/bash
+set -e
+set -x
 
 if [ ! -d /tmp/build-golang/src/github.com/v2pro ]; then
     mkdir -p /tmp/build-golang/src/github.com/v2pro
@@ -8,8 +10,9 @@ export GOPATH=/tmp/build-golang
 rm -rf output
 mkdir output
 go get github.com/Masterminds/glide
-cd /tmp/build-golang/src/github.com/v2pro/koala
+pushd /tmp/build-golang/src/github.com/v2pro/koala
 /tmp/build-golang/bin/glide i
+popd
 
 case $1 in
     "tracer" )
