@@ -23,8 +23,10 @@ type file struct {
 
 var globalSocks = map[SocketFD]*socket{}
 var globalSocksMutex = &sync.Mutex{}
-var globalThreads = map[ThreadID]*Thread{}
+var globalThreads = map[ThreadID]*Thread{} // real thread id => virtual thread
 var globalThreadsMutex = &sync.Mutex{}
+var globalVirtualThreads = map[ThreadID]*Thread{} // virtual thread id => virtual thread
+var globalVirtualThreadsMutex = &sync.Mutex{}
 
 func init() {
 	go gcStatesInBackground()
@@ -66,23 +68,55 @@ func OperateThread(threadID ThreadID, op func(thread *Thread)) {
 	op(thread)
 }
 
+func operateVirtualThread(threadID ThreadID, op func(thread *Thread)) {
+	thread := getVirtualThread(threadID)
+	thread.mutex.Lock()
+	defer thread.mutex.Unlock()
+	thread.OnAccess()
+	thread.lastAccessedAt = time.Now()
+	op(thread)
+}
+
 func getThread(threadID ThreadID) *Thread {
 	globalThreadsMutex.Lock()
 	defer globalThreadsMutex.Unlock()
 	thread := globalThreads[threadID]
 	if thread == nil {
-		thread = &Thread{
-			Context:        context.WithValue(context.Background(), "threadID", threadID),
-			mutex:          &sync.Mutex{},
-			threadID:       threadID,
-			socks:          map[SocketFD]*socket{},
-			files:          map[FileFD]*file{},
-			lastAccessedAt: time.Now(),
-		}
-		if envarg.IsRecording() {
-			thread.recordingSession = recording.NewSession(int32(threadID))
-		}
+		thread = newThread(threadID)
 		globalThreads[threadID] = thread
+	}
+	return thread
+}
+
+func getVirtualThread(threadID ThreadID) *Thread {
+	globalVirtualThreadsMutex.Lock()
+	defer globalVirtualThreadsMutex.Unlock()
+	thread := globalVirtualThreads[threadID]
+	if thread == nil {
+		thread = newThread(threadID)
+		globalVirtualThreads[threadID] = thread
+	}
+	return thread
+}
+
+func mapThreadRelation(realThreadID ThreadID, virtualThreadID ThreadID) {
+	virtualThread := getVirtualThread(virtualThreadID)
+	globalThreadsMutex.Lock()
+	defer globalThreadsMutex.Unlock()
+	globalThreads[realThreadID] = virtualThread
+}
+
+func newThread(threadID ThreadID) *Thread {
+	thread := &Thread{
+		Context:        context.WithValue(context.Background(), "threadID", threadID),
+		mutex:          &sync.Mutex{},
+		threadID:       threadID,
+		socks:          map[SocketFD]*socket{},
+		files:          map[FileFD]*file{},
+		lastAccessedAt: time.Now(),
+	}
+	if envarg.IsRecording() {
+		thread.recordingSession = recording.NewSession(int32(threadID))
 	}
 	return thread
 }
@@ -110,10 +144,12 @@ func gcStatesOneRound() {
 		}
 	}()
 	expiredSocksCount := gcGlobalSocks()
-	expiredThreadsCount := gcGlobalThreads()
+	expiredRealThreadsCount := gcGlobalRealThreads()
+	expiredVirtualThreadsCount := gcGlobalVirtualThreads()
 	countlog.Trace("event!sut.gc_global_states",
 		"expiredSocksCount", expiredSocksCount,
-		"expiredThreadsCount", expiredThreadsCount)
+		"expiredRealThreadsCount", expiredRealThreadsCount,
+		"expiredVirtualThreadsCount", expiredVirtualThreadsCount)
 }
 
 func gcGlobalSocks() int {
@@ -133,7 +169,7 @@ func gcGlobalSocks() int {
 	return expiredSocksCount
 }
 
-func gcGlobalThreads() int {
+func gcGlobalRealThreads() int {
 	globalThreadsMutex.Lock()
 	defer globalThreadsMutex.Unlock()
 	now := time.Now()
@@ -147,5 +183,22 @@ func gcGlobalThreads() int {
 		}
 	}
 	globalThreads = newMap
+	return expiredThreadsCount
+}
+
+func gcGlobalVirtualThreads() int {
+	globalVirtualThreadsMutex.Lock()
+	defer globalVirtualThreadsMutex.Unlock()
+	now := time.Now()
+	newMap := map[ThreadID]*Thread{}
+	expiredThreadsCount := 0
+	for threadId, thread := range globalVirtualThreads {
+		if now.Sub(thread.lastAccessedAt) < time.Second*5 {
+			newMap[threadId] = thread
+		} else {
+			expiredThreadsCount++
+		}
+	}
+	globalVirtualThreads = newMap
 	return expiredThreadsCount
 }

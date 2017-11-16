@@ -2,7 +2,6 @@ package sut
 
 import (
 	"github.com/v2pro/plz/countlog"
-	"net"
 	"bytes"
 )
 
@@ -10,31 +9,43 @@ var helperThreadShutdown = "to-koala!thread-shutdown"
 var helperCallFunction = "to-koala!call-function"
 var helperReturnFunction = "to-koala!return-function"
 var helperReadStorage = "to-koala!read-storage"
+var helperSetDelegatedFromThreadId = "to-koala!set-delegated-from-thread-id"
 
-func (thread *Thread) onHelper(socketFD SocketFD, span []byte, flags SendToFlags, addr net.UDPAddr) {
+func SendToKoala(threadID ThreadID,socketFD SocketFD, span []byte, flags SendToFlags) {
 	helperInfo := span
-	countlog.Trace("event!sut.received_helper_info",
-		"threadID", thread.threadID,
+	countlog.Trace("event!sut.send_to_koala",
+		"threadID", threadID,
 		"socketFD", socketFD,
-		"addr", &addr,
 		"content", helperInfo)
 	newlinePos := bytes.IndexByte(helperInfo, '\n')
 	if newlinePos == -1 {
 		return
 	}
-	helperType := string(helperInfo[:newlinePos])
 	body := helperInfo[newlinePos+1:]
-	switch helperType {
+	switch string(helperInfo[:newlinePos]) {
 	case helperThreadShutdown:
-		thread.OnShutdown()
+		operateVirtualThread(ThreadID(socketFD), func(thread *Thread) {
+			thread.OnShutdown()
+		})
 	case helperCallFunction:
-		thread.replayingSession.CallFunction(thread, body)
+		OperateThread(threadID, func(thread *Thread) {
+			thread.replayingSession.CallFunction(thread, body)
+		})
 	case helperReturnFunction:
-		thread.replayingSession.ReturnFunction(thread, body)
+		OperateThread(threadID, func(thread *Thread) {
+			thread.replayingSession.ReturnFunction(thread, body)
+		})
 	case helperReadStorage:
-		thread.recordingSession.ReadStorage(thread, body)
+		OperateThread(threadID, func(thread *Thread) {
+			thread.recordingSession.ReadStorage(thread, body)
+		})
+	case helperSetDelegatedFromThreadId:
+		realThreadId := threadID
+		virtualThreadId := ThreadID(socketFD)
+		mapThreadRelation(realThreadId, virtualThreadId)
 	default:
 		countlog.Debug("event!sut.unknown_helper",
-			"threadID", thread.threadID, "helperType", helperType)
+			"threadID", threadID,
+				"helperType", string(helperInfo[:newlinePos]))
 	}
 }

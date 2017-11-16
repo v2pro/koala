@@ -13,6 +13,7 @@ import (
 	"time"
 	"sync"
 	"context"
+	"unsafe"
 )
 
 // InboundRequestPrefix is used to recognize php-fpm FCGI_BEGIN_REQUEST packet.
@@ -96,6 +97,7 @@ func (thread *Thread) OnSend(socketFD SocketFD, span []byte, flags SendFlags, ex
 	countlog.Trace(event,
 		"threadID", thread.threadID,
 		"socketFD", socketFD,
+		"recordingSessionPtr", uintptr(unsafe.Pointer(thread.recordingSession)),
 		"addr", &sock.addr,
 		"flags", flags,
 		"content", span)
@@ -129,6 +131,7 @@ func (thread *Thread) OnRecv(socketFD SocketFD, span []byte, flags RecvFlags) []
 		countlog.Trace("event!sut.outbound_recv",
 			"threadID", thread.threadID,
 			"socketFD", socketFD,
+			"recordingSessionPtr", uintptr(unsafe.Pointer(thread.recordingSession)),
 			"addr", &sock.addr,
 			"content", span)
 		thread.recordingSession.RecvFromOutbound(thread, span, sock.addr, sock.localAddr, int(sock.socketFD))
@@ -137,6 +140,7 @@ func (thread *Thread) OnRecv(socketFD SocketFD, span []byte, flags RecvFlags) []
 	countlog.Trace("event!sut.inbound_recv",
 		"threadID", thread.threadID,
 		"socketFD", socketFD,
+		"recordingSessionPtr", uintptr(unsafe.Pointer(thread.recordingSession)),
 		"addr", &sock.addr,
 		"content", span)
 	if envarg.IsTracing() && thread.recordingSession != nil {
@@ -266,17 +270,14 @@ func (thread *Thread) OnConnectUnix(socketFD SocketFD, remoteAddr net.UnixAddr) 
 type SendToFlags int
 
 func (thread *Thread) OnSendTo(socketFD SocketFD, span []byte, flags SendToFlags, addr net.UDPAddr) {
-	if addr.String() != "127.127.127.127:127" {
-		countlog.Trace("event!sut.sendto",
-			"threadID", thread.threadID,
-			"socketFD", socketFD,
-			"addr", &addr,
-			"content", span)
-		thread.recordingSession.SendUDP(thread, span, addr)
-		thread.replayingSession.SendUDP(thread, span, addr)
-		return
-	}
-	thread.onHelper(socketFD, span, flags, addr)
+	countlog.Trace("event!sut.sendto",
+		"threadID", thread.threadID,
+		"socketFD", socketFD,
+		"addr", &addr,
+		"flags", flags,
+		"content", span)
+	thread.recordingSession.SendUDP(thread, span, addr)
+	thread.replayingSession.SendUDP(thread, span, addr)
 }
 
 func (thread *Thread) OnOpeningFile(fileName string, flags int) string {
@@ -388,13 +389,7 @@ func (thread *Thread) shutdownRecordingSession() {
 		return
 	}
 	newSession := recording.NewSession(int32(thread.threadID))
-	countlog.Trace("event!sut.shutdown_recording_session",
-		"threadID", thread.threadID,
-		"sessionId", thread.recordingSession.SessionId,
-		"nextSessionId", newSession.SessionId,
-		"sessionSummary", thread.recordingSession.Summary())
-	thread.recordingSession.NextSessionId = newSession.SessionId
-	thread.recordingSession.Shutdown(thread)
+	thread.recordingSession.Shutdown(thread, newSession)
 	thread.socks = map[SocketFD]*socket{} // socks on thread is a temp cache
 	thread.recordingSession = newSession
 }

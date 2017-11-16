@@ -27,19 +27,6 @@ func NewSession(threadId int32) *Session {
 	}
 }
 
-func (session *Session) Summary() string {
-	reqLen := 0
-	resLen := 0
-	if session.CallFromInbound != nil {
-		reqLen = len(session.CallFromInbound.Request)
-	}
-	if session.ReturnInbound != nil {
-		resLen = len(session.ReturnInbound.Response)
-	}
-	return fmt.Sprintf("CallFromInbound: %d bytes, ReturnInbound: %d bytes, actions: %d",
-		reqLen, resLen, len(session.Actions))
-}
-
 func (session *Session) newAction(actionType string) action {
 	occurredAt := time.Now().UnixNano()
 	return action{
@@ -183,25 +170,6 @@ func (session *Session) HasResponded() bool {
 	return true
 }
 
-func (session *Session) Shutdown(ctx context.Context) {
-	if session == nil {
-		return
-	}
-	if session.CallFromInbound == nil {
-		return
-	}
-	if len(session.CallFromInbound.Request) == 0 {
-		return
-	}
-	for _, recorder := range Recorders {
-		recorder.Record(session)
-	}
-	countlog.Debug("event!recording.session_recorded",
-		"ctx", ctx,
-		"session", session,
-	)
-}
-
 func (session *Session) addAction(action Action) {
 	if !ShouldRecordAction(action) {
 		return
@@ -223,4 +191,46 @@ func (session *Session) GetTraceHeader() []byte {
 		session.TraceHeader = GenerateTraceHeader(request)
 	}
 	return session.TraceHeader
+}
+
+func (session *Session) Shutdown(ctx context.Context, newSession *Session) {
+	if session == nil {
+		return
+	}
+	session.Summary(newSession)
+	session.NextSessionId = newSession.SessionId
+	if session.CallFromInbound == nil {
+		return
+	}
+	if len(session.CallFromInbound.Request) == 0 {
+		return
+	}
+	for _, recorder := range Recorders {
+		recorder.Record(session)
+	}
+	countlog.Debug("event!recording.session_recorded",
+		"ctx", ctx,
+		"session", session,
+	)
+}
+
+func (session *Session) Summary(newSession *Session) {
+	reqLen := 0
+	respLen := 0
+	if session.CallFromInbound != nil {
+		reqLen = len(session.CallFromInbound.Request)
+	}
+	if session.ReturnInbound != nil {
+		respLen = len(session.ReturnInbound.Response)
+	}
+	countlog.Trace("event!sut.shutdown_recording_session",
+		"threadID", session.ThreadId,
+		"sessionId", session.SessionId,
+		"nextSessionId", newSession.SessionId,
+		"callFromInboundBytes",
+		reqLen,
+		"returnInboundBytes",
+		respLen,
+		"actionsCount",
+		len(session.Actions))
 }
