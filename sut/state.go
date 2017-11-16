@@ -179,6 +179,7 @@ func gcGlobalRealThreads() int {
 		if now.Sub(thread.lastAccessedAt) < time.Second*5 {
 			newMap[threadId] = thread
 		} else {
+			thread.OnShutdown()
 			expiredThreadsCount++
 		}
 	}
