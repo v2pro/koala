@@ -15,6 +15,7 @@ sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == '/':
+            sock.sendto('to-koala!set-trace-header-key\norder_id\nworld', 0, ('127.127.127.127', 127))
             s = requests.Session()
             s.get('http://127.0.0.1:2515/branch')
             self.send_response(200)
@@ -28,8 +29,10 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             self.send_response(200)
             self.wfile.write(trace_header)
         elif self.path == '/leaf1':
+            sock.sendto('to-koala!get-trace-header-key\norder_id', 0, ('127.127.127.127', 127))
+            order_id = sock.recvfrom(4096, 127127)[0]
             self.send_response(200)
-            self.wfile.write('leaf1')
+            self.wfile.write(order_id)
         elif self.path == '/leaf2':
             self.send_response(200)
             self.wfile.write('leaf2')

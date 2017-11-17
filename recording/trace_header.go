@@ -39,6 +39,18 @@ func (header TraceHeader) Next() (TraceHeaderKey, TraceHeaderValue, TraceHeader)
 	return TraceHeaderKey(key), TraceHeaderValue(value), header
 }
 
+func (header TraceHeader) Get(targetKey TraceHeaderKey) TraceHeaderValue {
+	var key TraceHeaderKey
+	var value TraceHeaderValue
+	for len(header) > 0 {
+		key, value, header = header.Next()
+		if bytes.Equal(key, targetKey) {
+			return value
+		}
+	}
+	return nil
+}
+
 func (header TraceHeader) Set(key TraceHeaderKey, value TraceHeaderValue) TraceHeader {
 	if len(key) > math.MaxUint16 || len(value) > math.MaxUint16 {
 		countlog.Error("event!trace_header.size overflow", "key", key, "value", value)
@@ -79,5 +91,22 @@ func (header TraceHeader) Set(key TraceHeaderKey, value TraceHeaderValue) TraceH
 }
 
 func (header TraceHeader) MarshalJSON() ([]byte, error) {
-	return EncodeAnyByteArray(header), nil
+	if header == nil {
+		return []byte("null"), nil
+	}
+	var key TraceHeaderKey
+	var value TraceHeaderValue
+	output := []byte{'{'}
+	for len(header) > 0 {
+		key, value, header = header.Next()
+		output = append(output, EncodeAnyByteArray(key)...)
+		output = append(output, ':', ' ')
+		output = append(output, EncodeAnyByteArray(value)...)
+		if len(header) > 0 {
+			output = append(output, ',')
+		}
+		output = append(output, '\n')
+	}
+	output = append(output, '}')
+	return output, nil
 }

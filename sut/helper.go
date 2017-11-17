@@ -11,6 +11,8 @@ var helperReturnFunction = "to-koala!return-function"
 var helperReadStorage = "to-koala!read-storage"
 var helperSetDelegatedFromThreadId = "to-koala!set-delegated-from-thread-id"
 var helperGetTraceHeader = "to-koala!get-trace-header"
+var helperGetTraceHeaderKey = "to-koala!get-trace-header-key"
+var helperSetTraceHeaderKey = "to-koala!set-trace-header-key"
 
 func SendToKoala(threadID ThreadID, span []byte, flags SendToFlags) {
 	helperInfo := span
@@ -52,10 +54,29 @@ func SendToKoala(threadID ThreadID, span []byte, flags SendToFlags) {
 		mapThreadRelation(realThreadId, virtualThreadId)
 	case helperGetTraceHeader:
 		OperateThread(threadID, func(thread *Thread) {
-			if thread.recordingSession == nil {
-				thread.helperResponse = nil
-			} else {
+			if thread.recordingSession != nil {
 				thread.helperResponse = thread.recordingSession.GetTraceHeader()
+			}
+		})
+	case helperGetTraceHeaderKey:
+		OperateThread(threadID, func(thread *Thread) {
+			if thread.recordingSession != nil {
+				key := body
+				thread.helperResponse = thread.recordingSession.GetTraceHeader().Get(key)
+			}
+		})
+	case helperSetTraceHeaderKey:
+		OperateThread(threadID, func(thread *Thread) {
+			if thread.recordingSession != nil {
+				newlinePos = bytes.IndexByte(body, '\n')
+				if newlinePos == -1 {
+					countlog.Error("event!sut.SetTraceHeaderKey expects newline as separator",
+						"body", body)
+					return
+				}
+				key := body[:newlinePos]
+				value := body[newlinePos+1:]
+				thread.recordingSession.TraceHeader = thread.recordingSession.GetTraceHeader().Set(key, value)
 			}
 		})
 	default:
@@ -66,7 +87,9 @@ func SendToKoala(threadID ThreadID, span []byte, flags SendToFlags) {
 }
 
 func RecvFromKoala(threadID ThreadID) []byte {
-	response := getThread(threadID).helperResponse
+	thread := getThread(threadID)
+	response := thread.helperResponse
+	thread.helperResponse = nil
 	countlog.Trace("event!sut.recv_from_koala",
 		"threadID", threadID,
 		"response", response)
