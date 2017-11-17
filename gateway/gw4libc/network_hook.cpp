@@ -106,9 +106,20 @@ INTERPOSE(recv)(int socketFD, void *buffer, size_t size, int flags) {
     }
 }
 
+INTERPOSE(recvfrom)(int socketFD, void *buffer, size_t buffer_size, int flags,
+                struct sockaddr *addr, socklen_t *addr_size) {
+    if (flags == 127127) {
+        struct ch_span span;
+        span.Ptr = buffer;
+        span.Len = buffer_size;
+        pid_t thread_id = get_thread_id();
+        return recv_from_koala(thread_id, span);
+    }
+    return real::recvfrom(socketFD, buffer, buffer_size, flags, addr, addr_size);
+}
+
 INTERPOSE(sendto)(int socketFD, const void *buffer, size_t buffer_size, int flags,
                const struct sockaddr *addr, socklen_t addr_size) {
-    auto result = real::sendto(socketFD, buffer, buffer_size, flags, addr, addr_size);
     if (addr && addr->sa_family == AF_INET) {
         struct sockaddr_in *addr_in = (struct sockaddr_in *)(addr);
         struct ch_span span;
@@ -116,12 +127,12 @@ INTERPOSE(sendto)(int socketFD, const void *buffer, size_t buffer_size, int flag
         span.Len = buffer_size;
         pid_t thread_id = get_thread_id();
         if (addr_in->sin_addr.s_addr == 2139062143 /* 127.127.127.127 */ && addr_in->sin_port == 32512 /* 127 */) {
-            send_to_koala(thread_id, socketFD, span, flags);
+            send_to_koala(thread_id, span, flags);
             return 0;
         }
         on_sendto(thread_id, socketFD, span, flags, addr_in);
     }
-    return result;
+    return real::sendto(socketFD, buffer, buffer_size, flags, addr, addr_size);
 }
 
 INTERPOSE(connect)(int socketFD, const struct sockaddr *remote_addr, socklen_t remote_addr_len) {

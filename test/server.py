@@ -10,6 +10,8 @@ PORT = 2515
 
 logFile = open('/tmp/server.log', 'a')
 
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
 class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == '/':
@@ -18,10 +20,12 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             self.send_response(200)
             self.wfile.write(str(datetime.datetime.now()))
         if self.path == '/branch':
+            sock.sendto('to-koala!get-trace-header\n', 0, ('127.127.127.127', 127))
+            trace_header = sock.recvfrom(4096, 127127)[0]
             s = requests.Session()
             s.get('http://127.0.0.1:2515/leaf')
             self.send_response(200)
-            self.wfile.write('branch')
+            self.wfile.write(trace_header)
         elif self.path == '/leaf':
             self.send_response(200)
             self.wfile.write('leaf')
@@ -48,7 +52,7 @@ class ThreadingMixIn:
                 self.handle_error(request, client_address)
                 self.shutdown_request(request)
         finally:
-            socket.socket(socket.AF_INET, socket.SOCK_DGRAM).sendto(
+            sock.sendto(
                 'to-koala!thread-shutdown\n',
                 ('127.127.127.127', 127))
 

@@ -12,8 +12,8 @@ import base64
 
 def main():
     # test_koala_go()
-    # test_ld_preload()
-    test_java()
+    test_ld_preload()
+    # test_java()
 
 
 def test_koala_go():

@@ -245,16 +245,32 @@ func on_sendto(threadID C.pid_t, socketFD C.int, span C.struct_ch_span, flags C.
 	})
 }
 
-//export send_to_koala
-func send_to_koala(threadID C.pid_t, socketFD C.int, span C.struct_ch_span, flags C.int) {
+//export recv_from_koala
+func recv_from_koala(threadID C.pid_t, span C.struct_ch_span) C.int {
 	defer func() {
 		recovered := recover()
 		if recovered != nil {
-			countlog.Fatal("event!gw4libc.send_helper.panic", "err", recovered,
+			countlog.Fatal("event!gw4libc.recv_from_koala.panic", "err", recovered,
 				"stacktrace", countlog.ProvideStacktrace)
 		}
 	}()
-	sut.SendToKoala(sut.ThreadID(threadID), sut.SocketFD(socketFD), ch_span_to_bytes(span), sut.SendToFlags(flags))
+	response := sut.RecvFromKoala(sut.ThreadID(threadID))
+	if response == nil {
+		return 0
+	}
+	return C.int(copy(ch_span_to_bytes(span), response))
+}
+
+//export send_to_koala
+func send_to_koala(threadID C.pid_t, span C.struct_ch_span, flags C.int) {
+	defer func() {
+		recovered := recover()
+		if recovered != nil {
+			countlog.Fatal("event!gw4libc.send_to_koala.panic", "err", recovered,
+				"stacktrace", countlog.ProvideStacktrace)
+		}
+	}()
+	sut.SendToKoala(sut.ThreadID(threadID), ch_span_to_bytes(span), sut.SendToFlags(flags))
 }
 
 //export on_fopening_file

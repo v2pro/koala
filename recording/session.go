@@ -6,6 +6,7 @@ import (
 	"github.com/v2pro/plz/countlog"
 	"net"
 	"time"
+	"encoding/json"
 )
 
 type Session struct {
@@ -25,6 +26,16 @@ func NewSession(threadId int32) *Session {
 		ThreadId:  threadId,
 		SessionId: fmt.Sprintf("%d-%d", time.Now().UnixNano(), threadId),
 	}
+}
+
+func (session *Session) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Session
+		TraceHeader json.RawMessage
+	}{
+		Session:     *session,
+		TraceHeader: EncodeAnyByteArray(session.TraceHeader),
+	})
 }
 
 func (session *Session) newAction(actionType string) action {
@@ -189,6 +200,11 @@ func (session *Session) GetTraceHeader() []byte {
 			request = session.CallFromInbound.Request
 		}
 		session.TraceHeader = GenerateTraceHeader(request)
+		countlog.Trace("event!recording.generated_trace_header",
+			"threadID", session.ThreadId,
+			"sessionId", session.SessionId,
+			"traceHeader", session.TraceHeader,
+		)
 	}
 	return session.TraceHeader
 }
@@ -223,7 +239,7 @@ func (session *Session) Summary(newSession *Session) {
 	if session.ReturnInbound != nil {
 		respLen = len(session.ReturnInbound.Response)
 	}
-	countlog.Trace("event!sut.shutdown_recording_session",
+	countlog.Trace("event!recording.shutdown_recording_session",
 		"threadID", session.ThreadId,
 		"sessionId", session.SessionId,
 		"nextSessionId", newSession.SessionId,

@@ -33,6 +33,7 @@ type Thread struct {
 	recordingSession *recording.Session
 	replayingSession *replaying.ReplayingSession
 	lastAccessedAt   time.Time
+	helperResponse	 []byte
 }
 
 type SendFlags int
