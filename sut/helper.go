@@ -27,7 +27,7 @@ func SendToKoala(threadID ThreadID, span []byte, flags SendToFlags) {
 	body := helperInfo[newlinePos+1:]
 	switch string(helperInfo[:newlinePos]) {
 	case helperThreadShutdown:
-		if flags > 0 {
+		if flags != 0 {
 			operateVirtualThread(ThreadID(flags), func(thread *Thread) {
 				thread.OnShutdown()
 			})
