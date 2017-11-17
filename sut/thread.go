@@ -55,6 +55,7 @@ func (thread *Thread) BeforeSend(socketFD SocketFD, span *[]byte, flags SendFlag
 	if sock.isServer {
 		return nil
 	}
+	thread.recordingSession.BeforeSendToOutbound(thread, *span, sock.addr, sock.localAddr, int(sock.socketFD))
 	extraHeader := sock.beforeSend(thread.recordingSession, span)
 	if extraHeader != nil {
 		countlog.Trace("event!sut.before_send",

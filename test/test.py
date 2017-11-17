@@ -84,12 +84,15 @@ def test_ld_preload():
     env['CGO_CPPFLAGS'] = env['CGO_CFLAGS']
     shell_execute(
         'go install -tags="koala_recorder koala_tracer" -buildmode=c-shared '
-        'github.com/v2pro/koala/cmd/replayer', env=env)
+        'github.com/v2pro/koala/cmd/recorder', env=env)
     shell_execute(
-        'go build -tags="koala_recorder koala_tracer" -buildmode=c-shared -o koala-replayer.so '
-        'github.com/v2pro/koala/cmd/replayer', env=env)
+        'go build -tags="koala_recorder koala_tracer" -buildmode=c-shared -o koala-recorder.so '
+        'github.com/v2pro/koala/cmd/recorder', env=env)
     env = os.environ.copy()
-    env['LD_PRELOAD'] = '%s/koala-replayer.so' % os.path.abspath('.')
+    env['LD_PRELOAD'] = '%s/koala-recorder.so' % os.path.abspath('.')
+    if not os.path.exists('/tmp/sessions'):
+        os.mkdir('/tmp/sessions')
+    env['KOALA_RECORD_TO_DIR'] = '/tmp/sessions'
     env['SERVER_MODE'] = 'MULTI_THREADS'
     env['GOTRACEBACK'] = 'all'
     server = subprocess.Popen(

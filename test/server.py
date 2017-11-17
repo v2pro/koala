@@ -23,12 +23,16 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             sock.sendto('to-koala!get-trace-header\n', 0, ('127.127.127.127', 127))
             trace_header = sock.recvfrom(4096, 127127)[0]
             s = requests.Session()
-            s.get('http://127.0.0.1:2515/leaf')
+            s.get('http://127.0.0.1:2515/leaf1')
+            s.get('http://127.0.0.1:2515/leaf2')
             self.send_response(200)
             self.wfile.write(trace_header)
-        elif self.path == '/leaf':
+        elif self.path == '/leaf1':
             self.send_response(200)
-            self.wfile.write('leaf')
+            self.wfile.write('leaf1')
+        elif self.path == '/leaf2':
+            self.send_response(200)
+            self.wfile.write('leaf2')
 
 
 class ThreadingMixIn:

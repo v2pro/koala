@@ -238,6 +238,17 @@ func (sock *socket) onRecv_readTraceHeader(session *recording.Session, span []by
 	}
 	sock.tracerState.buffered = append(sock.tracerState.buffered, span[:toRead]...)
 	session.TraceHeader = sock.tracerState.buffered
+	var key recording.TraceHeaderKey
+	var value recording.TraceHeaderValue
+	var nextHeader = session.TraceHeader
+	for len(nextHeader) > 0 {
+		key, value, nextHeader = nextHeader.Next()
+		if bytes.Equal(key, recording.TraceHeaderKeyTraceId) {
+			session.TraceId = append([]byte(nil), value...)
+		} else if bytes.Equal(key, recording.TraceHeaderKeySpanId) {
+			session.SpanId = append([]byte(nil), value...)
+		}
+	}
 	sock.tracerState.expectedBufferSize = 0
 	sock.tracerState.buffered = nil
 	sock.tracerState.nextAction = "readBodySize"

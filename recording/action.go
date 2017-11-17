@@ -71,6 +71,7 @@ type CallOutbound struct {
 	ResponseTime int64
 	Response     []byte
 	UnixAddr     net.UnixAddr
+	CSpanId		 []byte
 }
 
 func (callOutbound *CallOutbound) MarshalJSON() ([]byte, error) {
@@ -78,10 +79,12 @@ func (callOutbound *CallOutbound) MarshalJSON() ([]byte, error) {
 		CallOutbound
 		Request  json.RawMessage
 		Response json.RawMessage
+		CSpanId json.RawMessage
 	}{
 		CallOutbound: *callOutbound,
 		Request:      EncodeAnyByteArray(callOutbound.Request),
 		Response:     EncodeAnyByteArray(callOutbound.Response),
+		CSpanId:       EncodeAnyByteArray(callOutbound.CSpanId),
 	})
 }
 

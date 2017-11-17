@@ -12,7 +12,9 @@ import (
 type Session struct {
 	ThreadId            int32
 	SessionId           string
-	TraceHeader         []byte
+	TraceHeader         TraceHeader
+	TraceId             []byte
+	SpanId              []byte
 	NextSessionId       string
 	CallFromInbound     *CallFromInbound
 	ReturnInbound       *ReturnInbound
@@ -31,10 +33,12 @@ func NewSession(threadId int32) *Session {
 func (session *Session) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Session
-		TraceHeader json.RawMessage
+		TraceId json.RawMessage
+		SpanId  json.RawMessage
 	}{
-		Session:     *session,
-		TraceHeader: EncodeAnyByteArray(session.TraceHeader),
+		Session: *session,
+		TraceId: EncodeAnyByteArray(session.TraceId),
+		SpanId:  EncodeAnyByteArray(session.SpanId),
 	})
 }
 
@@ -108,23 +112,11 @@ func (session *Session) RecvFromOutbound(ctx context.Context, span []byte, peer 
 		return
 	}
 	if session.currentCallOutbound == nil {
-		session.currentCallOutbound = &CallOutbound{
-			action:   session.newAction("CallOutbound"),
-			Peer:     peer,
-			Local:    local,
-			SocketFD: socketFD,
-		}
-		session.addAction(session.currentCallOutbound)
+		session.newCallOutbound(peer, local, socketFD)
 	}
 	if (session.currentCallOutbound.Peer.String() != peer.String()) ||
 		(session.currentCallOutbound.SocketFD != socketFD) {
-		session.currentCallOutbound = &CallOutbound{
-			action:   session.newAction("CallOutbound"),
-			Peer:     peer,
-			Local:    local,
-			SocketFD: socketFD,
-		}
-		session.addAction(session.currentCallOutbound)
+		session.newCallOutbound(peer, local, socketFD)
 	}
 	if session.currentCallOutbound.ResponseTime == 0 {
 		session.currentCallOutbound.ResponseTime = time.Now().UnixNano()
@@ -136,28 +128,36 @@ func (session *Session) SendToOutbound(ctx context.Context, span []byte, peer ne
 	if session == nil {
 		return
 	}
+	session.BeforeSendToOutbound(ctx, span, peer, local, socketFD)
+	session.currentCallOutbound.Request = append(session.currentCallOutbound.Request, span...)
+}
+
+func (session *Session) BeforeSendToOutbound(ctx context.Context, span []byte, peer net.TCPAddr, local *net.TCPAddr, socketFD int) {
+	if session == nil {
+		return
+	}
 	if (session.currentCallOutbound == nil) ||
 		(session.currentCallOutbound.Peer.String() != peer.String()) ||
 		(session.currentCallOutbound.SocketFD != socketFD) ||
 		(len(session.currentCallOutbound.Response) > 0) {
-		session.currentCallOutbound = &CallOutbound{
-			action:   session.newAction("CallOutbound"),
-			Peer:     peer,
-			Local:    local,
-			SocketFD: socketFD,
-		}
-		session.addAction(session.currentCallOutbound)
+		session.newCallOutbound(peer, local, socketFD)
 	} else if session.currentCallOutbound != nil && session.currentCallOutbound.ResponseTime > 0 {
 		// last request get a bad response, e.g., timeout
-		session.currentCallOutbound = &CallOutbound{
-			action:   session.newAction("CallOutbound"),
-			Peer:     peer,
-			Local:    local,
-			SocketFD: socketFD,
-		}
-		session.addAction(session.currentCallOutbound)
+		session.newCallOutbound(peer, local, socketFD)
 	}
-	session.currentCallOutbound.Request = append(session.currentCallOutbound.Request, span...)
+}
+
+func (session *Session) newCallOutbound(peer net.TCPAddr, local *net.TCPAddr, socketFD int) {
+	cspanId, _ := newID().MarshalText()
+	session.TraceHeader = session.GetTraceHeader().Set(TraceHeaderKeySpanId, cspanId)
+	session.currentCallOutbound = &CallOutbound{
+		action:   session.newAction("CallOutbound"),
+		Peer:     peer,
+		Local:    local,
+		SocketFD: socketFD,
+		CSpanId:  cspanId,
+	}
+	session.addAction(session.currentCallOutbound)
 }
 
 func (session *Session) SendUDP(ctx context.Context, span []byte, peer net.UDPAddr) {
@@ -188,22 +188,15 @@ func (session *Session) addAction(action Action) {
 	session.Actions = append(session.Actions, action)
 }
 
-var GenerateTraceHeader = func(callFromInboundRequest []byte) []byte {
-	id := newID()
-	return id[:]
-}
-
-func (session *Session) GetTraceHeader() []byte {
+func (session *Session) GetTraceHeader() TraceHeader {
 	if session.TraceHeader == nil {
-		var request []byte
-		if session.CallFromInbound != nil {
-			request = session.CallFromInbound.Request
-		}
-		session.TraceHeader = GenerateTraceHeader(request)
+		traceId, _ := newID().MarshalText()
+		session.TraceHeader = session.TraceHeader.Set(TraceHeaderKeyTraceId, traceId)
+		session.TraceId = traceId
 		countlog.Trace("event!recording.generated_trace_header",
 			"threadID", session.ThreadId,
 			"sessionId", session.SessionId,
-			"traceHeader", session.TraceHeader,
+			"traceId", traceId,
 		)
 	}
 	return session.TraceHeader

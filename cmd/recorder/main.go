@@ -27,7 +27,7 @@ type fileRecorder struct {
 }
 
 func (recorder *fileRecorder) Record(session *recording.Session) {
-	bytes, err := json.Marshal(session)
+	bytes, err := json.MarshalIndent(session, "", "  ")
 	if err != nil {
 		countlog.Error("event!recorder.failed to marshal json", "err", err)
 		return
