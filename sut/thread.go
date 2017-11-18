@@ -127,7 +127,7 @@ func (thread *Thread) OnRecv(socketFD SocketFD, span []byte, flags RecvFlags) []
 		countlog.Warn("event!sut.unknown-recv",
 			"threadID", thread.threadID,
 			"socketFD", socketFD)
-		return nil
+		return span
 	}
 	if !sock.isServer {
 		countlog.Trace("event!sut.outbound_recv",
@@ -137,7 +137,7 @@ func (thread *Thread) OnRecv(socketFD SocketFD, span []byte, flags RecvFlags) []
 			"addr", &sock.addr,
 			"content", span)
 		thread.recordingSession.RecvFromOutbound(thread, span, sock.addr, sock.localAddr, int(sock.socketFD))
-		return nil
+		return span
 	}
 	countlog.Trace("event!sut.inbound_recv",
 		"threadID", thread.threadID,

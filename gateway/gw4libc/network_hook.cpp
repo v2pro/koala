@@ -30,79 +30,95 @@ INTERPOSE(bind)(int socketFD, const struct sockaddr *addr, socklen_t length) {
 }
 
 INTERPOSE(send)(int socketFD, const void *buffer, size_t size, int flags) {
-    pid_t thread_id = get_thread_id();
-    struct ch_span span;
-    ssize_t body_sent_size;
-    if (!is_tracing()) {
-        body_sent_size = real::send(socketFD, buffer, size, flags);
-        if (body_sent_size >= 0) {
-            span.Ptr = buffer;
-            span.Len = body_sent_size;
-            on_send(thread_id, socketFD, span, flags, 0);
-        }
-        return body_sent_size;
-    }
-    // tracing might add extra_header before body
-    span.Ptr = buffer;
-    span.Len = size;
-    struct ch_allocated_string extra_header = before_send(thread_id, socketFD, &span, flags);
-    size = span.Len; // might require send less data this time due to previous header sent
-    if (extra_header.Ptr != NULL) {
-        char *remaining_ptr = extra_header.Ptr;
-        size_t remaining_len = extra_header.Len;
-        while (remaining_len > 0) {
-            ssize_t sent_size = real::send(socketFD, remaining_ptr, remaining_len, flags);
-            if (sent_size <= 0) {
-                span.Ptr = NULL;
-                span.Len = 0;
-                on_send(thread_id, socketFD, span, flags, extra_header.Len - remaining_len);
-                return sent_size;
-            }
-            remaining_ptr += sent_size;
-            remaining_len -= sent_size;
-        }
-        free(extra_header.Ptr);
-    }
-    body_sent_size = real::send(socketFD, buffer, size, flags);
-    if (body_sent_size >= 0) {
+    if (is_tracing()) {
+        // tracing mode
+        pid_t thread_id = get_thread_id();
+        struct ch_span span;
         span.Ptr = buffer;
-        span.Len = body_sent_size;
+        span.Len = size;
+        // before send return the header to be sent, it might be the left over from last time
+        // internally before_send/on_send has a finite-state-machine to handle the callback
+        struct ch_allocated_string extra_header = before_send(thread_id, socketFD, &span, flags);
+        // might require send less data this time due to previous header sent
+        // so span is passed as pointer
+        size = span.Len;
+        if (extra_header.Ptr != NULL) {
+            // inject trace header into tcp stream
+            char *remaining_ptr = extra_header.Ptr;
+            size_t remaining_len = extra_header.Len;
+            while (remaining_len > 0) {
+                ssize_t sent_size = real::send(socketFD, remaining_ptr, remaining_len, flags);
+                if (sent_size <= 0) {
+                    span.Ptr = NULL;
+                    span.Len = 0;
+                    // header not fully sent, remaining will be sent out next time 'send' being called
+                    on_send(thread_id, socketFD, span, flags, extra_header.Len - remaining_len);
+                    free(extra_header.Ptr);
+                    return sent_size;
+                }
+                remaining_ptr += sent_size;
+                remaining_len -= sent_size;
+            }
+            free(extra_header.Ptr);
+        }
+        // send out the body
+        ssize_t sent_size = real::send(socketFD, buffer, size, flags);
+        if (sent_size >= 0) {
+            span.Ptr = buffer;
+            span.Len = sent_size;
+        } else {
+            span.Ptr = NULL;
+            span.Len = 0;
+        }
+        // header fully sent, body might be partially sent
+        on_send(thread_id, socketFD, span, flags, extra_header.Len);
+        return sent_size;
     } else {
-        span.Ptr = NULL;
-        span.Len = 0;
+        // not in tracing mode
+        ssize_t sent_size = real::send(socketFD, buffer, size, flags);
+        if (sent_size < 0) {
+            return sent_size;
+        }
+        pid_t thread_id = get_thread_id();
+        struct ch_span span;
+        span.Ptr = buffer;
+        span.Len = sent_size;
+        on_send(thread_id, socketFD, span, flags, 0);
+        return sent_size;
     }
-    on_send(thread_id, socketFD, span, flags, extra_header.Len);
-    return body_sent_size;
 }
 
 INTERPOSE(recv)(int socketFD, void *buffer, size_t size, int flags) {
+    ssize_t received_size = real::recv(socketFD, buffer, size, flags);
+    if (received_size < 0) {
+        return received_size;
+    }
     pid_t thread_id = get_thread_id();
     struct ch_span span;
     if (!is_tracing()) {
-        ssize_t body_received_size = real::recv(socketFD, buffer, size, flags);
-        if (body_received_size >= 0) {
-            span.Ptr = buffer;
-            span.Len = body_received_size;
-            on_recv(thread_id, socketFD, span, flags);
-        }
-        return body_received_size;
-    }
-    // tracing might add extra_header before body
-    for(;;) {
-        ssize_t received_size = real::recv(socketFD, buffer, size, flags);
-        if (received_size >= 0) {
-            struct ch_span span;
-            span.Ptr = buffer;
-            span.Len = received_size;
-            pid_t thread_id = get_thread_id();
-            span = on_recv(thread_id, socketFD, span, flags);
-            if (span.Ptr != NULL) {
-                memmove((char *)buffer, span.Ptr, span.Len);
-                return span.Len;
-            }
-            // continue receive more header
-        }
+        span.Ptr = buffer;
+        span.Len = received_size;
+        on_recv(thread_id, socketFD, span, flags);
         return received_size;
+    }
+    // tracing might add extra_header before body, we need to strip it
+    // only body is returned to application
+    for(;;) {
+        if (received_size < 0) {
+            return received_size;
+        }
+        struct ch_span span;
+        span.Ptr = buffer;
+        span.Len = received_size;
+        // internally on_recv has a finite-state-machine to handle the callback
+        // header is stripped and returned in the return value
+        span = on_recv(thread_id, socketFD, span, flags);
+        if (span.Ptr != NULL) {
+            memmove((char *)buffer, span.Ptr, span.Len);
+            return span.Len;
+        }
+        // only header has been received, we need to receive more for the body
+        received_size = real::recv(socketFD, buffer, size, flags);
     }
 }
 

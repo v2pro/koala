@@ -158,6 +158,9 @@ func (sock *socket) afterSend(session *recording.Session, extraHeaderSentSize in
 }
 
 func (sock *socket) onRecv(session *recording.Session, span []byte) []byte {
+	if len(span) == 0 {
+		return span
+	}
 	if sock.tracerState == nil {
 		body := sock.onRecv_initial(session, span)
 		countlog.Trace("event!sock.onRecv_init",
