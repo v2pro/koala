@@ -179,7 +179,7 @@ func gcGlobalRealThreads() int {
 		if now.Sub(thread.lastAccessedAt) < time.Second*5 {
 			newMap[threadId] = thread
 		} else {
-			thread.OnShutdown()
+			shutdownThread(thread)
 			expiredThreadsCount++
 		}
 	}
@@ -197,9 +197,17 @@ func gcGlobalVirtualThreads() int {
 		if now.Sub(thread.lastAccessedAt) < time.Second*5 {
 			newMap[threadId] = thread
 		} else {
+			shutdownThread(thread)
 			expiredThreadsCount++
 		}
 	}
 	globalVirtualThreads = newMap
 	return expiredThreadsCount
+}
+
+
+func shutdownThread(thread *Thread) {
+	thread.mutex.Lock()
+	defer thread.mutex.Unlock()
+	thread.OnShutdown()
 }

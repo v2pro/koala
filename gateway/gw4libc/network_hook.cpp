@@ -38,7 +38,7 @@ INTERPOSE(send)(int socketFD, const void *buffer, size_t size, int flags) {
         // internally before_send/on_send has a finite-state-machine to handle the callback
         // might require send less data this time due to previous header sent
         // so size is passed as pointer
-        struct ch_allocated_string extra_header = before_send(thread_id, socketFD, &size, flags);
+        struct ch_allocated_string extra_header = before_send(thread_id, socketFD, flags, &size);
         if (extra_header.Ptr != NULL) {
             // inject trace header into tcp stream
             char *remaining_ptr = extra_header.Ptr;

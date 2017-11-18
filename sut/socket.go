@@ -8,6 +8,7 @@ import (
 	"github.com/v2pro/plz/countlog"
 	"encoding/binary"
 	"encoding/hex"
+	"math"
 )
 
 type socket struct {
@@ -50,6 +51,9 @@ func (sock *socket) canGC(now time.Time) bool {
 }
 
 func (sock *socket) beforeSend(session *recording.Session, bodySize int) ([]byte, int) {
+	if bodySize > math.MaxUint16 {
+		bodySize = math.MaxUint16 // only 2 bytes to represent the body size in the header
+	}
 	if sock.tracerState == nil {
 		sock.tracerState = &tracerState{}
 		countlog.Trace("event!sock.beforeSend_init",
@@ -204,12 +208,16 @@ func (sock *socket) onRecv_initial(session *recording.Session, span []byte) []by
 	sock.tracerState = &tracerState{}
 	if len(span) < 5 {
 		sock.tracerState.isTraced = false
-		countlog.Trace("event!sock.onRecv_initial.span too small", "socketFD", sock.socketFD)
+		countlog.Trace("event!sock.onRecv_initial.span too small",
+			"socketFD", sock.socketFD,
+			"threadID", session.ThreadId)
 		return span
 	}
 	if !bytes.Equal(magicInit[:5], span[:5]) {
 		sock.tracerState.isTraced = false
-		countlog.Trace("event!sock.onRecv_initial.not starts with magic", "socketFD", sock.socketFD)
+		countlog.Trace("event!sock.onRecv_initial.not starts with magic",
+			"socketFD", sock.socketFD,
+			"threadID", session.ThreadId)
 		return span
 	}
 	sock.tracerState.isTraced = true

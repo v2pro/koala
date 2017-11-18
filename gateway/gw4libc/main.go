@@ -148,7 +148,7 @@ func on_accept6(threadID C.pid_t, serverSocketFD C.int, clientSocketFD C.int, ad
 }
 
 //export before_send
-func before_send(threadID C.pid_t, socketFD C.int, cBodySize *C.size_t, flags C.int) C.struct_ch_allocated_string {
+func before_send(threadID C.pid_t, socketFD C.int, flags C.int, cBodySize *C.size_t) C.struct_ch_allocated_string {
 	defer func() {
 		recovered := recover()
 		if recovered != nil {
@@ -383,4 +383,10 @@ func redirect_path(threadID C.pid_t,
 		return C.struct_ch_allocated_string{C.CString(redirectTo), C.size_t(len(redirectTo))}
 	}
 	return C.struct_ch_allocated_string{nil, 0}
+}
+
+//export countlog1
+func countlog1(level C.int, event C.struct_ch_span,
+	k1 C.struct_ch_span, v1 C.struct_ch_span) {
+	countlog.Log(int(level), ch_span_to_string(event), ch_span_to_string(k1), ch_span_to_bytes(v1))
 }

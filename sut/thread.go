@@ -180,7 +180,7 @@ func (thread *Thread) OnAccept(serverSocketFD SocketFD, clientSocketFD SocketFD,
 	countlog.Debug("event!sut.accept",
 		"threadID", thread.threadID,
 		"serverSocketFD", serverSocketFD,
-		"clientSocketFD", clientSocketFD,
+		"socketFD", clientSocketFD,
 		"addr", &addr)
 }
 
