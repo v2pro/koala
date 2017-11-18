@@ -16,10 +16,14 @@ func Test_send_incomplete(t *testing.T) {
 		0x00, 0x03,                   // body size
 	}
 	buf := []byte{1, 2, 3}
-	should.Equal(header, sock.beforeSend(session, &buf))
+	extraHeader, bodySize := sock.beforeSend(session, len(buf))
+	should.Equal(header, extraHeader)
+	should.Equal(3, bodySize)
 	sock.afterSend(session, 3, 0)
 	buf = []byte{1, 2, 3}
-	should.Equal(header[3:], sock.beforeSend(session, &buf))
+	extraHeader, bodySize = sock.beforeSend(session, len(buf))
+	should.Equal(header[3:], extraHeader)
+	should.Equal(3, bodySize)
 }
 
 func Test_send_complete(t *testing.T) {
@@ -32,14 +36,18 @@ func Test_send_complete(t *testing.T) {
 		0x00, 0x03,                   // body size
 	}
 	buf := []byte{1, 2, 3}
-	should.Equal(header, sock.beforeSend(session, &buf))
+	extraHeader, bodySize := sock.beforeSend(session, len(buf))
+	should.Equal(header, extraHeader)
+	should.Equal(3, bodySize)
 	sock.afterSend(session, 10, 3)
 	header = []byte{
 		0xde, 0xad, // magic same trace
 		0x00, 0x03, // body size
 	}
 	buf = []byte{1, 2, 3}
-	should.Equal(header, sock.beforeSend(session, &buf))
+	extraHeader, bodySize = sock.beforeSend(session, len(buf))
+	should.Equal(header, extraHeader)
+	should.Equal(3, bodySize)
 }
 
 func Test_send_buf_increased(t *testing.T) {
@@ -52,11 +60,14 @@ func Test_send_buf_increased(t *testing.T) {
 		0x00, 0x03,                   // body size
 	}
 	buf := []byte{1, 2, 3}
-	should.Equal(header, sock.beforeSend(session, &buf))
+	extraHeader, bodySize := sock.beforeSend(session, len(buf))
+	should.Equal(header, extraHeader)
+	should.Equal(3, bodySize)
 	sock.afterSend(session, 7, 0)
 	buf = []byte{1, 2, 3, 4, 5}
-	should.Equal(header[7:], sock.beforeSend(session, &buf))
-	should.Equal([]byte{1, 2, 3}, buf) // sent buf limited to 3, as stated in the header previously
+	extraHeader, bodySize = sock.beforeSend(session, len(buf))
+	should.Equal(header[7:], extraHeader)
+	should.Equal(3, bodySize) // sent buf limited to 3, as stated in the header previously
 }
 
 func Test_send_change_trace(t *testing.T) {
@@ -69,7 +80,9 @@ func Test_send_change_trace(t *testing.T) {
 		0x00, 0x03,                   // body size
 	}
 	buf := []byte{1, 2, 3}
-	should.Equal(header, sock.beforeSend(session, &buf))
+	extraHeader, bodySize := sock.beforeSend(session, len(buf))
+	should.Equal(header, extraHeader)
+	should.Equal(3, bodySize)
 	sock.afterSend(session, 10, 3)
 	session.TraceHeader = []byte{0xbb}
 	header = []byte{
@@ -78,7 +91,9 @@ func Test_send_change_trace(t *testing.T) {
 		0x00, 0x03,       // body size
 	}
 	buf = []byte{1, 2, 3}
-	should.Equal(header, sock.beforeSend(session, &buf))
+	extraHeader, bodySize = sock.beforeSend(session, len(buf))
+	should.Equal(header, extraHeader)
+	should.Equal(3, bodySize)
 }
 
 func Test_recv_complete(t *testing.T) {

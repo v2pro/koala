@@ -148,7 +148,7 @@ func on_accept6(threadID C.pid_t, serverSocketFD C.int, clientSocketFD C.int, ad
 }
 
 //export before_send
-func before_send(threadID C.pid_t, socketFD C.int, spanPtr *C.struct_ch_span, flags C.int) C.struct_ch_allocated_string {
+func before_send(threadID C.pid_t, socketFD C.int, cBodySize *C.size_t, flags C.int) C.struct_ch_allocated_string {
 	defer func() {
 		recovered := recover()
 		if recovered != nil {
@@ -158,9 +158,9 @@ func before_send(threadID C.pid_t, socketFD C.int, spanPtr *C.struct_ch_span, fl
 	}()
 	var extraHeader []byte
 	sut.OperateThread(sut.ThreadID(threadID), func(thread *sut.Thread) {
-		span := ch_span_to_bytes(*spanPtr)
-		extraHeader = thread.BeforeSend(sut.SocketFD(socketFD), &span, sut.SendFlags(flags))
-		spanPtr.Len = C.size_t(len(span))
+		bodySize := int(*cBodySize)
+		extraHeader, bodySize = thread.BeforeSend(sut.SocketFD(socketFD), bodySize, sut.SendFlags(flags))
+		*cBodySize = C.size_t(bodySize)
 	})
 	if extraHeader == nil {
 		return C.struct_ch_allocated_string{nil, 0}

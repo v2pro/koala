@@ -38,33 +38,32 @@ type Thread struct {
 
 type SendFlags int
 
-func (thread *Thread) BeforeSend(socketFD SocketFD, span *[]byte, flags SendFlags) []byte {
+func (thread *Thread) BeforeSend(socketFD SocketFD, bodySize int, flags SendFlags) ([]byte, int) {
 	if !envarg.IsTracing() {
-		return nil
+		return nil, bodySize
 	}
 	if thread.recordingSession == nil {
-		return nil
+		return nil, bodySize
 	}
 	sock := thread.lookupSocket(socketFD)
 	if sock == nil {
 		countlog.Warn("event!sut.unknown-before-send",
 			"threadID", thread.threadID,
 			"socketFD", socketFD)
-		return nil
+		return nil, bodySize
 	}
 	if sock.isServer {
-		return nil
+		return nil, bodySize
 	}
-	thread.recordingSession.BeforeSendToOutbound(thread, *span, sock.addr, sock.localAddr, int(sock.socketFD))
-	extraHeader := sock.beforeSend(thread.recordingSession, span)
-	if extraHeader != nil {
-		countlog.Trace("event!sut.before_send",
-			"socketFD", socketFD,
-			"threadID", thread.threadID,
-			"content", span,
-			"extraHeader", extraHeader)
-	}
-	return extraHeader
+	thread.recordingSession.BeforeSendToOutbound(thread, sock.addr, sock.localAddr, int(sock.socketFD))
+	extraHeader, toSendBodySize := sock.beforeSend(thread.recordingSession, bodySize)
+	countlog.Trace("event!sut.before_send",
+		"socketFD", socketFD,
+		"threadID", thread.threadID,
+		"bodySize", bodySize,
+		"toSendBodySize", toSendBodySize,
+		"extraHeader", extraHeader)
+	return extraHeader, toSendBodySize
 }
 
 func (thread *Thread) OnSend(socketFD SocketFD, span []byte, flags SendFlags, extraHeaderSentSize int) {

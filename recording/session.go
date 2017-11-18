@@ -129,11 +129,11 @@ func (session *Session) SendToOutbound(ctx context.Context, span []byte, peer ne
 	if session == nil {
 		return
 	}
-	session.BeforeSendToOutbound(ctx, span, peer, local, socketFD)
+	session.BeforeSendToOutbound(ctx, peer, local, socketFD)
 	session.currentCallOutbound.Request = append(session.currentCallOutbound.Request, span...)
 }
 
-func (session *Session) BeforeSendToOutbound(ctx context.Context, span []byte, peer net.TCPAddr, local *net.TCPAddr, socketFD int) {
+func (session *Session) BeforeSendToOutbound(ctx context.Context, peer net.TCPAddr, local *net.TCPAddr, socketFD int) {
 	if session == nil {
 		return
 	}

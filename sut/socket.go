@@ -49,13 +49,13 @@ func (sock *socket) canGC(now time.Time) bool {
 	return true
 }
 
-func (sock *socket) beforeSend(session *recording.Session, span *[]byte) []byte {
+func (sock *socket) beforeSend(session *recording.Session, bodySize int) ([]byte, int) {
 	if sock.tracerState == nil {
 		sock.tracerState = &tracerState{}
 		countlog.Trace("event!sock.beforeSend_init",
 			"socketFD", sock.socketFD,
 			"threadID", session.ThreadId)
-		return sock.beforeSend_addMagicInit(session.GetTraceHeader(), *span)
+		return sock.beforeSend_addMagicInit(session.GetTraceHeader(), bodySize)
 	}
 	if sock.tracerState.expectedBufferSize == 0 {
 		traceHeader := session.GetTraceHeader()
@@ -63,21 +63,21 @@ func (sock *socket) beforeSend(session *recording.Session, span *[]byte) []byte 
 			countlog.Trace("event!sock.beforeSend_sameTrace",
 				"socketFD", sock.socketFD,
 				"threadID", session.ThreadId)
-			return sock.beforeSend_addMagicSameTrace(*span)
+			return sock.beforeSend_addMagicSameTrace(bodySize)
 		}
 		countlog.Trace("event!sock.beforeSend_changeTrace",
 			"socketFD", sock.socketFD,
 			"threadID", session.ThreadId)
-		return sock.beforeSend_addMagicChangeTrace(traceHeader, *span)
+		return sock.beforeSend_addMagicChangeTrace(traceHeader, bodySize)
 	}
-	if int(sock.tracerState.expectedBufferSize) < len(*span) {
+	if int(sock.tracerState.expectedBufferSize) < bodySize {
 		// prevent sending more body then the header specified
 		countlog.Trace("event!sock.beforeSend_limitSendBuffer",
 			"socketFD", sock.socketFD,
 			"threadID", session.ThreadId,
 			"expectedBufferSize", sock.tracerState.expectedBufferSize,
-			"spanSize", len(*span))
-		*span = (*span)[:sock.tracerState.expectedBufferSize]
+			"bodySize", bodySize)
+		bodySize = int(sock.tracerState.expectedBufferSize)
 	}
 	if len(sock.tracerState.buffered) != 0 {
 		countlog.Trace("event!sock.beforeSend_sendRemainingHeaderAndBody",
@@ -85,55 +85,55 @@ func (sock *socket) beforeSend(session *recording.Session, span *[]byte) []byte 
 			"threadID", session.ThreadId,
 			"expectedBufferSize", sock.tracerState.expectedBufferSize,
 			"buffered", sock.tracerState.buffered)
-		return sock.tracerState.buffered
+		return sock.tracerState.buffered, bodySize
 	}
 	countlog.Trace("event!sock.beforeSend_sendRemainingBody",
 		"socketFD", sock.socketFD,
 		"threadID", session.ThreadId,
 		"expectedBufferSize", sock.tracerState.expectedBufferSize)
-	return nil
+	return nil, bodySize
 }
 
-func (sock *socket) beforeSend_addMagicInit(traceHeader []byte, span []byte) []byte {
+func (sock *socket) beforeSend_addMagicInit(traceHeader []byte, bodySize int) ([]byte, int) {
 	extraHeader := append(magicInit, []byte{
 		byte(len(traceHeader) >> 8),
 		byte(len(traceHeader)),
 	}...)
 	extraHeader = append(extraHeader, traceHeader...)
 	extraHeader = append(extraHeader, []byte{
-		byte(len(span) >> 8),
-		byte(len(span)),
+		byte(bodySize >> 8),
+		byte(bodySize),
 	}...)
 	sock.tracerState.buffered = extraHeader
-	sock.tracerState.expectedBufferSize = uint16(len(span))
+	sock.tracerState.expectedBufferSize = uint16(bodySize)
 	sock.tracerState.prevTraceHeader = traceHeader
-	return extraHeader
+	return extraHeader, bodySize
 }
 
-func (sock *socket) beforeSend_addMagicChangeTrace(traceHeader []byte, span []byte) []byte {
+func (sock *socket) beforeSend_addMagicChangeTrace(traceHeader []byte, bodySize int) ([]byte, int) {
 	extraHeader := append(magicChangeTrace, []byte{
 		byte(len(traceHeader) >> 8),
 		byte(len(traceHeader)),
 	}...)
 	extraHeader = append(extraHeader, traceHeader...)
 	extraHeader = append(extraHeader, []byte{
-		byte(len(span) >> 8),
-		byte(len(span)),
+		byte(bodySize >> 8),
+		byte(bodySize),
 	}...)
 	sock.tracerState.buffered = extraHeader
-	sock.tracerState.expectedBufferSize = uint16(len(span))
+	sock.tracerState.expectedBufferSize = uint16(bodySize)
 	sock.tracerState.prevTraceHeader = traceHeader
-	return extraHeader
+	return extraHeader, bodySize
 }
 
-func (sock *socket) beforeSend_addMagicSameTrace(span []byte) []byte {
+func (sock *socket) beforeSend_addMagicSameTrace(bodySize int) ([]byte, int) {
 	extraHeader := append(magicSameTrace, []byte{
-		byte(len(span) >> 8),
-		byte(len(span)),
+		byte(bodySize >> 8),
+		byte(bodySize),
 	}...)
 	sock.tracerState.buffered = extraHeader
-	sock.tracerState.expectedBufferSize = uint16(len(span))
-	return extraHeader
+	sock.tracerState.expectedBufferSize = uint16(bodySize)
+	return extraHeader, bodySize
 }
 
 func (sock *socket) afterSend(session *recording.Session, extraHeaderSentSize int, bodySentSize int) {
@@ -212,6 +212,7 @@ func (sock *socket) onRecv_initial(session *recording.Session, span []byte) []by
 		countlog.Trace("event!sock.onRecv_initial.not starts with magic", "socketFD", sock.socketFD)
 		return span
 	}
+	sock.tracerState.isTraced = true
 	sock.tracerState.nextAction = "readTraceHeaderSize"
 	return sock.onRecv_readTraceHeaderSize(session, span[5:])
 }

@@ -34,14 +34,11 @@ INTERPOSE(send)(int socketFD, const void *buffer, size_t size, int flags) {
         // tracing mode
         pid_t thread_id = get_thread_id();
         struct ch_span span;
-        span.Ptr = buffer;
-        span.Len = size;
         // before send return the header to be sent, it might be the left over from last time
         // internally before_send/on_send has a finite-state-machine to handle the callback
-        struct ch_allocated_string extra_header = before_send(thread_id, socketFD, &span, flags);
         // might require send less data this time due to previous header sent
-        // so span is passed as pointer
-        size = span.Len;
+        // so size is passed as pointer
+        struct ch_allocated_string extra_header = before_send(thread_id, socketFD, &size, flags);
         if (extra_header.Ptr != NULL) {
             // inject trace header into tcp stream
             char *remaining_ptr = extra_header.Ptr;
