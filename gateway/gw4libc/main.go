@@ -9,6 +9,7 @@ package gw4libc
 // #include <sys/un.h>
 // #include "span.h"
 // #include "allocated_string.h"
+// #include "countlog.h"
 // #include "time_hook.h"
 // #include "init.h"
 import "C"
@@ -21,6 +22,7 @@ import (
 	"net"
 	"unsafe"
 	"syscall"
+	"math"
 )
 
 func init() {
@@ -385,8 +387,26 @@ func redirect_path(threadID C.pid_t,
 	return C.struct_ch_allocated_string{nil, 0}
 }
 
+//export countlog0
+func countlog0(level C.int, event C.struct_ch_span) {
+	countlog.Log(int(level), ch_span_to_string(event))
+}
+
 //export countlog1
 func countlog1(level C.int, event C.struct_ch_span,
-	k1 C.struct_ch_span, v1 C.struct_ch_span) {
-	countlog.Log(int(level), ch_span_to_string(event), ch_span_to_string(k1), ch_span_to_bytes(v1))
+	k1 C.struct_ch_span, v1 C.struct_event_arg) {
+	countlog.Log(int(level), ch_span_to_string(event), ch_span_to_string(k1), eventArgToEmptyInterface(v1))
+}
+
+func eventArgToEmptyInterface(v C.struct_event_arg) interface{} {
+	switch v.Type {
+	case C.UNSIGNED_LONG:
+		return v.Val_ulong
+	case C.STRING:
+		buf := (*[math.MaxInt32]byte)((unsafe.Pointer)(v.Val_string))[:v.Val_ulong]
+		return buf
+	default:
+		countlog.Warn("event!gw4libc.cast_event_arg_failed", "type", v.Type)
+		return nil
+	}
 }
