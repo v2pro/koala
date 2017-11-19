@@ -388,14 +388,16 @@ func redirect_path(threadID C.pid_t,
 }
 
 //export countlog0
-func countlog0(level C.int, event C.struct_ch_span) {
-	countlog.Log(int(level), ch_span_to_string(event))
+func countlog0(threadID C.pid_t, level C.int, event C.struct_ch_span) {
+	countlog.Log(int(level), ch_span_to_string(event),
+		"threadID", threadID)
 }
 
 //export countlog1
-func countlog1(level C.int, event C.struct_ch_span,
+func countlog1(threadID C.pid_t, level C.int, event C.struct_ch_span,
 	k1 C.struct_ch_span, v1 C.struct_event_arg) {
-	countlog.Log(int(level), ch_span_to_string(event), ch_span_to_string(k1), eventArgToEmptyInterface(v1))
+	countlog.Log(int(level), ch_span_to_string(event),
+		"threadID", threadID, ch_span_to_string(k1), eventArgToEmptyInterface(v1))
 }
 
 func eventArgToEmptyInterface(v C.struct_event_arg) interface{} {
