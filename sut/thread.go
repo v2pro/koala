@@ -38,6 +38,17 @@ type Thread struct {
 
 type SendFlags int
 
+func (thread *Thread) ExportState() map[string]interface{} {
+	thread.mutex.Lock()
+	defer thread.mutex.Unlock()
+	state := map[string]interface{}{
+		"ThreadID": thread.threadID,
+		"LastAccessedAt": thread.lastAccessedAt,
+		"RecordingSession": thread.recordingSession,
+	}
+	return state
+}
+
 func (thread *Thread) BeforeSend(socketFD SocketFD, bodySize int, flags SendFlags) ([]byte, int) {
 	if !envarg.IsTracing() {
 		return nil, bodySize

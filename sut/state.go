@@ -32,14 +32,25 @@ var globalVirtualThreadsMutex = &sync.Mutex{}
 func init() {
 	go gcStatesInBackground()
 	countlog.RegisterStateExporterByFunc("socks", exportSocks)
+	countlog.RegisterStateExporterByFunc("threads", exportThreads)
 }
 
 func exportSocks() map[string]interface{} {
 	globalSocksMutex.Lock()
 	defer globalSocksMutex.Unlock()
 	state := map[string]interface{}{}
-	for fd, sock := range globalSocks {
-		state[strconv.Itoa(int(fd))] = sock
+	for socketFD, sock := range globalSocks {
+		state[strconv.Itoa(int(socketFD))] = sock
+	}
+	return state
+}
+
+func exportThreads() map[string]interface{} {
+	globalThreadsMutex.Lock()
+	defer globalThreadsMutex.Unlock()
+	state := map[string]interface{}{}
+	for threadID, thread := range globalThreads {
+		state[strconv.Itoa(int(threadID))] = thread
 	}
 	return state
 }
