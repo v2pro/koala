@@ -7,6 +7,7 @@ import (
 	"github.com/v2pro/koala/envarg"
 	"github.com/v2pro/plz/countlog"
 	"time"
+	"strconv"
 )
 
 type SocketFD int
@@ -30,6 +31,17 @@ var globalVirtualThreadsMutex = &sync.Mutex{}
 
 func init() {
 	go gcStatesInBackground()
+	countlog.RegisterStateExporterByFunc("socks", exportSocks)
+}
+
+func exportSocks() map[string]interface{} {
+	globalSocksMutex.Lock()
+	defer globalSocksMutex.Unlock()
+	state := map[string]interface{}{}
+	for fd, sock := range globalSocks {
+		state[strconv.Itoa(int(fd))] = sock
+	}
+	return state
 }
 
 func setGlobalSock(socketFD SocketFD, sock *socket) {
@@ -204,7 +216,6 @@ func gcGlobalVirtualThreads() int {
 	globalVirtualThreads = newMap
 	return expiredThreadsCount
 }
-
 
 func shutdownThread(thread *Thread) {
 	thread.mutex.Lock()

@@ -2,18 +2,6 @@
 set -e
 set -x
 
-if [ ! -d /tmp/build-golang/src/github.com/v2pro ]; then
-    mkdir -p /tmp/build-golang/src/github.com/v2pro
-    ln -s $PWD /tmp/build-golang/src/github.com/v2pro/koala
-fi
-export GOPATH=/tmp/build-golang
-rm -rf output
-mkdir output
-go get github.com/Masterminds/glide
-pushd /tmp/build-golang/src/github.com/v2pro/koala
-/tmp/build-golang/bin/glide i
-popd
-
 case $1 in
     "tracer" )
         # trace & record to file, only for testing purpose

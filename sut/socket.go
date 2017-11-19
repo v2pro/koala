@@ -34,6 +34,15 @@ var magicInit = []byte{0xde, 0xad, 0xbe, 0xef, 0x01}
 var magicSameTrace = []byte{0xde, 0xad}
 var magicChangeTrace = []byte{0xbe, 0xef}
 
+func (sock *socket) ExportState() map[string]interface{} {
+	state := map[string]interface{}{
+		"IsServer":       sock.isServer,
+		"LastAccessedAt": sock.lastAccessedAt,
+		"Addr":           sock.addr,
+	}
+	return state
+}
+
 func (sock *socket) canGC(now time.Time) bool {
 	if now.Sub(sock.lastAccessedAt) < time.Minute*5 {
 		return false
