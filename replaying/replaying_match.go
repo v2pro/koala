@@ -6,7 +6,10 @@ import (
 	"context"
 	"bytes"
 	"fmt"
+	"math"
 )
+
+var expect100 = []byte("Expect: 100-continue")
 
 func (replayingSession *ReplayingSession) MatchOutboundTalk(
 	ctx context.Context, lastMatchedIndex int, request []byte) (int, float64, *recording.CallOutbound) {
@@ -14,6 +17,12 @@ func (replayingSession *ReplayingSession) MatchOutboundTalk(
 	chunks := cutToChunks(request, unit)
 	reqCandidates := replayingSession.loadKeys()
 	scores := make([]int, len(replayingSession.CallOutbounds))
+	reqExpect100 := bytes.Contains(request, expect100)
+	for i, callOutbound := range replayingSession.CallOutbounds {
+		if reqExpect100 != bytes.Contains(callOutbound.Request, expect100) {
+			scores[i] = math.MinInt64
+		}
+	}
 	maxScore := 0
 	maxScoreIndex := 0
 	for chunkIndex, chunk := range chunks {

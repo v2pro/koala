@@ -1,5 +1,6 @@
 package gw4libc
 
+// #cgo CXXFLAGS: --std=c++11 -Wno-ignored-attributes
 // #cgo LDFLAGS: -ldl -lm
 // #include <stddef.h>
 // #include <netinet/in.h>
@@ -8,6 +9,7 @@ package gw4libc
 // #include <sys/un.h>
 // #include "span.h"
 // #include "allocated_string.h"
+// #include "countlog.h"
 // #include "time_hook.h"
 // #include "init.h"
 import "C"
@@ -18,7 +20,9 @@ import (
 	"github.com/v2pro/koala/sut"
 	"github.com/v2pro/plz/countlog"
 	"net"
+	"unsafe"
 	"syscall"
+	"math"
 )
 
 func init() {
@@ -34,7 +38,11 @@ func init() {
 		C.set_time_offset(C.int(offset))
 	}
 	gw4go.Start()
-	C.go_initialized()
+	isTracing := C.int(0)
+	if envarg.IsTracing() {
+		isTracing = 1
+	}
+	C.go_initialized(isTracing)
 }
 
 //export on_connect
@@ -98,21 +106,6 @@ func on_bind(threadID C.pid_t, socketFD C.int, addr *C.struct_sockaddr_in) {
 
 //export on_bind_unix
 func on_bind_unix(threadID C.pid_t, socketFD C.int, addr *C.char) {
-	/*
-		defer func() {
-			recovered := recover()
-			if recovered != nil {
-				countlog.Fatal("event!gw4libc.bind.panic", "err", recovered,
-					"stacktrace", countlog.ProvideStacktrace)
-			}
-		}()
-		sut.OperateThread(sut.ThreadID(threadID), func(thread *sut.Thread) {
-			thread.OnBindUnix(sut.SocketFD(socketFD), net.UnixAddr{
-				Name: string(C.GoBytes(unsafe.Pointer(&((*addr).sun_path[0])), C.int(108))),
-				Net:  "unix",
-			})
-		})
-	*/
 }
 
 //export on_accept
@@ -133,7 +126,48 @@ func on_accept(threadID C.pid_t, serverSocketFD C.int, clientSocketFD C.int, add
 			Port: int(ch.Ntohs(sockaddr_in_sin_port_get(addr))),
 		})
 	})
+}
 
+//export on_accept6
+func on_accept6(threadID C.pid_t, serverSocketFD C.int, clientSocketFD C.int, addr *C.struct_sockaddr_in6) {
+	defer func() {
+		recovered := recover()
+		if recovered != nil {
+			countlog.Fatal("event!gw4libc.accept.panic", "err", recovered,
+				"stacktrace", countlog.ProvideStacktrace)
+		}
+	}()
+	if sockaddr_in6_sin_family_get(addr) != syscall.AF_INET6 {
+		panic("expect ipv6 addr")
+	}
+	sut.OperateThread(sut.ThreadID(threadID), func(thread *sut.Thread) {
+		ip := sockaddr_in6_sin_addr_get(addr)
+		thread.OnAccept(sut.SocketFD(serverSocketFD), sut.SocketFD(clientSocketFD), net.TCPAddr{
+			IP:   ip[:],
+			Port: int(ch.Ntohs(sockaddr_in6_sin_port_get(addr))),
+		})
+	})
+}
+
+//export before_send
+func before_send(threadID C.pid_t, socketFD C.int, flags C.int, cBodySize *C.size_t) C.struct_ch_allocated_string {
+	defer func() {
+		recovered := recover()
+		if recovered != nil {
+			countlog.Fatal("event!gw4libc.before_send.panic", "err", recovered,
+				"stacktrace", countlog.ProvideStacktrace)
+		}
+	}()
+	var extraHeader []byte
+	sut.OperateThread(sut.ThreadID(threadID), func(thread *sut.Thread) {
+		bodySize := int(*cBodySize)
+		extraHeader, bodySize = thread.BeforeSend(sut.SocketFD(socketFD), bodySize, sut.SendFlags(flags))
+		*cBodySize = C.size_t(bodySize)
+	})
+	if extraHeader == nil {
+		return C.struct_ch_allocated_string{nil, 0}
+	}
+	return C.struct_ch_allocated_string{(*C.char)(C.CBytes(extraHeader)), C.size_t(len(extraHeader))}
 }
 
 //export on_accept_unix
@@ -156,7 +190,7 @@ func on_accept_unix(threadID C.pid_t, serverSocketFD C.int, clientSocketFD C.int
 }
 
 //export on_send
-func on_send(threadID C.pid_t, socketFD C.int, span C.struct_ch_span, flags C.int) {
+func on_send(threadID C.pid_t, socketFD C.int, span C.struct_ch_span, flags C.int, extraHeaderSentSize C.int) {
 	defer func() {
 		recovered := recover()
 		if recovered != nil {
@@ -165,12 +199,12 @@ func on_send(threadID C.pid_t, socketFD C.int, span C.struct_ch_span, flags C.in
 		}
 	}()
 	sut.OperateThread(sut.ThreadID(threadID), func(thread *sut.Thread) {
-		thread.OnSend(sut.SocketFD(socketFD), ch_span_to_bytes(span), sut.SendFlags(flags))
+		thread.OnSend(sut.SocketFD(socketFD), ch_span_to_bytes(span), sut.SendFlags(flags), int(extraHeaderSentSize))
 	})
 }
 
 //export on_recv
-func on_recv(threadID C.pid_t, socketFD C.int, span C.struct_ch_span, flags C.int) {
+func on_recv(threadID C.pid_t, socketFD C.int, span C.struct_ch_span, flags C.int) C.struct_ch_span {
 	defer func() {
 		recovered := recover()
 		if recovered != nil {
@@ -178,9 +212,22 @@ func on_recv(threadID C.pid_t, socketFD C.int, span C.struct_ch_span, flags C.in
 				"stacktrace", countlog.ProvideStacktrace)
 		}
 	}()
+	var body []byte
 	sut.OperateThread(sut.ThreadID(threadID), func(thread *sut.Thread) {
-		thread.OnRecv(sut.SocketFD(socketFD), ch_span_to_bytes(span), sut.RecvFlags(flags))
+		body = thread.OnRecv(sut.SocketFD(socketFD), ch_span_to_bytes(span), sut.RecvFlags(flags))
 	})
+	if body == nil {
+		return C.struct_ch_span{nil, 0}
+	}
+	ptr := (*sliceHeader)((unsafe.Pointer)(&body)).Data
+	return C.struct_ch_span{ptr, C.size_t(len(body))}
+}
+
+// sliceHeader is a safe version of SliceHeader used within this package.
+type sliceHeader struct {
+	Data unsafe.Pointer
+	Len  int
+	Cap  int
 }
 
 //export on_sendto
@@ -200,6 +247,34 @@ func on_sendto(threadID C.pid_t, socketFD C.int, span C.struct_ch_span, flags C.
 	})
 }
 
+//export recv_from_koala
+func recv_from_koala(threadID C.pid_t, span C.struct_ch_span) C.int {
+	defer func() {
+		recovered := recover()
+		if recovered != nil {
+			countlog.Fatal("event!gw4libc.recv_from_koala.panic", "err", recovered,
+				"stacktrace", countlog.ProvideStacktrace)
+		}
+	}()
+	response := sut.RecvFromKoala(sut.ThreadID(threadID))
+	if response == nil {
+		return 0
+	}
+	return C.int(copy(ch_span_to_bytes(span), response))
+}
+
+//export send_to_koala
+func send_to_koala(threadID C.pid_t, span C.struct_ch_span, flags C.int) {
+	defer func() {
+		recovered := recover()
+		if recovered != nil {
+			countlog.Fatal("event!gw4libc.send_to_koala.panic", "err", recovered,
+				"stacktrace", countlog.ProvideStacktrace)
+		}
+	}()
+	sut.SendToKoala(sut.ThreadID(threadID), ch_span_to_bytes(span), sut.SendToFlags(flags))
+}
+
 //export on_fopening_file
 func on_fopening_file(threadID C.pid_t,
 	filename C.struct_ch_span,
@@ -216,9 +291,9 @@ func on_fopening_file(threadID C.pid_t,
 		redirectTo = thread.OnOpeningFile(ch_span_to_string(filename), ch_span_to_open_flags(opentype))
 	})
 	if redirectTo != "" {
-		return C.struct_ch_allocated_string{C.CString(redirectTo)}
+		return C.struct_ch_allocated_string{C.CString(redirectTo), C.size_t(len(redirectTo))}
 	}
-	return C.struct_ch_allocated_string{nil}
+	return C.struct_ch_allocated_string{nil, 0}
 }
 
 //export on_fopened_file
@@ -254,9 +329,9 @@ func on_opening_file(threadID C.pid_t,
 		redirectTo = thread.OnOpeningFile(ch_span_to_string(filename), int(flags))
 	})
 	if redirectTo != "" {
-		return C.struct_ch_allocated_string{C.CString(redirectTo)}
+		return C.struct_ch_allocated_string{C.CString(redirectTo), C.size_t(len(redirectTo))}
 	}
-	return C.struct_ch_allocated_string{nil}
+	return C.struct_ch_allocated_string{nil, 0}
 }
 
 //export on_opened_file
@@ -307,7 +382,33 @@ func redirect_path(threadID C.pid_t,
 		redirectTo = thread.OnOpeningFile(ch_span_to_string(pathname), 0)
 	})
 	if redirectTo != "" {
-		return C.struct_ch_allocated_string{C.CString(redirectTo)}
+		return C.struct_ch_allocated_string{C.CString(redirectTo), C.size_t(len(redirectTo))}
 	}
-	return C.struct_ch_allocated_string{nil}
+	return C.struct_ch_allocated_string{nil, 0}
+}
+
+//export countlog0
+func countlog0(threadID C.pid_t, level C.int, event C.struct_ch_span) {
+	countlog.Log(int(level), ch_span_to_string(event),
+		"threadID", threadID)
+}
+
+//export countlog1
+func countlog1(threadID C.pid_t, level C.int, event C.struct_ch_span,
+	k1 C.struct_ch_span, v1 C.struct_event_arg) {
+	countlog.Log(int(level), ch_span_to_string(event),
+		"threadID", threadID, ch_span_to_string(k1), eventArgToEmptyInterface(v1))
+}
+
+func eventArgToEmptyInterface(v C.struct_event_arg) interface{} {
+	switch v.Type {
+	case C.UNSIGNED_LONG:
+		return v.Val_ulong
+	case C.STRING:
+		buf := (*[math.MaxInt32]byte)((unsafe.Pointer)(v.Val_string))[:v.Val_ulong]
+		return buf
+	default:
+		countlog.Warn("event!gw4libc.cast_event_arg_failed", "type", v.Type)
+		return nil
+	}
 }

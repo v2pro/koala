@@ -1,14 +1,14 @@
-hash: 9d6c9767a3542c0ae0feab0bb6db6265126813e405f3a8edead61a8db46b2d08
-updated: 2017-11-07T16:43:22.090966605+08:00
+hash: 9b5ffb96d051edbf339bb653ad3fe2471cabeef02c5a568d85e1bccb61aa5e4c
+updated: 2017-11-14T22:01:29.740214784+08:00
 imports:
 - name: github.com/json-iterator/go
-  version: aed5a81f09330b8d254a117fb853e2f886f1cb3b
+  version: 9fddff05f0b5cfe038f1802add248f3f0d08a015
 - name: github.com/rakyll/statik
   version: 016ca6fdb1b26618ff8f53fbd1109ff834524f23
   subpackages:
   - fs
 - name: github.com/v2pro/plz
-  version: 766897d93ee269c08178fb3f8eabb0cd4be272dd
+  version: b392bdc05b9a9ecf9d209b8dea038180813e2b09
   subpackages:
   - countlog
   - witch

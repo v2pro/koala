@@ -6,6 +6,7 @@ import (
 	"unsafe"
 	"encoding/binary"
 	"net"
+	"github.com/v2pro/plz/countlog"
 )
 
 func Dump(typ reflect.Type) {
@@ -22,7 +23,8 @@ func FieldOf(typ reflect.Type, name string) *reflect.StructField {
 			return &field
 		}
 	}
-	panic(name + " not found in " + typ.String())
+	countlog.Error("event!ch.field not found", "type", typ.String(), "name", name)
+	return nil
 }
 
 func GetUint8(ptr unsafe.Pointer, field *reflect.StructField) uint8 {
@@ -63,6 +65,22 @@ func SetUint32(ptr unsafe.Pointer, field *reflect.StructField, val uint32) {
 	}
 	fieldPtr := unsafe.Pointer(uintptr(ptr) + field.Offset)
 	*(*uint32)(fieldPtr) = val
+}
+
+func Get16ElementsByteArray(ptr unsafe.Pointer, field *reflect.StructField) [16]byte {
+	if field.Type.Kind() != reflect.Array || field.Type.Elem().Kind() != reflect.Uint8 || field.Type.Len() != 16 {
+		panic("kind mismatch")
+	}
+	fieldPtr := unsafe.Pointer(uintptr(ptr) + field.Offset)
+	return *(*[16]byte)(fieldPtr)
+}
+
+func Set16ElementsByteArray(ptr unsafe.Pointer, field *reflect.StructField, val [16]byte) {
+	if field.Type.Kind() != reflect.Array || field.Type.Elem().Kind() != reflect.Uint8 || field.Type.Len() != 16 {
+		panic("kind mismatch")
+	}
+	fieldPtr := unsafe.Pointer(uintptr(ptr) + field.Offset)
+	*(*[16]byte)(fieldPtr) = val
 }
 
 func GetPtr(ptr unsafe.Pointer, field *reflect.StructField) unsafe.Pointer {

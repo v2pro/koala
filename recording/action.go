@@ -43,7 +43,7 @@ func (callFromInbound *CallFromInbound) MarshalJSON() ([]byte, error) {
 		Request json.RawMessage
 	}{
 		CallFromInbound: *callFromInbound,
-		Request:         encodeAnyByteArray(callFromInbound.Request),
+		Request:         EncodeAnyByteArray(callFromInbound.Request),
 	})
 }
 
@@ -58,7 +58,7 @@ func (returnInbound *ReturnInbound) MarshalJSON() ([]byte, error) {
 		Response json.RawMessage
 	}{
 		ReturnInbound: *returnInbound,
-		Response:      encodeAnyByteArray(returnInbound.Response),
+		Response:      EncodeAnyByteArray(returnInbound.Response),
 	})
 }
 
@@ -71,6 +71,7 @@ type CallOutbound struct {
 	ResponseTime int64
 	Response     []byte
 	UnixAddr     net.UnixAddr
+	CSpanId		 []byte
 }
 
 func (callOutbound *CallOutbound) MarshalJSON() ([]byte, error) {
@@ -78,10 +79,12 @@ func (callOutbound *CallOutbound) MarshalJSON() ([]byte, error) {
 		CallOutbound
 		Request  json.RawMessage
 		Response json.RawMessage
+		CSpanId json.RawMessage
 	}{
 		CallOutbound: *callOutbound,
-		Request:      encodeAnyByteArray(callOutbound.Request),
-		Response:     encodeAnyByteArray(callOutbound.Response),
+		Request:      EncodeAnyByteArray(callOutbound.Request),
+		Response:     EncodeAnyByteArray(callOutbound.Response),
+		CSpanId:       EncodeAnyByteArray(callOutbound.CSpanId),
 	})
 }
 
@@ -97,7 +100,7 @@ func (appendFile *AppendFile) MarshalJSON() ([]byte, error) {
 		Content json.RawMessage
 	}{
 		AppendFile: *appendFile,
-		Content:    encodeAnyByteArray(appendFile.Content),
+		Content:    EncodeAnyByteArray(appendFile.Content),
 	})
 }
 
@@ -113,7 +116,7 @@ func (sendUDP *SendUDP) MarshalJSON() ([]byte, error) {
 		Content json.RawMessage
 	}{
 		SendUDP: *sendUDP,
-		Content: encodeAnyByteArray(sendUDP.Content),
+		Content: EncodeAnyByteArray(sendUDP.Content),
 	})
 }
 
@@ -128,7 +131,7 @@ func (readStorage *ReadStorage) MarshalJSON() ([]byte, error) {
 		Content json.RawMessage
 	}{
 		ReadStorage: *readStorage,
-		Content:     encodeAnyByteArray(readStorage.Content),
+		Content:     EncodeAnyByteArray(readStorage.Content),
 	})
 }
 
@@ -238,7 +241,7 @@ var safeSet = [utf8.RuneSelf]bool{
 }
 var hex = "0123456789abcdef"
 
-func encodeAnyByteArray(s []byte) json.RawMessage {
+func EncodeAnyByteArray(s []byte) json.RawMessage {
 	encoded := []byte{'"'}
 	i := 0
 	start := i

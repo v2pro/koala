@@ -1,4 +1,4 @@
-#ifdef KOALA_REPLAYER
+#ifdef KOALA_LIBC_FILE_HOOK
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <stdarg.h>
+#include <sys/stat.h>
 #include "interpose.h"
 #include "init.h"
 #include "thread_id.h"
@@ -150,6 +151,26 @@ INTERPOSE(open)(const char *filename, int flags, ...) {
     }
 }
 
+INTERPOSE(read)(int fileFD, void *buffer, size_t size) {
+    FILE_HOOK_ENTER(read)
+    if (is_go_initialized() != 1) {
+        return real::read(fileFD, buffer, size);
+    }
+    ssize_t read_size = real::read(fileFD, buffer, size);
+    if (read_size >= 0) {
+        struct stat statbuf;
+        fstat(fileFD, &statbuf);
+        if (S_ISSOCK(statbuf.st_mode)) {
+            pid_t thread_id = get_thread_id();
+            struct ch_span span;
+            span.Ptr = buffer;
+            span.Len = read_size;
+            on_recv(thread_id, fileFD, span, 0);
+        }
+    }
+    return read_size;
+}
+
 INTERPOSE(write)(int fileFD, const void *buffer, size_t size) {
     FILE_HOOK_ENTER(write)
     if (is_go_initialized() != 1) {
@@ -161,8 +182,14 @@ INTERPOSE(write)(int fileFD, const void *buffer, size_t size) {
         struct ch_span span;
         span.Ptr = buffer;
         span.Len = written_size;
-        on_write(thread_id, fileFD, span);
+        struct stat statbuf;
+        fstat(fileFD, &statbuf);
+        if (S_ISSOCK(statbuf.st_mode)) {
+            on_send(thread_id, fileFD, span, 0, 0);
+        } else {
+            on_write(thread_id, fileFD, span);
+        }
     }
     return written_size;
 }
-#endif // KOALA_REPLAYER
+#endif // KOALA_LIBC_FILE_HOOK

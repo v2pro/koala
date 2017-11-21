@@ -69,7 +69,7 @@ func (replayingSession *ReplayingSession) AppendFile(ctx context.Context, conten
 	appendFile := &AppendFile{
 		replayedAction: newReplayedAction("AppendFile"),
 		FileName:       fileName,
-		Content:        content,
+		Content:        append([]byte(nil), content...),
 	}
 	replayingSession.collectAction(ctx, appendFile)
 }
@@ -81,7 +81,7 @@ func (replayingSession *ReplayingSession) SendUDP(ctx context.Context, content [
 	sendUdp := &SendUDP{
 		replayedAction: newReplayedAction("SendUDP"),
 		Peer:           peer,
-		Content:        content,
+		Content:        append([]byte(nil), content...),
 	}
 	replayingSession.collectAction(ctx, sendUdp)
 }

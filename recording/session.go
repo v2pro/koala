@@ -6,10 +6,16 @@ import (
 	"github.com/v2pro/plz/countlog"
 	"net"
 	"time"
+	"encoding/json"
+	"github.com/v2pro/koala/envarg"
 )
 
 type Session struct {
+	ThreadId            int32
 	SessionId           string
+	TraceHeader         TraceHeader
+	TraceId             []byte
+	SpanId              []byte
 	NextSessionId       string
 	CallFromInbound     *CallFromInbound
 	ReturnInbound       *ReturnInbound
@@ -18,23 +24,23 @@ type Session struct {
 	currentCallOutbound *CallOutbound          `json:"-"`
 }
 
-func NewSession(suffix int32) *Session {
+func NewSession(threadId int32) *Session {
 	return &Session{
-		SessionId: fmt.Sprintf("%d-%d", time.Now().UnixNano(), suffix),
+		ThreadId:  threadId,
+		SessionId: fmt.Sprintf("%d-%d", time.Now().UnixNano(), threadId),
 	}
 }
 
-func (session *Session) Summary() string {
-	reqLen := 0
-	resLen := 0
-	if session.CallFromInbound != nil {
-		reqLen = len(session.CallFromInbound.Request)
-	}
-	if session.ReturnInbound != nil {
-		resLen = len(session.ReturnInbound.Response)
-	}
-	return fmt.Sprintf("CallFromInbound: %d bytes, ReturnInbound: %d bytes, actions: %d",
-		reqLen, resLen, len(session.Actions))
+func (session *Session) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Session
+		TraceId json.RawMessage
+		SpanId  json.RawMessage
+	}{
+		Session: *session,
+		TraceId: EncodeAnyByteArray(session.TraceId),
+		SpanId:  EncodeAnyByteArray(session.SpanId),
+	})
 }
 
 func (session *Session) newAction(actionType string) action {
@@ -71,7 +77,7 @@ func (session *Session) ReadStorage(ctx context.Context, span []byte) {
 	}
 	session.addAction(&ReadStorage{
 		action:  session.newAction("ReadStorage"),
-		Content: span,
+		Content: append([]byte(nil), span...),
 	})
 }
 
@@ -107,23 +113,11 @@ func (session *Session) RecvFromOutbound(ctx context.Context, span []byte, peer 
 		return
 	}
 	if session.currentCallOutbound == nil {
-		session.currentCallOutbound = &CallOutbound{
-			action:   session.newAction("CallOutbound"),
-			Peer:     peer,
-			Local:    local,
-			SocketFD: socketFD,
-		}
-		session.addAction(session.currentCallOutbound)
+		session.newCallOutbound(peer, local, socketFD)
 	}
 	if (session.currentCallOutbound.Peer.String() != peer.String()) ||
 		(session.currentCallOutbound.SocketFD != socketFD) {
-		session.currentCallOutbound = &CallOutbound{
-			action:   session.newAction("CallOutbound"),
-			Peer:     peer,
-			Local:    local,
-			SocketFD: socketFD,
-		}
-		session.addAction(session.currentCallOutbound)
+		session.newCallOutbound(peer, local, socketFD)
 	}
 	if session.currentCallOutbound.ResponseTime == 0 {
 		session.currentCallOutbound.ResponseTime = time.Now().UnixNano()
@@ -135,28 +129,39 @@ func (session *Session) SendToOutbound(ctx context.Context, span []byte, peer ne
 	if session == nil {
 		return
 	}
+	session.BeforeSendToOutbound(ctx, peer, local, socketFD)
+	session.currentCallOutbound.Request = append(session.currentCallOutbound.Request, span...)
+}
+
+func (session *Session) BeforeSendToOutbound(ctx context.Context, peer net.TCPAddr, local *net.TCPAddr, socketFD int) {
+	if session == nil {
+		return
+	}
 	if (session.currentCallOutbound == nil) ||
 		(session.currentCallOutbound.Peer.String() != peer.String()) ||
 		(session.currentCallOutbound.SocketFD != socketFD) ||
 		(len(session.currentCallOutbound.Response) > 0) {
-		session.currentCallOutbound = &CallOutbound{
-			action:   session.newAction("CallOutbound"),
-			Peer:     peer,
-			Local:    local,
-			SocketFD: socketFD,
-		}
-		session.addAction(session.currentCallOutbound)
+		session.newCallOutbound(peer, local, socketFD)
 	} else if session.currentCallOutbound != nil && session.currentCallOutbound.ResponseTime > 0 {
 		// last request get a bad response, e.g., timeout
-		session.currentCallOutbound = &CallOutbound{
-			action:   session.newAction("CallOutbound"),
-			Peer:     peer,
-			Local:    local,
-			SocketFD: socketFD,
-		}
-		session.addAction(session.currentCallOutbound)
+		session.newCallOutbound(peer, local, socketFD)
 	}
-	session.currentCallOutbound.Request = append(session.currentCallOutbound.Request, span...)
+}
+
+func (session *Session) newCallOutbound(peer net.TCPAddr, local *net.TCPAddr, socketFD int) {
+	cspanId := []byte(nil)
+	if envarg.IsTracing() {
+		cspanId, _ = newID().MarshalText()
+		session.TraceHeader = session.GetTraceHeader().Set(TraceHeaderKeySpanId, cspanId)
+	}
+	session.currentCallOutbound = &CallOutbound{
+		action:   session.newAction("CallOutbound"),
+		Peer:     peer,
+		Local:    local,
+		SocketFD: socketFD,
+		CSpanId:  cspanId,
+	}
+	session.addAction(session.currentCallOutbound)
 }
 
 func (session *Session) SendUDP(ctx context.Context, span []byte, peer net.UDPAddr) {
@@ -166,7 +171,7 @@ func (session *Session) SendUDP(ctx context.Context, span []byte, peer net.UDPAd
 	session.addAction(&SendUDP{
 		action:  session.newAction("SendUDP"),
 		Peer:    peer,
-		Content: span,
+		Content: append([]byte(nil), span...),
 	})
 }
 
@@ -180,10 +185,33 @@ func (session *Session) HasResponded() bool {
 	return true
 }
 
-func (session *Session) Shutdown(ctx context.Context) {
+func (session *Session) addAction(action Action) {
+	if !ShouldRecordAction(action) {
+		return
+	}
+	session.Actions = append(session.Actions, action)
+}
+
+func (session *Session) GetTraceHeader() TraceHeader {
+	if session.TraceHeader == nil {
+		traceId, _ := newID().MarshalText()
+		session.TraceHeader = session.TraceHeader.Set(TraceHeaderKeyTraceId, traceId)
+		session.TraceId = traceId
+		countlog.Trace("event!recording.generated_trace_header",
+			"threadID", session.ThreadId,
+			"sessionId", session.SessionId,
+			"traceId", traceId,
+		)
+	}
+	return session.TraceHeader
+}
+
+func (session *Session) Shutdown(ctx context.Context, newSession *Session) {
 	if session == nil {
 		return
 	}
+	session.Summary(newSession)
+	session.NextSessionId = newSession.SessionId
 	if session.CallFromInbound == nil {
 		return
 	}
@@ -199,9 +227,23 @@ func (session *Session) Shutdown(ctx context.Context) {
 	)
 }
 
-func (session *Session) addAction(action Action) {
-	if !ShouldRecordAction(action) {
-		return
+func (session *Session) Summary(newSession *Session) {
+	reqLen := 0
+	respLen := 0
+	if session.CallFromInbound != nil {
+		reqLen = len(session.CallFromInbound.Request)
 	}
-	session.Actions = append(session.Actions, action)
+	if session.ReturnInbound != nil {
+		respLen = len(session.ReturnInbound.Response)
+	}
+	countlog.Trace("event!recording.shutdown_recording_session",
+		"threadID", session.ThreadId,
+		"sessionId", session.SessionId,
+		"nextSessionId", newSession.SessionId,
+		"callFromInboundBytes",
+		reqLen,
+		"returnInboundBytes",
+		respLen,
+		"actionsCount",
+		len(session.Actions))
 }

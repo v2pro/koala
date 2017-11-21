@@ -10,8 +10,10 @@ import (
 	"net"
 	"os"
 	"strings"
-	"syscall"
 	"time"
+	"sync"
+	"context"
+	"unsafe"
 )
 
 // InboundRequestPrefix is used to recognize php-fpm FCGI_BEGIN_REQUEST packet.
@@ -21,69 +23,61 @@ import (
 // Set InboundRequestPrefix to []byte{1, 1} to only begin new session for FCGI_BEGIN_REQUEST.
 // First 0x01 is the version field of fastcgi protocol, second 0x01 is FCGI_BEGIN_REQUEST.
 var InboundRequestPrefix = []byte{}
-var helperThreadShutdown = "to-koala!thread-shutdown"
-var helperCallFunction = "to-koala!call-function"
-var helperReturnFunction = "to-koala!return-function"
-var helperReadStorage = "to-koala!read-storage"
 
-func (thread *Thread) lookupSocket(socketFD SocketFD) *socket {
-	sock := thread.socks[socketFD]
-	if sock != nil {
-		return sock
-	}
-	sock = getGlobalSock(socketFD)
-	if sock == nil {
-		return nil
-	}
-	remoteAddr, err := syscall.Getpeername(int(socketFD))
-	if err != nil {
-		countlog.Error("event!failed to get peer name", "err", err, "socketFD", socketFD)
-		return nil
-	}
-	remoteAddr4, _ := remoteAddr.(*syscall.SockaddrInet4)
-	// if remote address changed, the fd must be closed and reused
-	if remoteAddr4 != nil && (remoteAddr4.Port != sock.addr.Port ||
-		remoteAddr4.Addr[0] != sock.addr.IP[0] ||
-		remoteAddr4.Addr[1] != sock.addr.IP[1] ||
-		remoteAddr4.Addr[2] != sock.addr.IP[2] ||
-		remoteAddr4.Addr[3] != sock.addr.IP[3]) {
-		sock = &socket{
-			socketFD: socketFD,
-			isServer: false,
-			addr: net.TCPAddr{
-				Port: remoteAddr4.Port,
-				IP:   net.IP(remoteAddr4.Addr[:]),
-			},
-			lastAccessedAt: time.Now(),
-		}
-		setGlobalSock(socketFD, sock)
-	}
-	remoteAddr6, _ := remoteAddr.(*syscall.SockaddrInet6)
-	if remoteAddr6 != nil && (remoteAddr6.Port != sock.addr.Port ||
-		remoteAddr6.Addr[0] != sock.addr.IP[0] ||
-		remoteAddr6.Addr[1] != sock.addr.IP[1] ||
-		remoteAddr6.Addr[2] != sock.addr.IP[2] ||
-		remoteAddr6.Addr[3] != sock.addr.IP[3] ||
-		remoteAddr6.Addr[4] != sock.addr.IP[4] ||
-		remoteAddr6.Addr[5] != sock.addr.IP[5]) {
-		sock = &socket{
-			socketFD: socketFD,
-			isServer: false,
-			addr: net.TCPAddr{
-				Port: remoteAddr6.Port,
-				IP:   net.IP(remoteAddr6.Addr[:]),
-			},
-			lastAccessedAt: time.Now(),
-		}
-		setGlobalSock(socketFD, sock)
-	}
-	thread.socks[socketFD] = sock
-	return sock
+type Thread struct {
+	context.Context
+	mutex            *sync.Mutex
+	threadID         ThreadID
+	socks            map[SocketFD]*socket
+	files            map[FileFD]*file
+	recordingSession *recording.Session
+	replayingSession *replaying.ReplayingSession
+	lastAccessedAt   time.Time
+	helperResponse	 []byte
 }
 
 type SendFlags int
 
-func (thread *Thread) OnSend(socketFD SocketFD, span []byte, flags SendFlags) {
+func (thread *Thread) ExportState() map[string]interface{} {
+	thread.mutex.Lock()
+	defer thread.mutex.Unlock()
+	state := map[string]interface{}{
+		"ThreadID": thread.threadID,
+		"LastAccessedAt": thread.lastAccessedAt,
+		"RecordingSession": thread.recordingSession,
+	}
+	return state
+}
+
+func (thread *Thread) BeforeSend(socketFD SocketFD, bodySize int, flags SendFlags) ([]byte, int) {
+	if !envarg.IsTracing() {
+		return nil, bodySize
+	}
+	if thread.recordingSession == nil {
+		return nil, bodySize
+	}
+	sock := thread.lookupSocket(socketFD)
+	if sock == nil {
+		countlog.Warn("event!sut.unknown-before-send",
+			"threadID", thread.threadID,
+			"socketFD", socketFD)
+		return nil, bodySize
+	}
+	if sock.isServer {
+		return nil, bodySize
+	}
+	thread.recordingSession.BeforeSendToOutbound(thread, sock.addr, sock.localAddr, int(sock.socketFD))
+	extraHeader, toSendBodySize := sock.beforeSend(thread.recordingSession, bodySize)
+	countlog.Trace("event!sut.before_send",
+		"socketFD", socketFD,
+		"threadID", thread.threadID,
+		"bodySize", bodySize,
+		"toSendBodySize", toSendBodySize,
+		"extraHeader", extraHeader)
+	return extraHeader, toSendBodySize
+}
+
+func (thread *Thread) OnSend(socketFD SocketFD, span []byte, flags SendFlags, extraHeaderSentSize int) {
 	if len(span) == 0 {
 		return
 	}
@@ -108,52 +102,83 @@ func (thread *Thread) OnSend(socketFD SocketFD, span []byte, flags SendFlags) {
 					"threadID", thread.threadID)
 			}
 		}
+		if thread.recordingSession != nil && envarg.IsTracing() {
+			sock.afterSend(thread.recordingSession, extraHeaderSentSize, len(span))
+		}
 	}
 	countlog.Trace(event,
 		"threadID", thread.threadID,
 		"socketFD", socketFD,
+		"recordingSessionPtr", uintptr(unsafe.Pointer(thread.recordingSession)),
 		"addr", &sock.addr,
+		"flags", flags,
 		"content", span)
+}
+
+func (thread *Thread) AfterSend(socketFD SocketFD, extraHeaderSentSize int, bodySentSize int) {
+	if !envarg.IsTracing() {
+		return
+	}
+	sock := getGlobalSock(socketFD)
+	if sock == nil {
+		countlog.Warn("event!sut.unknown-after-send",
+			"threadID", thread.threadID,
+			"socketFD", socketFD)
+		return
+	}
+	sock.afterSend(thread.recordingSession, extraHeaderSentSize, bodySentSize)
 }
 
 type RecvFlags int
 
-func (thread *Thread) OnRecv(socketFD SocketFD, span []byte, flags RecvFlags) {
+func (thread *Thread) OnRecv(socketFD SocketFD, span []byte, flags RecvFlags) []byte {
 	sock := thread.lookupSocket(socketFD)
 	if sock == nil {
 		countlog.Warn("event!sut.unknown-recv",
 			"threadID", thread.threadID,
 			"socketFD", socketFD)
-		return
+		return span
 	}
-	event := "event!sut.inbound_recv"
-	if sock.isServer {
-		if thread.recordingSession.HasResponded() && bytes.HasPrefix(span, InboundRequestPrefix) {
-			countlog.Trace("event!sut.recv_from_inbound_found_responded",
-				"threadID", thread.threadID,
-				"socketFD", socketFD)
-			thread.shutdownRecordingSession()
-		}
-		thread.recordingSession.RecvFromInbound(thread, span, sock.addr, sock.unixAddr)
-		replayingSession := replaying.RetrieveTmp(sock.addr)
-		if replayingSession != nil {
-			nanoOffset := replayingSession.CallFromInbound.GetOccurredAt() - time.Now().UnixNano()
-			SetTimeOffset(int(time.Duration(nanoOffset) / time.Second))
-			thread.replayingSession = replayingSession
-			countlog.Trace("event!sut.received_replaying_session",
-				"threadID", thread.threadID,
-				"replayingSession", thread.replayingSession,
-				"addr", sock.addr)
-		}
-	} else {
-		event = "event!sut.outbound_recv"
+	if !sock.isServer {
+		countlog.Trace("event!sut.outbound_recv",
+			"threadID", thread.threadID,
+			"socketFD", socketFD,
+			"recordingSessionPtr", uintptr(unsafe.Pointer(thread.recordingSession)),
+			"addr", &sock.addr,
+			"content", span)
 		thread.recordingSession.RecvFromOutbound(thread, span, sock.addr, sock.localAddr, int(sock.socketFD))
+		return span
 	}
-	countlog.Trace(event,
+	countlog.Trace("event!sut.inbound_recv",
 		"threadID", thread.threadID,
 		"socketFD", socketFD,
+		"recordingSessionPtr", uintptr(unsafe.Pointer(thread.recordingSession)),
 		"addr", &sock.addr,
 		"content", span)
+	if envarg.IsTracing() && thread.recordingSession != nil {
+		span = sock.onRecv(thread.recordingSession, span)
+	}
+	if span == nil {
+		return nil
+	}
+	if thread.recordingSession.HasResponded() && bytes.HasPrefix(span, InboundRequestPrefix) {
+		countlog.Trace("event!sut.recv_from_inbound_found_responded",
+			"threadID", thread.threadID,
+			"socketFD", socketFD)
+		thread.shutdownRecordingSession()
+	}
+	thread.recordingSession.RecvFromInbound(thread, span, sock.addr, sock.unixAddr)
+	replayingSession := replaying.RetrieveTmp(sock.addr)
+	if replayingSession != nil {
+		nanoOffset := replayingSession.CallFromInbound.GetOccurredAt() - time.Now().UnixNano()
+		SetTimeOffset(int(time.Duration(nanoOffset) / time.Second))
+		thread.replayingSession = replayingSession
+		countlog.Trace("event!sut.received_replaying_session",
+			"threadID", thread.threadID,
+			"replayingSession", thread.replayingSession,
+			"addr", sock.addr)
+	}
+	return span
 }
 
 func (thread *Thread) OnAccept(serverSocketFD SocketFD, clientSocketFD SocketFD, addr net.TCPAddr) {
@@ -166,7 +191,7 @@ func (thread *Thread) OnAccept(serverSocketFD SocketFD, clientSocketFD SocketFD,
 	countlog.Debug("event!sut.accept",
 		"threadID", thread.threadID,
 		"serverSocketFD", serverSocketFD,
-		"clientSocketFD", clientSocketFD,
+		"socketFD", clientSocketFD,
 		"addr", &addr)
 }
 
@@ -216,7 +241,7 @@ func (thread *Thread) OnConnect(socketFD SocketFD, remoteAddr net.TCPAddr) {
 	}
 	setGlobalSock(socketFD, thread.socks[socketFD])
 	if envarg.IsReplaying() {
-		localAddr, err := replaying.BindFDToLocalAddr(int(socketFD))
+		localAddr, err := bindFDToLocalAddr(int(socketFD))
 		if err != nil {
 			countlog.Error("event!sut.failed to bind local addr", "err", err)
 			return
@@ -240,7 +265,7 @@ func (thread *Thread) OnConnectUnix(socketFD SocketFD, remoteAddr net.UnixAddr) 
 	setGlobalSock(socketFD, thread.socks[socketFD])
 	//TODO: replaying
 	if envarg.IsReplaying() {
-		localAddr, err := replaying.BindFDToLocalAddr(int(socketFD))
+		localAddr, err := bindFDToLocalAddr(int(socketFD))
 		if err != nil {
 			countlog.Error("event!sut.failed to bind local addr", "err", err)
 			return
@@ -257,41 +282,14 @@ func (thread *Thread) OnConnectUnix(socketFD SocketFD, remoteAddr net.UnixAddr) 
 type SendToFlags int
 
 func (thread *Thread) OnSendTo(socketFD SocketFD, span []byte, flags SendToFlags, addr net.UDPAddr) {
-	if addr.String() != "127.127.127.127:127" {
-		countlog.Trace("event!sut.sendto",
-			"threadID", thread.threadID,
-			"socketFD", socketFD,
-			"addr", &addr,
-			"content", span)
-		thread.recordingSession.SendUDP(thread, span, addr)
-		thread.replayingSession.SendUDP(thread, span, addr)
-		return
-	}
-	helperInfo := span
-	countlog.Trace("event!sut.received_helper_info",
+	countlog.Trace("event!sut.sendto",
 		"threadID", thread.threadID,
 		"socketFD", socketFD,
 		"addr", &addr,
-		"content", helperInfo)
-	newlinePos := bytes.IndexByte(helperInfo, '\n')
-	if newlinePos == -1 {
-		return
-	}
-	helperType := string(helperInfo[:newlinePos])
-	body := helperInfo[newlinePos+1:]
-	switch helperType {
-	case helperThreadShutdown:
-		thread.OnShutdown()
-	case helperCallFunction:
-		thread.replayingSession.CallFunction(thread, body)
-	case helperReturnFunction:
-		thread.replayingSession.ReturnFunction(thread, body)
-	case helperReadStorage:
-		thread.recordingSession.ReadStorage(thread, body)
-	default:
-		countlog.Debug("event!sut.unknown_helper",
-			"threadID", thread.threadID, "helperType", helperType)
-	}
+		"flags", flags,
+		"content", span)
+	thread.recordingSession.SendUDP(thread, span, addr)
+	thread.replayingSession.SendUDP(thread, span, addr)
 }
 
 func (thread *Thread) OnOpeningFile(fileName string, flags int) string {
@@ -367,9 +365,6 @@ func (thread *Thread) OnOpenedFile(fileFD FileFD, fileName string, flags int) {
 }
 
 func (thread *Thread) OnWrite(fileFD FileFD, content []byte) {
-	countlog.Trace("event!sut.write",
-		"threadID", thread.threadID,
-		"fileFD", fileFD)
 	file := thread.files[fileFD]
 	if file == nil {
 		return
@@ -406,13 +401,7 @@ func (thread *Thread) shutdownRecordingSession() {
 		return
 	}
 	newSession := recording.NewSession(int32(thread.threadID))
-	countlog.Trace("event!sut.shutdown_recording_session",
-		"threadID", thread.threadID,
-		"sessionId", thread.recordingSession.SessionId,
-		"nextSessionId", newSession.SessionId,
-		"sessionSummary", thread.recordingSession.Summary())
-	thread.recordingSession.NextSessionId = newSession.SessionId
-	thread.recordingSession.Shutdown(thread)
+	thread.recordingSession.Shutdown(thread, newSession)
 	thread.socks = map[SocketFD]*socket{} // socks on thread is a temp cache
 	thread.recordingSession = newSession
 }
