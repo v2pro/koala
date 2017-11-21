@@ -2,15 +2,16 @@ package recording
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"github.com/v2pro/koala/envarg"
 	"github.com/v2pro/plz/countlog"
 	"net"
 	"time"
-	"encoding/json"
-	"github.com/v2pro/koala/envarg"
 )
 
 type Session struct {
+	Context             string
 	ThreadId            int32
 	SessionId           string
 	TraceHeader         TraceHeader
