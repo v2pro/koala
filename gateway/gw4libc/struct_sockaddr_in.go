@@ -10,7 +10,6 @@ import (
 	"unsafe"
 	"github.com/v2pro/koala/ch"
 	"runtime"
-	"fmt"
 )
 
 var sockaddr_in_type = reflect.TypeOf((*C.struct_sockaddr_in)(nil)).Elem()
