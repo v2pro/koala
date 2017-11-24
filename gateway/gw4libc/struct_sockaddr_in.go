@@ -9,6 +9,8 @@ import (
 	"reflect"
 	"unsafe"
 	"github.com/v2pro/koala/ch"
+	"runtime"
+	"fmt"
 )
 
 var sockaddr_in_type = reflect.TypeOf((*C.struct_sockaddr_in)(nil)).Elem()
@@ -23,10 +25,12 @@ var sockaddr_in6_sin_family_field = ch.FieldOf(sockaddr_in6_type, "sin6_family")
 var sockaddr_in6_sin_port_field = ch.FieldOf(sockaddr_in6_type, "sin6_port")
 var sockaddr_in6_sin_addr_field = ch.FieldOf(sockaddr_in6_type, "sin6_addr")
 var in6_addr_type = reflect.TypeOf((*C.struct_in6_addr)(nil)).Elem()
-var in6_addr_s_addr_field = ch.FieldOf(in6_addr_type, "__in6_u")
+var in6_addr_s_addr_field *reflect.StructField
 
 func init() {
-	if in6_addr_s_addr_field == nil {
+	if runtime.GOOS == "linux" {
+		in6_addr_s_addr_field = ch.FieldOf(in6_addr_type, "__in6_u")
+	} else {
 		in6_addr_s_addr_field = ch.FieldOf(in6_addr_type, "__u6_addr")
 	}
 	//ch.Dump(in6_addr_type)

@@ -13,7 +13,7 @@ import (
 
 func init() {
 	envarg.SetupLogging()
-	witch.StartViewer(":8318")
+	witch.Start(":8318")
 	dir := envarg.GetenvFromC("KOALA_RECORD_TO_DIR")
 	if dir == "" {
 		countlog.Fatal("event!recorder.pleases specify KOALA_RECORD_TO_DIR")

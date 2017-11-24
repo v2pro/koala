@@ -8,7 +8,7 @@ import (
 
 func init() {
 	envarg.SetupLogging()
-	witch.StartViewer(":8318")
+	witch.Start(":8318")
 }
 
 func main() {
