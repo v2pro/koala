@@ -15,6 +15,16 @@ case $1 in
         export CGO_CPPFLAGS=$CGO_CFLAGS
         exec go build -tags="koala_recorder" -buildmode=c-shared -o output/koala-recorder.so github.com/v2pro/koala/cmd/recorder
         ;;
+    "vendor" )
+        if [ ! -d /tmp/build-golang/src/github.com/v2pro ]; then
+            mkdir -p /tmp/build-golang/src/github.com/v2pro
+            ln -s $PWD /tmp/build-golang/src/github.com/v2pro/koala
+        fi
+        export GOPATH=/tmp/build-golang
+        go get github.com/Masterminds/glide
+        cd /tmp/build-golang/src/github.com/v2pro/koala
+        exec $GOPATH/bin/glide i
+        ;;
 esac
 
 # build replayer by default
