@@ -1,6 +1,6 @@
 package gw4libc
 
-// #cgo koala_recorder CXXFLAGS: --std=c++11 -Wno-ignored-attributes
+// #cgo !koala_recorder CXXFLAGS: --std=c++11 -Wno-ignored-attributes
 // #cgo LDFLAGS: -ldl -lm
 // #include <stddef.h>
 // #include <netinet/in.h>
