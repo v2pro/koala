@@ -1,6 +1,6 @@
 package gw4libc
 
-// #cgo CXXFLAGS: --std=c++11 -Wno-ignored-attributes
+// #cgo !koala_recorder CXXFLAGS: --std=c++11 -Wno-ignored-attributes
 // #cgo LDFLAGS: -ldl -lm
 // #include <stddef.h>
 // #include <netinet/in.h>
@@ -19,10 +19,10 @@ import (
 	"github.com/v2pro/koala/gateway/gw4go"
 	"github.com/v2pro/koala/sut"
 	"github.com/v2pro/plz/countlog"
-	"net"
-	"unsafe"
-	"syscall"
 	"math"
+	"net"
+	"syscall"
+	"unsafe"
 )
 
 func init() {
