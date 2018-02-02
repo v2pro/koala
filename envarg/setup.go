@@ -3,27 +3,47 @@ package envarg
 import (
 	"os"
 	"github.com/v2pro/plz/countlog"
+	"github.com/v2pro/plz/countlog/output/hrf"
+	"github.com/v2pro/plz/countlog/output"
+	"github.com/v2pro/plz/countlog/output/compact"
+	"io"
+	"github.com/v2pro/plz/countlog/spi"
 )
 
 func SetupLogging() {
-	logWriter := countlog.NewAsyncLogWriter(
-		LogLevel(),
-		countlog.NewFileLogOutput(LogFile()))
+	countlog.SetMinLevel(LogLevel())
+	countlog.EventWriter = output.NewEventWriter(output.EventWriterConfig{
+		Format: createLogFormat(),
+		Writer: openLogFile(),
+	})
+}
+
+func openLogFile() io.Writer {
+	fileName := LogFile()
+	switch fileName {
+	case "STDOUT":
+		return os.Stdout
+	case "STDERR":
+		return os.Stderr
+	default:
+		file, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+		if err != nil {
+			spi.OnError(err)
+			return os.Stderr
+		}
+		return file
+	}
+}
+
+func createLogFormat() output.Format {
 	switch LogFormat() {
 	case "HumanReadableFormat":
-		logWriter.LogFormatter = &countlog.HumanReadableFormat{
-			ContextPropertyNames: []string{"threadID", "outboundSrc"},
-			StringLengthCap:      512,
-		}
+		return &hrf.Format{}
 	case "CompactFormat":
-		logWriter.LogFormatter = &countlog.CompactFormat{StringLengthCap: 512}
+		return &compact.Format{}
 	default:
 		os.Stderr.WriteString("unknown LogFormat: " + LogFormat() + "\n")
 		os.Stderr.Sync()
-		logWriter.LogFormatter = &countlog.CompactFormat{}
+		return &compact.Format{}
 	}
-	logWriter.EventWhitelist["event!replaying.talks_scored"] = true
-	//logWriter.EventWhitelist["event!sut.opening_file"] = true
-	logWriter.Start()
-	countlog.LogWriters = append(countlog.LogWriters, logWriter)
 }
