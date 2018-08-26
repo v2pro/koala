@@ -3,18 +3,23 @@ package envarg
 // #include <stdlib.h>
 import "C"
 import (
-	"net"
-	"strings"
 	"github.com/v2pro/plz/countlog"
+	"net"
+	"strconv"
+	"strings"
+	"time"
 	"unsafe"
 )
 
 var inboundAddr *net.TCPAddr
+var inboundReadTimeout = 100 * time.Millisecond
 var outboundAddr *net.TCPAddr
 var sutAddr *net.TCPAddr
 var logFile string
 var logLevel = countlog.LevelDebug
 var logFormat string
+var enableXdebug = false
+var xdebugPort int
 
 func init() {
 	initInboundAddr()
@@ -29,7 +34,11 @@ func init() {
 	if logFormat == "" {
 		logFormat = "HumanReadableFormat"
 	}
+	if isReplaying {
+		initXdebugPort()
+	}
 }
+
 func initLogLevel() {
 	logLevelStr := strings.ToUpper(GetenvFromC("KOALA_LOG_LEVEL"))
 	switch logLevelStr {
@@ -47,6 +56,7 @@ func initLogLevel() {
 		logLevel = countlog.LevelFatal
 	}
 }
+
 func initInboundAddr() {
 	addrStr := GetenvFromC("KOALA_INBOUND_ADDR")
 	if addrStr == "" {
@@ -57,6 +67,13 @@ func initInboundAddr() {
 		panic("can not resolve inbound addr: " + err.Error())
 	}
 	inboundAddr = addr
+
+	timeoutStr := GetenvFromC("KOALA_INBOUND_READ_TIMEOUT")
+	if timeoutStr != "" {
+		if readTimeout, err := time.ParseDuration(timeoutStr); err == nil {
+			inboundReadTimeout = readTimeout
+		}
+	}
 }
 
 func initOutboundAddr() {
@@ -83,6 +100,18 @@ func initSutAddr() {
 	sutAddr = addr
 }
 
+func initXdebugPort() {
+	// for replay mode
+	portStr := GetenvFromC("KOALA_XDEBUG_PORT")
+	if portStr == "" {
+		return
+	}
+	if portInt, err := strconv.Atoi(portStr); err == nil {
+		enableXdebug = true
+		xdebugPort = portInt
+	}
+}
+
 func IsReplaying() bool {
 	return isReplaying
 }
@@ -97,6 +126,10 @@ func IsTracing() bool {
 
 func InboundAddr() *net.TCPAddr {
 	return inboundAddr
+}
+
+func InboundReadTimeout() time.Duration {
+	return inboundReadTimeout
 }
 
 func SutAddr() *net.TCPAddr {
@@ -117,6 +150,14 @@ func LogLevel() int {
 
 func LogFormat() string {
 	return logFormat
+}
+
+func EnableXdebug() bool {
+	return enableXdebug
+}
+
+func XdebugPort() int {
+	return xdebugPort
 }
 
 // GetenvFromC to make getenv work in php-fpm child process

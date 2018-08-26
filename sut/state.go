@@ -1,13 +1,13 @@
 package sut
 
 import (
-	"sync"
 	"context"
-	"github.com/v2pro/koala/recording"
 	"github.com/v2pro/koala/envarg"
+	"github.com/v2pro/koala/recording"
 	"github.com/v2pro/plz/countlog"
-	"time"
 	"strconv"
+	"sync"
+	"time"
 )
 
 type SocketFD int
@@ -137,6 +137,7 @@ func newThread(threadID ThreadID) *Thread {
 		socks:          map[SocketFD]*socket{},
 		files:          map[FileFD]*file{},
 		lastAccessedAt: time.Now(),
+		ignoreSocks:    map[SocketFD]bool{},
 	}
 	if envarg.IsRecording() {
 		thread.recordingSession = recording.NewSession(int32(threadID))
