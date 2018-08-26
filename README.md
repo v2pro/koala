@@ -9,6 +9,9 @@
 * KOALA_OUTBOUND_ADDR: ip:port, the address all outgoing traffic will be redirected to
 * KOALA_LOG_FILE: STDOUT/STDERR/filepath, if using filepath, the log will rotate every hour
 * KOALA_LOG_LEVEL: TRACE/DEBUG/INFO/ERROR/FATAL
+* KOALA_INBOUND_READ_TIMEOUT: a duration string, set the timeout of inbound read response fron sut
+* KOALA_XDEBUG_PORT: port, the port of xdebug remote port, when replay a session with xdebug
+
 
 # Build tags
 
