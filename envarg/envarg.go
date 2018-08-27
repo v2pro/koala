@@ -24,7 +24,7 @@ var outboundBypassPort int
 func init() {
 	initInboundAddr()
 	initOutboundAddr()
-	initOutboundByPassPort()
+	initOutboundBypassPort()
 	initSutAddr()
 	logFile = GetenvFromC("KOALA_LOG_FILE")
 	if logFile == "" {
@@ -98,7 +98,7 @@ func initSutAddr() {
 	sutAddr = addr
 }
 
-func initOutboundByPassPort() {
+func initOutboundBypassPort() {
 	if !isReplaying {
 		return
 	}
