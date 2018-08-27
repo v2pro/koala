@@ -3,12 +3,13 @@ package envarg
 // #include <stdlib.h>
 import "C"
 import (
-	"github.com/v2pro/plz/countlog"
 	"net"
 	"strconv"
 	"strings"
 	"time"
 	"unsafe"
+
+	"github.com/v2pro/plz/countlog"
 )
 
 var inboundAddr *net.TCPAddr
@@ -18,12 +19,12 @@ var sutAddr *net.TCPAddr
 var logFile string
 var logLevel = countlog.LevelDebug
 var logFormat string
-var enableXdebug = false
-var xdebugPort int
+var outboundBypassPort int
 
 func init() {
 	initInboundAddr()
 	initOutboundAddr()
+	initOutboundByPassPort()
 	initSutAddr()
 	logFile = GetenvFromC("KOALA_LOG_FILE")
 	if logFile == "" {
@@ -33,9 +34,6 @@ func init() {
 	logFormat = GetenvFromC("KOALA_LOG_FORMAT")
 	if logFormat == "" {
 		logFormat = "HumanReadableFormat"
-	}
-	if isReplaying {
-		initXdebugPort()
 	}
 }
 
@@ -100,15 +98,16 @@ func initSutAddr() {
 	sutAddr = addr
 }
 
-func initXdebugPort() {
-	// for replay mode
-	portStr := GetenvFromC("KOALA_XDEBUG_PORT")
+func initOutboundByPassPort() {
+	if !isReplaying {
+		return
+	}
+	portStr := GetenvFromC("KOALA_OUTBOUND_BYPASS_PORT")
 	if portStr == "" {
 		return
 	}
 	if portInt, err := strconv.Atoi(portStr); err == nil {
-		enableXdebug = true
-		xdebugPort = portInt
+		outboundBypassPort = portInt
 	}
 }
 
@@ -152,12 +151,8 @@ func LogFormat() string {
 	return logFormat
 }
 
-func EnableXdebug() bool {
-	return enableXdebug
-}
-
-func XdebugPort() int {
-	return xdebugPort
+func OutboundBypassPort() int {
+	return outboundBypassPort
 }
 
 // GetenvFromC to make getenv work in php-fpm child process
