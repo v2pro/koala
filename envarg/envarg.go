@@ -4,21 +4,27 @@ package envarg
 import "C"
 import (
 	"net"
+	"strconv"
 	"strings"
-	"github.com/v2pro/plz/countlog"
+	"time"
 	"unsafe"
+
+	"github.com/v2pro/plz/countlog"
 )
 
 var inboundAddr *net.TCPAddr
+var inboundReadTimeout = 100 * time.Millisecond
 var outboundAddr *net.TCPAddr
 var sutAddr *net.TCPAddr
 var logFile string
 var logLevel = countlog.LevelDebug
 var logFormat string
+var outboundBypassPort int
 
 func init() {
 	initInboundAddr()
 	initOutboundAddr()
+	initOutboundBypassPort()
 	initSutAddr()
 	logFile = GetenvFromC("KOALA_LOG_FILE")
 	if logFile == "" {
@@ -30,6 +36,7 @@ func init() {
 		logFormat = "HumanReadableFormat"
 	}
 }
+
 func initLogLevel() {
 	logLevelStr := strings.ToUpper(GetenvFromC("KOALA_LOG_LEVEL"))
 	switch logLevelStr {
@@ -47,6 +54,7 @@ func initLogLevel() {
 		logLevel = countlog.LevelFatal
 	}
 }
+
 func initInboundAddr() {
 	addrStr := GetenvFromC("KOALA_INBOUND_ADDR")
 	if addrStr == "" {
@@ -57,6 +65,13 @@ func initInboundAddr() {
 		panic("can not resolve inbound addr: " + err.Error())
 	}
 	inboundAddr = addr
+
+	timeoutStr := GetenvFromC("KOALA_INBOUND_READ_TIMEOUT")
+	if timeoutStr != "" {
+		if readTimeout, err := time.ParseDuration(timeoutStr); err == nil {
+			inboundReadTimeout = readTimeout
+		}
+	}
 }
 
 func initOutboundAddr() {
@@ -83,6 +98,19 @@ func initSutAddr() {
 	sutAddr = addr
 }
 
+func initOutboundBypassPort() {
+	if !isReplaying {
+		return
+	}
+	portStr := GetenvFromC("KOALA_OUTBOUND_BYPASS_PORT")
+	if portStr == "" {
+		return
+	}
+	if portInt, err := strconv.Atoi(portStr); err == nil {
+		outboundBypassPort = portInt
+	}
+}
+
 func IsReplaying() bool {
 	return isReplaying
 }
@@ -97,6 +125,10 @@ func IsTracing() bool {
 
 func InboundAddr() *net.TCPAddr {
 	return inboundAddr
+}
+
+func InboundReadTimeout() time.Duration {
+	return inboundReadTimeout
 }
 
 func SutAddr() *net.TCPAddr {
@@ -117,6 +149,10 @@ func LogLevel() int {
 
 func LogFormat() string {
 	return logFormat
+}
+
+func OutboundBypassPort() int {
+	return outboundBypassPort
 }
 
 // GetenvFromC to make getenv work in php-fpm child process

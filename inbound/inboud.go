@@ -1,14 +1,15 @@
 package inbound
 
 import (
-	"net/http"
+	"encoding/json"
 	"io/ioutil"
 	"net"
+	"net/http"
 	"time"
-	"github.com/v2pro/koala/replaying"
+
 	"github.com/v2pro/koala/envarg"
-	"encoding/json"
 	"github.com/v2pro/koala/internal"
+	"github.com/v2pro/koala/replaying"
 	"github.com/v2pro/plz/countlog"
 )
 
@@ -76,7 +77,7 @@ func handleInbound(respWriter http.ResponseWriter, req *http.Request) {
 		return
 	}
 	replayedSession := replayingSession.Finish(response)
-	marshaledReplayedSession, err := json.MarshalIndent(replayedSession,  "", "  ")
+	marshaledReplayedSession, err := json.MarshalIndent(replayedSession, "", "  ")
 	if err != nil {
 		countlog.Error("event!inbound.marshal replaying session failed", "err", err)
 		return
@@ -90,7 +91,12 @@ func handleInbound(respWriter http.ResponseWriter, req *http.Request) {
 
 func readResponse(conn *net.TCPConn) ([]byte, error) {
 	buf := make([]byte, 1024)
-	conn.SetReadDeadline(time.Now().Add(time.Second * 30))
+	firstByteTimeout := time.Second * 30
+	timeout := envarg.InboundReadTimeout()
+	if timeout >= firstByteTimeout {
+		firstByteTimeout = timeout
+	}
+	conn.SetReadDeadline(time.Now().Add(firstByteTimeout))
 	bytesRead, err := conn.Read(buf)
 	if err != nil {
 		countlog.Error("event!inbound.failed to read first packet from sut", "err", err)
@@ -99,7 +105,7 @@ func readResponse(conn *net.TCPConn) ([]byte, error) {
 	response := []byte{}
 	response = append(response, buf[:bytesRead]...)
 	for {
-		conn.SetReadDeadline(time.Now().Add(time.Millisecond * 100))
+		conn.SetReadDeadline(time.Now().Add(timeout))
 		bytesRead, err = conn.Read(buf)
 		if err != nil {
 			break

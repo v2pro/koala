@@ -2,6 +2,7 @@ package sut
 
 import (
 	"bytes"
+	"context"
 	"github.com/v2pro/koala/envarg"
 	"github.com/v2pro/koala/recording"
 	"github.com/v2pro/koala/replaying"
@@ -10,9 +11,8 @@ import (
 	"net"
 	"os"
 	"strings"
-	"time"
 	"sync"
-	"context"
+	"time"
 	"unsafe"
 )
 
@@ -33,7 +33,8 @@ type Thread struct {
 	recordingSession *recording.Session
 	replayingSession *replaying.ReplayingSession
 	lastAccessedAt   time.Time
-	helperResponse	 []byte
+	helperResponse   []byte
+	ignoreSocks      map[SocketFD]bool
 }
 
 type SendFlags int
@@ -42,8 +43,8 @@ func (thread *Thread) ExportState() map[string]interface{} {
 	thread.mutex.Lock()
 	defer thread.mutex.Unlock()
 	state := map[string]interface{}{
-		"ThreadID": thread.threadID,
-		"LastAccessedAt": thread.lastAccessedAt,
+		"ThreadID":         thread.threadID,
+		"LastAccessedAt":   thread.lastAccessedAt,
 		"RecordingSession": thread.recordingSession,
 	}
 	return state
@@ -54,6 +55,9 @@ func (thread *Thread) BeforeSend(socketFD SocketFD, bodySize int, flags SendFlag
 		return nil, bodySize
 	}
 	if thread.recordingSession == nil {
+		return nil, bodySize
+	}
+	if thread.ignoreSocks[socketFD] {
 		return nil, bodySize
 	}
 	sock := thread.lookupSocket(socketFD)
@@ -79,6 +83,10 @@ func (thread *Thread) BeforeSend(socketFD SocketFD, bodySize int, flags SendFlag
 
 func (thread *Thread) OnSend(socketFD SocketFD, span []byte, flags SendFlags, extraHeaderSentSize int) {
 	if len(span) == 0 {
+		return
+	}
+
+	if thread.ignoreSocks[socketFD] {
 		return
 	}
 	sock := thread.lookupSocket(socketFD)
@@ -119,6 +127,9 @@ func (thread *Thread) AfterSend(socketFD SocketFD, extraHeaderSentSize int, body
 	if !envarg.IsTracing() {
 		return
 	}
+	if thread.ignoreSocks[socketFD] {
+		return
+	}
 	sock := getGlobalSock(socketFD)
 	if sock == nil {
 		countlog.Warn("event!sut.unknown-after-send",
@@ -132,6 +143,9 @@ func (thread *Thread) AfterSend(socketFD SocketFD, extraHeaderSentSize int, body
 type RecvFlags int
 
 func (thread *Thread) OnRecv(socketFD SocketFD, span []byte, flags RecvFlags) []byte {
+	if thread.ignoreSocks[socketFD] {
+		return span
+	}
 	sock := thread.lookupSocket(socketFD)
 	if sock == nil {
 		countlog.Warn("event!sut.unknown-recv",
@@ -404,4 +418,12 @@ func (thread *Thread) shutdownRecordingSession() {
 	thread.recordingSession.Shutdown(thread, newSession)
 	thread.socks = map[SocketFD]*socket{} // socks on thread is a temp cache
 	thread.recordingSession = newSession
+}
+
+func (thread *Thread) IgnoreSocketFD(socketFD SocketFD, remoteAddr net.TCPAddr) {
+	countlog.Trace("event!sut.ignoreSocket",
+		"threadID", thread.threadID,
+		"socketFD", socketFD,
+		"addr", &remoteAddr)
+	thread.ignoreSocks[socketFD] = true
 }
