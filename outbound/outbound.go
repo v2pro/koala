@@ -2,14 +2,15 @@ package outbound
 
 import (
 	"context"
+	"io"
+	"net"
+	"time"
+
 	"github.com/v2pro/koala/envarg"
 	"github.com/v2pro/koala/internal"
 	"github.com/v2pro/koala/recording"
 	"github.com/v2pro/koala/replaying"
 	"github.com/v2pro/plz/countlog"
-	"io"
-	"net"
-	"time"
 )
 
 const fakeIndexNotMatched = -1
