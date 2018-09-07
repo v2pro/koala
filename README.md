@@ -11,7 +11,7 @@
 * KOALA_LOG_LEVEL: TRACE/DEBUG/INFO/ERROR/FATAL
 * KOALA_INBOUND_READ_TIMEOUT: a duration string, set the timeout of inbound read response from sut
 * KOALA_OUTBOUND_BYPASS_PORT: port, the port of outbound will bypass, eg replay a session with xdebug and pass xdebug remote port
-
+* KOALA_GC_GLOBAL_STATUS_TIMEOUT: a duration string, set the timeout of gc for koala global status, eg thread, socket
 
 # Build tags
 

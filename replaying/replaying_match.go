@@ -74,7 +74,6 @@ func (replayingSession *ReplayingSession) MatchOutboundTalk(
 		}
 	}
 	return maxScoreIndex, mark, replayingSession.CallOutbounds[maxScoreIndex]
-
 }
 
 func (replayingSession *ReplayingSession) loadKeys() [][]byte {
