@@ -2,12 +2,13 @@ package sut
 
 import (
 	"context"
-	"github.com/v2pro/koala/envarg"
-	"github.com/v2pro/koala/recording"
-	"github.com/v2pro/plz/countlog"
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/v2pro/koala/envarg"
+	"github.com/v2pro/koala/recording"
+	"github.com/v2pro/plz/countlog"
 )
 
 type SocketFD int
@@ -182,8 +183,12 @@ func gcGlobalSocks() int {
 	now := time.Now()
 	newMap := map[SocketFD]*socket{}
 	expiredSocksCount := 0
+	timeout := 5 * time.Minute
+	if envarg.GcGlobalStatusTimeout() > timeout {
+		timeout = envarg.GcGlobalStatusTimeout()
+	}
 	for fd, sock := range globalSocks {
-		if now.Sub(sock.lastAccessedAt) < time.Minute*5 {
+		if now.Sub(sock.lastAccessedAt) < envarg.GcGlobalStatusTimeout() {
 			newMap[fd] = sock
 		} else {
 			expiredSocksCount++
@@ -200,7 +205,7 @@ func gcGlobalRealThreads() int {
 	newMap := map[ThreadID]*Thread{}
 	expiredThreadsCount := 0
 	for threadId, thread := range globalThreads {
-		if now.Sub(thread.lastAccessedAt) < time.Second*5 {
+		if now.Sub(thread.lastAccessedAt) < envarg.GcGlobalStatusTimeout() {
 			newMap[threadId] = thread
 		} else {
 			shutdownThread(thread)
@@ -218,7 +223,7 @@ func gcGlobalVirtualThreads() int {
 	newMap := map[ThreadID]*Thread{}
 	expiredThreadsCount := 0
 	for threadId, thread := range globalVirtualThreads {
-		if now.Sub(thread.lastAccessedAt) < time.Second*5 {
+		if now.Sub(thread.lastAccessedAt) < envarg.GcGlobalStatusTimeout() {
 			newMap[threadId] = thread
 		} else {
 			shutdownThread(thread)

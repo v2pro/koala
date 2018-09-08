@@ -1,12 +1,13 @@
 package replaying
 
 import (
-	"github.com/v2pro/koala/recording"
-	"github.com/v2pro/plz/countlog"
-	"context"
 	"bytes"
+	"context"
 	"fmt"
 	"math"
+
+	"github.com/v2pro/koala/recording"
+	"github.com/v2pro/plz/countlog"
 )
 
 var expect100 = []byte("Expect: 100-continue")
@@ -52,6 +53,8 @@ func (replayingSession *ReplayingSession) MatchOutboundTalk(
 	countlog.Trace("event!replaying.talks_scored",
 		"ctx", ctx,
 		"lastMatchedIndex", lastMatchedIndex,
+		"maxScoreIndex", maxScoreIndex,
+		"maxScore", maxScore,
 		"totalScore", len(chunks),
 		"scores", func() interface{} {
 			return fmt.Sprintf("%v", scores)
@@ -71,7 +74,6 @@ func (replayingSession *ReplayingSession) MatchOutboundTalk(
 		}
 	}
 	return maxScoreIndex, mark, replayingSession.CallOutbounds[maxScoreIndex]
-
 }
 
 func (replayingSession *ReplayingSession) loadKeys() [][]byte {
@@ -104,7 +106,7 @@ func cutToChunks(key []byte, unit int) [][]byte {
 		}
 	}
 	chunkCount := len(key) / unit
-	for i := 0; i < len(key)/unit; i++ {
+	for i := 0; i < chunkCount; i++ {
 		chunks = append(chunks, key[i*unit:(i+1)*unit])
 	}
 	lastChunk := key[chunkCount*unit:]
@@ -128,5 +130,5 @@ func findReadableChunk(key []byte) (int, int) {
 	if end == -1 {
 		return start, len(key) - start
 	}
-	return start, end-start
+	return start, end - start
 }

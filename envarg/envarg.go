@@ -20,6 +20,7 @@ var logFile string
 var logLevel = countlog.LevelDebug
 var logFormat string
 var outboundBypassPort int
+var gcGlobalStatusTimeout = 5 * time.Second
 
 func init() {
 	initInboundAddr()
@@ -35,6 +36,16 @@ func init() {
 	if logFormat == "" {
 		logFormat = "HumanReadableFormat"
 	}
+	initGcGlobalStatusTimeout()
+	countlog.Trace("event!koala.envarg_init",
+		"logLevel", logLevel,
+		"logFile", logFile,
+		"logFormat", logFormat,
+		"inboundReadTimeout", inboundReadTimeout,
+		"outboundBypassPort", outboundBypassPort,
+		"isReplaying", IsReplaying(),
+		"isRecording", IsRecording(),
+		"isTracing", IsTracing())
 }
 
 func initLogLevel() {
@@ -111,6 +122,15 @@ func initOutboundBypassPort() {
 	}
 }
 
+func initGcGlobalStatusTimeout() {
+	timeoutStr := GetenvFromC("KOALA_GC_GLOBAL_STATUS_TIMEOUT")
+	if timeoutStr != "" {
+		if timeout, err := time.ParseDuration(timeoutStr); err == nil {
+			gcGlobalStatusTimeout = timeout
+		}
+	}
+}
+
 func IsReplaying() bool {
 	return isReplaying
 }
@@ -153,6 +173,10 @@ func LogFormat() string {
 
 func OutboundBypassPort() int {
 	return outboundBypassPort
+}
+
+func GcGlobalStatusTimeout() time.Duration {
+	return gcGlobalStatusTimeout
 }
 
 // GetenvFromC to make getenv work in php-fpm child process

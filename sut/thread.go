@@ -120,7 +120,8 @@ func (thread *Thread) OnSend(socketFD SocketFD, span []byte, flags SendFlags, ex
 		"recordingSessionPtr", uintptr(unsafe.Pointer(thread.recordingSession)),
 		"addr", &sock.addr,
 		"flags", flags,
-		"content", span)
+		"content", span,
+		"contentLen", len(span))
 }
 
 func (thread *Thread) AfterSend(socketFD SocketFD, extraHeaderSentSize int, bodySentSize int) {
@@ -159,7 +160,8 @@ func (thread *Thread) OnRecv(socketFD SocketFD, span []byte, flags RecvFlags) []
 			"socketFD", socketFD,
 			"recordingSessionPtr", uintptr(unsafe.Pointer(thread.recordingSession)),
 			"addr", &sock.addr,
-			"content", span)
+			"content", span,
+			"contentLen", len(span))
 		thread.recordingSession.RecvFromOutbound(thread, span, sock.addr, sock.localAddr, int(sock.socketFD))
 		return span
 	}
@@ -168,7 +170,8 @@ func (thread *Thread) OnRecv(socketFD SocketFD, span []byte, flags RecvFlags) []
 		"socketFD", socketFD,
 		"recordingSessionPtr", uintptr(unsafe.Pointer(thread.recordingSession)),
 		"addr", &sock.addr,
-		"content", span)
+		"content", span,
+		"contentLen", len(span))
 	if envarg.IsTracing() && thread.recordingSession != nil {
 		span = sock.onRecv(thread.recordingSession, span)
 	}
@@ -314,6 +317,7 @@ func (thread *Thread) OnOpeningFile(fileName string, flags int) string {
 	if thread.replayingSession == nil {
 		return ""
 	}
+	originalFileName := fileName
 	shouldTrace := thread.replayingSession.ShouldTraceFile(fileName)
 	fileName = thread.tryMockFile(fileName)
 	if shouldTrace {
@@ -325,6 +329,11 @@ func (thread *Thread) OnOpeningFile(fileName string, flags int) string {
 	if shouldTrace {
 		fileName = thread.instrumentFile(fileName)
 	}
+	countlog.Trace("event!sut.opening_file",
+		"threadID", thread.threadID,
+		"shouldTrace", shouldTrace,
+		"originalFile", originalFileName,
+		"finalFile", fileName)
 	return fileName
 }
 
