@@ -61,7 +61,6 @@ func handleOutbound(conn *net.TCPConn) {
 	lastMatchedIndex := -1
 	ctx := context.WithValue(context.Background(), "outboundSrc", tcpAddr.String())
 	protocol := ""
-	replayingSession := replaying.RetrieveTmp(*tcpAddr)
 	for i := 0; i < 1024; i++ {
 		guessedProtocol, request := readRequest(ctx, conn, buf, i == 0)
 		if guessedProtocol != "" {
@@ -74,6 +73,7 @@ func handleOutbound(conn *net.TCPConn) {
 			countlog.Warn("event!outbound.received empty request", "ctx", ctx, "i", i)
 			return
 		}
+		replayingSession := replaying.RetrieveTmp(*tcpAddr)
 		if replayingSession == nil {
 			if len(request) == 0 {
 				countlog.Warn("event!outbound.read request empty", "ctx", ctx, "i", i)
@@ -159,6 +159,7 @@ func readRequest(ctx context.Context, conn *net.TCPConn, buf []byte, isFirstPack
 	}
 	protocol := ""
 	if err != nil {
+		countlog.Trace("event!outbound.read_request_first_read_err", "ctx", ctx, "err", err)
 		if isFirstPacket {
 			countlog.Debug("event!outbound.write_mysql_greeting", "ctx", ctx)
 			_, err := conn.Write(mysqlGreeting)
@@ -170,7 +171,6 @@ func readRequest(ctx context.Context, conn *net.TCPConn, buf []byte, isFirstPack
 			}
 			protocol = "mysql"
 		}
-		countlog.Trace("event!outbound.read_request_first_packet_err", "ctx", ctx, "err", err)
 	} else {
 		request = append(request, buf[:bytesRead]...)
 	}
@@ -183,9 +183,7 @@ func readRequest(ctx context.Context, conn *net.TCPConn, buf []byte, isFirstPack
 		}
 		request = append(request, buf[:bytesRead]...)
 	}
-	countlog.Debug("event!outbound.request",
-		"ctx", ctx,
-		"content", request)
+	countlog.Debug("event!outbound.request", "ctx", ctx, "content", request)
 	return protocol, request
 }
 
