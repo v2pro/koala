@@ -38,7 +38,13 @@ func (replayingSession *ReplayingSession) MatchOutboundTalk(
 			if pos >= 0 {
 				reqCandidates[j] = reqCandidate[pos:]
 				if chunkIndex == 0 && lastMatchedIndex == -1 {
-					scores[j] += len(chunks) // first chunk has more weight
+					scores[j] += len(chunks) // connect first chunk has more weight +
+				} else if chunkIndex == 0 && pos == 0 {
+					moreScore := len(chunks) / 2
+					if moreScore <= 1 {
+						moreScore = 2
+					}
+					scores[j] += moreScore // first chunk full match has more weight, at lease 2
 				} else {
 					scores[j]++
 				}
@@ -50,6 +56,7 @@ func (replayingSession *ReplayingSession) MatchOutboundTalk(
 			}
 		}
 	}
+
 	countlog.Trace("event!replaying.talks_scored",
 		"ctx", ctx,
 		"lastMatchedIndex", lastMatchedIndex,
