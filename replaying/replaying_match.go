@@ -57,8 +57,16 @@ func (replayingSession *ReplayingSession) MatchOutboundTalk(
 		}
 	}
 
+	// 多个 maxScore，优先从上一次成功匹配的 Index 之后开始，取第一个 maxScore，尤其是从 0 开始全部重新匹配时
+	for j, score := range scores {
+		if score == maxScore && replayingSession.lastMaxScoreIndex < j {
+			maxScoreIndex = j
+			break
+		}
+	}
 	countlog.Trace("event!replaying.talks_scored",
 		"ctx", ctx,
+		"lastMaxScoreIndex", replayingSession.lastMaxScoreIndex,
 		"lastMatchedIndex", lastMatchedIndex,
 		"maxScoreIndex", maxScoreIndex,
 		"maxScore", maxScore,
@@ -79,6 +87,9 @@ func (replayingSession *ReplayingSession) MatchOutboundTalk(
 		if mark < 0.1 {
 			return -1, 0, nil
 		}
+	}
+	if maxScoreIndex > replayingSession.lastMaxScoreIndex {
+		replayingSession.lastMaxScoreIndex = maxScoreIndex
 	}
 	return maxScoreIndex, mark, replayingSession.CallOutbounds[maxScoreIndex]
 }

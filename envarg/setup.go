@@ -1,8 +1,8 @@
 package envarg
 
 import (
-	"os"
 	"github.com/v2pro/plz/countlog"
+	"os"
 )
 
 func SetupLogging() {
@@ -13,7 +13,7 @@ func SetupLogging() {
 	case "HumanReadableFormat":
 		logWriter.LogFormatter = &countlog.HumanReadableFormat{
 			ContextPropertyNames: []string{"threadID", "outboundSrc"},
-			StringLengthCap:      512,
+			StringLengthCap:      1024,
 		}
 	case "CompactFormat":
 		logWriter.LogFormatter = &countlog.CompactFormat{StringLengthCap: 512}

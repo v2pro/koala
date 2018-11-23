@@ -1,29 +1,31 @@
 package replaying
 
 import (
+	"context"
+	"encoding/json"
 	"github.com/v2pro/koala/recording"
 	"github.com/v2pro/plz/countlog"
-	"context"
 	"net"
-	"encoding/json"
-	"strings"
 	"strconv"
+	"strings"
 )
 
 type ReplayingSession struct {
-	SessionId       string
-	CallFromInbound *recording.CallFromInbound
-	ReturnInbound   *recording.ReturnInbound
-	CallOutbounds   []*recording.CallOutbound
-	RedirectDirs    map[string]string
-	MockFiles       map[string][]byte
-	TracePaths      []string
-	actionCollector chan ReplayedAction
+	SessionId         string
+	CallFromInbound   *recording.CallFromInbound
+	ReturnInbound     *recording.ReturnInbound
+	CallOutbounds     []*recording.CallOutbound
+	RedirectDirs      map[string]string
+	MockFiles         map[string][]byte
+	TracePaths        []string
+	actionCollector   chan ReplayedAction
+	lastMaxScoreIndex int
 }
 
 func NewReplayingSession() *ReplayingSession {
 	return &ReplayingSession{
-		actionCollector: make(chan ReplayedAction, 40960),
+		actionCollector:   make(chan ReplayedAction, 40960),
+		lastMaxScoreIndex: -1,
 	}
 }
 

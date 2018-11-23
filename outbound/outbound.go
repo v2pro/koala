@@ -56,7 +56,7 @@ func handleOutbound(conn *net.TCPConn) {
 	}()
 	defer conn.Close()
 	tcpAddr := conn.RemoteAddr().(*net.TCPAddr)
-	countlog.Trace("event!outbound.new_conn", "addr", *tcpAddr)
+	countlog.Trace("event!outbound.new_conn", "addr", tcpAddr)
 	buf := make([]byte, 1024)
 	lastMatchedIndex := -1
 	ctx := context.WithValue(context.Background(), "outboundSrc", tcpAddr.String())
@@ -86,9 +86,7 @@ func handleOutbound(conn *net.TCPConn) {
 				}
 			}
 			countlog.Error("event!outbound.outbound can not find replaying session",
-				"ctx", ctx,
-				"addr", *tcpAddr,
-				"content", request)
+				"ctx", ctx, "addr", tcpAddr, "content", request, "protocol", protocol)
 			return
 		}
 		callOutbound := replaying.NewCallOutbound(*tcpAddr, request)
@@ -183,7 +181,8 @@ func readRequest(ctx context.Context, conn *net.TCPConn, buf []byte, isFirstPack
 		}
 		request = append(request, buf[:bytesRead]...)
 	}
-	countlog.Debug("event!outbound.request", "ctx", ctx, "content", request)
+	countlog.Debug("event!outbound.request", "ctx", ctx, "content", request,
+		"isFirstPacket", isFirstPacket, "protocol", protocol)
 	return protocol, request
 }
 
