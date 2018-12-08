@@ -59,7 +59,8 @@ func on_connect(threadID C.pid_t, socketFD C.int, remoteAddr *C.struct_sockaddr_
 		IP:   ch.Int2ip(sockaddr_in_sin_addr_get(remoteAddr)),
 		Port: int(ch.Ntohs(sockaddr_in_sin_port_get(remoteAddr))),
 	}
-	if origAddr.String() == "127.0.0.1:18500" || (envarg.IsReplaying() && origAddr.Port == envarg.OutboundBypassPort()) {
+	origAddrStr := origAddr.String()
+	if origAddrStr == "127.0.0.1:18500" || (envarg.IsReplaying() && envarg.IsOutboundBypassPort(origAddr.Port)) {
 		sut.OperateThread(sut.ThreadID(threadID), func(thread *sut.Thread) {
 			thread.IgnoreSocketFD(sut.SocketFD(socketFD), origAddr)
 		})
@@ -68,10 +69,9 @@ func on_connect(threadID C.pid_t, socketFD C.int, remoteAddr *C.struct_sockaddr_
 	sut.OperateThread(sut.ThreadID(threadID), func(thread *sut.Thread) {
 		thread.OnConnect(sut.SocketFD(socketFD), origAddr)
 	})
-	if envarg.IsReplaying() {
+	if envarg.IsReplaying() && origAddrStr != envarg.OutboundAddr().String() {
 		countlog.Trace("event!gw4libc.redirect_connect_target",
-			"origAddr", origAddr,
-			"redirectTo", envarg.OutboundAddr())
+			"origAddr", &origAddr, "redirectTo", envarg.OutboundAddr())
 		sockaddr_in_sin_addr_set(remoteAddr, ch.Ip2int(envarg.OutboundAddr().IP))
 		sockaddr_in_sin_port_set(remoteAddr, ch.Htons(uint16(envarg.OutboundAddr().Port)))
 	}

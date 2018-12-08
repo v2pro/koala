@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/v2pro/koala/envarg"
 	"github.com/v2pro/koala/recording"
 	"github.com/v2pro/plz/countlog"
 )
@@ -13,6 +14,22 @@ import (
 var expect100 = []byte("Expect: 100-continue")
 
 func (replayingSession *ReplayingSession) MatchOutboundTalk(
+	ctx context.Context, connLastMatchedIndex int, request []byte) (int, float64, *recording.CallOutbound) {
+
+	if envarg.ReplayingMatchStrategy() == replayingSimHashMatch {
+		return replayingSession.similarityMatch(ctx, connLastMatchedIndex, request)
+	} else {
+		lastMatchedIndex, mark, matchedTalk := replayingSession.chunkMatch(ctx, connLastMatchedIndex, request)
+		if matchedTalk == nil && connLastMatchedIndex >= 0 {
+			// rematch from begin and lastMatchedIndex = -1 maybe first chunk has more weight
+			// TODO: reduce cutToChunks to once, now is twice
+			return replayingSession.chunkMatch(ctx, -1, request)
+		}
+		return lastMatchedIndex, mark, matchedTalk
+	}
+}
+
+func (replayingSession *ReplayingSession) chunkMatch(
 	ctx context.Context, lastMatchedIndex int, request []byte) (int, float64, *recording.CallOutbound) {
 	unit := 16
 	chunks := cutToChunks(request, unit)
@@ -57,8 +74,16 @@ func (replayingSession *ReplayingSession) MatchOutboundTalk(
 		}
 	}
 
+	// 多个 maxScore，优先从上一次成功匹配的 Index 之后开始，取第一个 maxScore，尤其是从 0 开始全部重新匹配时
+	for j, score := range scores {
+		if score == maxScore && replayingSession.lastMaxScoreIndex < j {
+			maxScoreIndex = j
+			break
+		}
+	}
 	countlog.Trace("event!replaying.talks_scored",
 		"ctx", ctx,
+		"lastMaxScoreIndex", replayingSession.lastMaxScoreIndex,
 		"lastMatchedIndex", lastMatchedIndex,
 		"maxScoreIndex", maxScoreIndex,
 		"maxScore", maxScore,
@@ -79,6 +104,9 @@ func (replayingSession *ReplayingSession) MatchOutboundTalk(
 		if mark < 0.1 {
 			return -1, 0, nil
 		}
+	}
+	if maxScoreIndex > replayingSession.lastMaxScoreIndex {
+		replayingSession.lastMaxScoreIndex = maxScoreIndex
 	}
 	return maxScoreIndex, mark, replayingSession.CallOutbounds[maxScoreIndex]
 }
@@ -137,5 +165,5 @@ func findReadableChunk(key []byte) (int, int) {
 	if end == -1 {
 		return start, len(key) - start
 	}
-	return start, end - start
+	return start, end
 }
