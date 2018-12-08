@@ -19,36 +19,33 @@ var sutAddr *net.TCPAddr
 var logFile string
 var logLevel = countlog.LevelDebug
 var logFormat string
-var outboundBypassPort int
+var outboundBypassPorts = make(map[int]bool, 10)
 var gcGlobalStatusTimeout = 5 * time.Second
+var replayingMatchStrategy string
 
 func init() {
 	initInboundAddr()
 	initOutboundAddr()
-	initOutboundBypassPort()
 	initSutAddr()
+	initOutboundBypassPort()
+	initReplayingMatchStrategy()
+	initGcGlobalStatusTimeout()
+	initLog()
+
+	countlog.Trace("event!koala.envarg_init",
+		"logLevel", logLevel, "logFile", logFile, "logFormat", logFormat,
+		"inboundReadTimeout", inboundReadTimeout,
+		"outboundBypassPorts", outboundBypassPorts,
+		"replayingMatchStrategy", replayingMatchStrategy,
+		"isReplaying", IsReplaying(), "isRecording", IsRecording(), "isTracing", IsTracing())
+}
+
+func initLog() {
 	logFile = GetenvFromC("KOALA_LOG_FILE")
 	if logFile == "" {
 		logFile = "STDOUT"
 	}
-	initLogLevel()
-	logFormat = GetenvFromC("KOALA_LOG_FORMAT")
-	if logFormat == "" {
-		logFormat = "HumanReadableFormat"
-	}
-	initGcGlobalStatusTimeout()
-	countlog.Trace("event!koala.envarg_init",
-		"logLevel", logLevel,
-		"logFile", logFile,
-		"logFormat", logFormat,
-		"inboundReadTimeout", inboundReadTimeout,
-		"outboundBypassPort", outboundBypassPort,
-		"isReplaying", IsReplaying(),
-		"isRecording", IsRecording(),
-		"isTracing", IsTracing())
-}
 
-func initLogLevel() {
 	logLevelStr := strings.ToUpper(GetenvFromC("KOALA_LOG_LEVEL"))
 	switch logLevelStr {
 	case "TRACE":
@@ -63,6 +60,11 @@ func initLogLevel() {
 		logLevel = countlog.LevelError
 	case "FATAL":
 		logLevel = countlog.LevelFatal
+	}
+
+	logFormat = GetenvFromC("KOALA_LOG_FORMAT")
+	if logFormat == "" {
+		logFormat = "HumanReadableFormat"
 	}
 }
 
@@ -117,8 +119,10 @@ func initOutboundBypassPort() {
 	if portStr == "" {
 		return
 	}
-	if portInt, err := strconv.Atoi(portStr); err == nil {
-		outboundBypassPort = portInt
+	for _, port := range strings.Split(portStr, ",") {
+		if portInt, err := strconv.Atoi(port); err == nil {
+			outboundBypassPorts[portInt] = true
+		}
 	}
 }
 
@@ -128,6 +132,14 @@ func initGcGlobalStatusTimeout() {
 		if timeout, err := time.ParseDuration(timeoutStr); err == nil {
 			gcGlobalStatusTimeout = timeout
 		}
+	}
+}
+
+func initReplayingMatchStrategy() {
+	replayingMatchStrategy = ""
+	strategyStr := GetenvFromC("KOALA_REPLAYING_MATCH_STRATEGY")
+	if strategyStr != "" {
+		replayingMatchStrategy = strings.ToLower(strategyStr)
 	}
 }
 
@@ -171,12 +183,19 @@ func LogFormat() string {
 	return logFormat
 }
 
-func OutboundBypassPort() int {
-	return outboundBypassPort
+func IsOutboundBypassPort(portInt int) bool {
+	if _, ok := outboundBypassPorts[portInt]; ok {
+		return true
+	}
+	return false
 }
 
 func GcGlobalStatusTimeout() time.Duration {
 	return gcGlobalStatusTimeout
+}
+
+func ReplayingMatchStrategy() string {
+	return replayingMatchStrategy
 }
 
 // GetenvFromC to make getenv work in php-fpm child process

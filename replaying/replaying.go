@@ -3,11 +3,12 @@ package replaying
 import (
 	"context"
 	"encoding/json"
-	"github.com/v2pro/koala/recording"
-	"github.com/v2pro/plz/countlog"
 	"net"
 	"strconv"
 	"strings"
+
+	"github.com/v2pro/koala/recording"
+	"github.com/v2pro/plz/countlog"
 )
 
 type ReplayingSession struct {
@@ -19,7 +20,7 @@ type ReplayingSession struct {
 	MockFiles         map[string][]byte
 	TracePaths        []string
 	actionCollector   chan ReplayedAction
-	lastMaxScoreIndex int
+	lastMaxScoreIndex int // outbounds level's last matched index
 }
 
 func NewReplayingSession() *ReplayingSession {

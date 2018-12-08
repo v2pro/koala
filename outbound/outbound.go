@@ -58,9 +58,10 @@ func handleOutbound(conn *net.TCPConn) {
 	tcpAddr := conn.RemoteAddr().(*net.TCPAddr)
 	countlog.Trace("event!outbound.new_conn", "addr", tcpAddr)
 	buf := make([]byte, 1024)
-	lastMatchedIndex := -1
+	connLastMatchedIndex := fakeIndexNotMatched
 	ctx := context.WithValue(context.Background(), "outboundSrc", tcpAddr.String())
 	protocol := ""
+	beginTime := time.Now()
 	for i := 0; i < 1024; i++ {
 		guessedProtocol, request := readRequest(ctx, conn, buf, i == 0)
 		if guessedProtocol != "" {
@@ -100,11 +101,8 @@ func handleOutbound(conn *net.TCPConn) {
 		}
 		var matchedTalk *recording.CallOutbound
 		var mark float64
-		lastMatchedIndex, mark, matchedTalk = replayingSession.MatchOutboundTalk(ctx, lastMatchedIndex, request)
+		connLastMatchedIndex, mark, matchedTalk = replayingSession.MatchOutboundTalk(ctx, connLastMatchedIndex, request)
 		if callOutbound.MatchedActionIndex != fakeIndexSimulated {
-			if matchedTalk == nil && lastMatchedIndex != 0 {
-				lastMatchedIndex, mark, matchedTalk = replayingSession.MatchOutboundTalk(ctx, -1, request)
-			}
 			if matchedTalk == nil {
 				callOutbound.MatchedRequest = nil
 				callOutbound.MatchedResponse = nil
@@ -127,6 +125,9 @@ func handleOutbound(conn *net.TCPConn) {
 		} else {
 			// set matched id as ActionIndex for simulateHttp|simulateMysql
 			if matchedTalk != nil {
+				callOutbound.MatchedMark = mark
+				callOutbound.MatchedRequest = matchedTalk.Request
+				callOutbound.MatchedResponse = matchedTalk.Response
 				callOutbound.MatchedActionIndex = matchedTalk.ActionIndex
 			}
 		}
@@ -140,7 +141,8 @@ func handleOutbound(conn *net.TCPConn) {
 			"requestLen", len(request),
 			"matchedRequestLen", len(callOutbound.MatchedRequest),
 			"matchedResponse", callOutbound.MatchedResponse,
-			"matchedResponseLen", len(callOutbound.MatchedResponse))
+			"matchedResponseLen", len(callOutbound.MatchedResponse),
+			"spendTime", time.Since(beginTime))
 	}
 }
 

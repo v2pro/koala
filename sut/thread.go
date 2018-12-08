@@ -3,17 +3,18 @@ package sut
 import (
 	"bytes"
 	"context"
-	"github.com/v2pro/koala/envarg"
-	"github.com/v2pro/koala/recording"
-	"github.com/v2pro/koala/replaying"
-	"github.com/v2pro/koala/trace"
-	"github.com/v2pro/plz/countlog"
 	"net"
 	"os"
 	"strings"
 	"sync"
 	"time"
 	"unsafe"
+
+	"github.com/v2pro/koala/envarg"
+	"github.com/v2pro/koala/recording"
+	"github.com/v2pro/koala/replaying"
+	"github.com/v2pro/koala/trace"
+	"github.com/v2pro/plz/countlog"
 )
 
 // InboundRequestPrefix is used to recognize php-fpm FCGI_BEGIN_REQUEST packet.
@@ -192,8 +193,8 @@ func (thread *Thread) OnRecv(socketFD SocketFD, span []byte, flags RecvFlags) []
 		thread.replayingSession = replayingSession
 		countlog.Trace("event!sut.received_replaying_session",
 			"threadID", thread.threadID,
-			"replayingSession", thread.replayingSession,
-			"addr", sock.addr)
+			"replayingSessionId", thread.replayingSession.SessionId,
+			"addr", &sock.addr)
 	}
 	return span
 }
