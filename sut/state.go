@@ -2,6 +2,7 @@ package sut
 
 import (
 	"context"
+	"net"
 	"strconv"
 	"sync"
 	"time"
@@ -138,7 +139,7 @@ func newThread(threadID ThreadID) *Thread {
 		socks:          map[SocketFD]*socket{},
 		files:          map[FileFD]*file{},
 		lastAccessedAt: time.Now(),
-		ignoreSocks:    map[SocketFD]bool{},
+		ignoreSocks:    map[SocketFD]net.TCPAddr{},
 	}
 	if envarg.IsRecording() {
 		thread.recordingSession = recording.NewSession(int32(threadID))

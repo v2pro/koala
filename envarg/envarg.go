@@ -22,6 +22,7 @@ var logFormat string
 var outboundBypassPorts = make(map[int]bool, 10)
 var gcGlobalStatusTimeout = 5 * time.Second
 var replayingMatchStrategy string
+var replayingMatchThreshold = 0.7
 
 func init() {
 	initInboundAddr()
@@ -37,6 +38,7 @@ func init() {
 		"inboundReadTimeout", inboundReadTimeout,
 		"outboundBypassPorts", outboundBypassPorts,
 		"replayingMatchStrategy", replayingMatchStrategy,
+		"replayingMatchThreshold", replayingMatchThreshold,
 		"isReplaying", IsReplaying(), "isRecording", IsRecording(), "isTracing", IsTracing())
 }
 
@@ -141,6 +143,13 @@ func initReplayingMatchStrategy() {
 	if strategyStr != "" {
 		replayingMatchStrategy = strings.ToLower(strategyStr)
 	}
+	thresholdStr := GetenvFromC("KOALA_REPLAYING_MATCH_THRESHOLD")
+	if thresholdStr != "" {
+		threshold, err := strconv.ParseFloat(thresholdStr, 64)
+		if err == nil {
+			replayingMatchThreshold = threshold
+		}
+	}
 }
 
 func IsReplaying() bool {
@@ -196,6 +205,10 @@ func GcGlobalStatusTimeout() time.Duration {
 
 func ReplayingMatchStrategy() string {
 	return replayingMatchStrategy
+}
+
+func ReplayingMatchThreshold() float64 {
+	return replayingMatchThreshold
 }
 
 // GetenvFromC to make getenv work in php-fpm child process

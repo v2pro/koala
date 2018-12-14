@@ -13,6 +13,7 @@
 * KOALA_OUTBOUND_BYPASS_PORT: port, the port of outbound will bypass, eg replay a session with xdebug and pass xdebug remote port
 * KOALA_GC_GLOBAL_STATUS_TIMEOUT: a duration string, set the timeout of gc for koala global status, eg thread, socket
 * KOALA_REPLAYING_MATCH_STRATEGY: set outbound replaying match strategy, default use chunk match strategy, support `sim` for similarity match
+* KOALA_REPLAYING_MATCH_THRESHOLD: set outbound replaying similarity match threshold
 
 # Build tags
 
