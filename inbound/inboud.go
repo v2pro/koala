@@ -61,7 +61,8 @@ func handleInbound(respWriter http.ResponseWriter, req *http.Request) {
 		countlog.Error("event!inbound.failed to assign local addresses", "err", err)
 		return
 	}
-	countlog.Info("event!inbound.assignLocalAddr", "localAddr", localAddr)
+	countlog.Info("event!inbound.assignLocalAddr", "localAddr", localAddr,
+		"replayingSessionId", replayingSession.SessionId)
 	replaying.StoreTmp(*localAddr, replayingSession)
 	conn, err := net.DialTCP("tcp4", localAddr, envarg.SutAddr())
 	if err != nil {

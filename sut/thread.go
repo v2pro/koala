@@ -35,7 +35,7 @@ type Thread struct {
 	replayingSession *replaying.ReplayingSession
 	lastAccessedAt   time.Time
 	helperResponse   []byte
-	ignoreSocks      map[SocketFD]bool
+	ignoreSocks      map[SocketFD]net.TCPAddr
 }
 
 type SendFlags int
@@ -58,7 +58,7 @@ func (thread *Thread) BeforeSend(socketFD SocketFD, bodySize int, flags SendFlag
 	if thread.recordingSession == nil {
 		return nil, bodySize
 	}
-	if thread.ignoreSocks[socketFD] {
+	if _, ok := thread.ignoreSocks[socketFD]; ok {
 		return nil, bodySize
 	}
 	sock := thread.lookupSocket(socketFD)
@@ -86,15 +86,12 @@ func (thread *Thread) OnSend(socketFD SocketFD, span []byte, flags SendFlags, ex
 	if len(span) == 0 {
 		return
 	}
-
-	if thread.ignoreSocks[socketFD] {
+	if _, ok := thread.ignoreSocks[socketFD]; ok {
 		return
 	}
 	sock := thread.lookupSocket(socketFD)
 	if sock == nil {
-		countlog.Warn("event!sut.unknown-send",
-			"threadID", thread.threadID,
-			"socketFD", socketFD)
+		countlog.Warn("event!sut.unknown-send", "threadID", thread.threadID, "socketFD", socketFD)
 		return
 	}
 	event := "event!sut.inbound_send"
@@ -129,7 +126,7 @@ func (thread *Thread) AfterSend(socketFD SocketFD, extraHeaderSentSize int, body
 	if !envarg.IsTracing() {
 		return
 	}
-	if thread.ignoreSocks[socketFD] {
+	if _, ok := thread.ignoreSocks[socketFD]; ok {
 		return
 	}
 	sock := getGlobalSock(socketFD)
@@ -145,14 +142,12 @@ func (thread *Thread) AfterSend(socketFD SocketFD, extraHeaderSentSize int, body
 type RecvFlags int
 
 func (thread *Thread) OnRecv(socketFD SocketFD, span []byte, flags RecvFlags) []byte {
-	if thread.ignoreSocks[socketFD] {
+	if _, ok := thread.ignoreSocks[socketFD]; ok {
 		return span
 	}
 	sock := thread.lookupSocket(socketFD)
 	if sock == nil {
-		countlog.Warn("event!sut.unknown-recv",
-			"threadID", thread.threadID,
-			"socketFD", socketFD)
+		countlog.Warn("event!sut.unknown-recv", "threadID", thread.threadID, "socketFD", socketFD)
 		return span
 	}
 	if !sock.isServer {
@@ -191,6 +186,7 @@ func (thread *Thread) OnRecv(socketFD SocketFD, span []byte, flags RecvFlags) []
 		nanoOffset := replayingSession.CallFromInbound.GetOccurredAt() - time.Now().UnixNano()
 		SetTimeOffset(int(time.Duration(nanoOffset) / time.Second))
 		thread.replayingSession = replayingSession
+		thread.ignoreSocks = map[SocketFD]net.TCPAddr{}
 		countlog.Trace("event!sut.received_replaying_session",
 			"threadID", thread.threadID,
 			"replayingSessionId", thread.replayingSession.SessionId,
@@ -206,6 +202,11 @@ func (thread *Thread) OnAccept(serverSocketFD SocketFD, clientSocketFD SocketFD,
 		addr:     addr,
 	}
 	setGlobalSock(clientSocketFD, thread.socks[clientSocketFD])
+
+	// multiple consecutive requests, each request need clear thread.ignoreSocks
+	// because clientFD maybe reuse, check fd is in ignoreSockFD and addr is same
+	// if not same and delete
+	thread.delReusedIgnoreFD(clientSocketFD, addr)
 	countlog.Debug("event!sut.accept",
 		"threadID", thread.threadID,
 		"serverSocketFD", serverSocketFD,
@@ -435,5 +436,14 @@ func (thread *Thread) IgnoreSocketFD(socketFD SocketFD, remoteAddr net.TCPAddr) 
 		"threadID", thread.threadID,
 		"socketFD", socketFD,
 		"addr", &remoteAddr)
-	thread.ignoreSocks[socketFD] = true
+	thread.ignoreSocks[socketFD] = remoteAddr
+}
+
+// in case of fd reused
+func (thread *Thread) delReusedIgnoreFD(socketFD SocketFD, newAddr net.TCPAddr) {
+	if val, ok := thread.ignoreSocks[socketFD]; ok {
+		if val.String() != newAddr.String() {
+			delete(thread.ignoreSocks, socketFD)
+		}
+	}
 }

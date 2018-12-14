@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/v2pro/koala/envarg"
 	"github.com/v2pro/koala/recording"
 	"github.com/v2pro/koala/replaying/similarity"
 	"github.com/v2pro/plz/countlog"
@@ -64,7 +65,7 @@ func (replayingSession *ReplayingSession) similarityMatch(
 			return fmt.Sprintf("%v", scores)
 		})
 
-	if maxScore < 0.5 {
+	if maxScore < envarg.ReplayingMatchThreshold() {
 		return -1, 0, nil
 	}
 	return maxScoreIndex, scores[maxScoreIndex], replayingSession.CallOutbounds[maxScoreIndex]
@@ -83,7 +84,7 @@ func getReplayingSessionVectors(replayingSession *ReplayingSession) []map[string
 			vectors[i] = strSlice2Map(lexer.Scan(callOutbound.Request))
 		}
 		globalVectors[replayingSession.SessionId] = vectors
-		countlog.Trace("event!replaying.build_min_hash", "spendTime", time.Since(begin))
+		countlog.Trace("event!replaying.build_vector", "spendTime", time.Since(begin))
 	}
 
 	return vectors

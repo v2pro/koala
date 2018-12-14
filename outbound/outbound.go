@@ -114,6 +114,7 @@ func handleOutbound(conn *net.TCPConn) {
 			}
 			callOutbound.MatchedMark = mark
 			if matchedTalk == nil {
+				replayingSession.CallOutbound(ctx, callOutbound)
 				countlog.Error("event!outbound.failed to find matching talk", "ctx", ctx)
 				return
 			}
