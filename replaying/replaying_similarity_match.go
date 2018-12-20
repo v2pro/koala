@@ -57,8 +57,8 @@ func (replayingSession *ReplayingSession) similarityMatch(
 
 	countlog.Trace("event!replaying.similarity_talks_scored",
 		"ctx", ctx,
-		"lastMaxScoreIndex", replayingSession.lastMaxScoreIndex,
-		"lastMatchedIndex", connLastMatchedIndex,
+		"replaySession.lastMaxScoreIndex", replayingSession.lastMaxScoreIndex,
+		"connLastMatchedIndex", connLastMatchedIndex,
 		"maxScoreIndex", maxScoreIndex,
 		"maxScore", maxScore,
 		"scores", func() interface{} {
@@ -100,9 +100,9 @@ func strSlice2Map(str []string) map[string]float64 {
 
 func getFixStartIndex(connLastMatchedIndex int, lastMaxScoreIndex int) int {
 	if connLastMatchedIndex != -1 {
-		return connLastMatchedIndex
+		return connLastMatchedIndex + 1
 	} else if lastMaxScoreIndex != -1 {
-		return lastMaxScoreIndex
+		return lastMaxScoreIndex + 1
 	}
 	return -1
 }

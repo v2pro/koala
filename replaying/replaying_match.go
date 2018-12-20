@@ -83,8 +83,8 @@ func (replayingSession *ReplayingSession) chunkMatch(
 	}
 	countlog.Trace("event!replaying.talks_scored",
 		"ctx", ctx,
-		"lastMaxScoreIndex", replayingSession.lastMaxScoreIndex,
-		"lastMatchedIndex", lastMatchedIndex,
+		"replayingSession.lastMaxScoreIndex", replayingSession.lastMaxScoreIndex,
+		"connLastMatchedIndex", lastMatchedIndex,
 		"maxScoreIndex", maxScoreIndex,
 		"maxScore", maxScore,
 		"totalScore", len(chunks),
