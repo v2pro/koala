@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/v2pro/koala/envarg"
-	"github.com/v2pro/plz/countlog"
 	"net"
 	"time"
+
+	"github.com/v2pro/plz/countlog"
 )
 
 type Session struct {
@@ -151,10 +151,6 @@ func (session *Session) BeforeSendToOutbound(ctx context.Context, peer net.TCPAd
 
 func (session *Session) newCallOutbound(peer net.TCPAddr, local *net.TCPAddr, socketFD int) {
 	cspanId := []byte(nil)
-	if envarg.IsTracing() {
-		cspanId, _ = newID().MarshalText()
-		session.TraceHeader = session.GetTraceHeader().Set(TraceHeaderKeySpanId, cspanId)
-	}
 	session.currentCallOutbound = &CallOutbound{
 		action:   session.newAction("CallOutbound"),
 		Peer:     peer,

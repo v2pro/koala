@@ -39,7 +39,7 @@ func init() {
 		"outboundBypassPorts", outboundBypassPorts,
 		"replayingMatchStrategy", replayingMatchStrategy,
 		"replayingMatchThreshold", replayingMatchThreshold,
-		"isReplaying", IsReplaying(), "isRecording", IsRecording(), "isTracing", IsTracing())
+		"isReplaying", IsReplaying(), "isRecording", IsRecording())
 }
 
 func initLog() {
@@ -158,10 +158,6 @@ func IsReplaying() bool {
 
 func IsRecording() bool {
 	return isRecording
-}
-
-func IsTracing() bool {
-	return isTracing
 }
 
 func InboundAddr() *net.TCPAddr {

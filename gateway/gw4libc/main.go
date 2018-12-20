@@ -39,11 +39,7 @@ func init() {
 		C.set_time_offset(C.int(offset))
 	}
 	gw4go.Start()
-	isTracing := C.int(0)
-	if envarg.IsTracing() {
-		isTracing = 1
-	}
-	C.go_initialized(isTracing)
+	C.go_initialized()
 }
 
 //export on_connect
@@ -151,27 +147,6 @@ func on_accept6(threadID C.pid_t, serverSocketFD C.int, clientSocketFD C.int, ad
 			Port: int(ch.Ntohs(sockaddr_in6_sin_port_get(addr))),
 		})
 	})
-}
-
-//export before_send
-func before_send(threadID C.pid_t, socketFD C.int, flags C.int, cBodySize *C.size_t) C.struct_ch_allocated_string {
-	defer func() {
-		recovered := recover()
-		if recovered != nil {
-			countlog.Fatal("event!gw4libc.before_send.panic", "err", recovered,
-				"stacktrace", countlog.ProvideStacktrace)
-		}
-	}()
-	var extraHeader []byte
-	sut.OperateThread(sut.ThreadID(threadID), func(thread *sut.Thread) {
-		bodySize := int(*cBodySize)
-		extraHeader, bodySize = thread.BeforeSend(sut.SocketFD(socketFD), bodySize, sut.SendFlags(flags))
-		*cBodySize = C.size_t(bodySize)
-	})
-	if extraHeader == nil {
-		return C.struct_ch_allocated_string{nil, 0}
-	}
-	return C.struct_ch_allocated_string{(*C.char)(C.CBytes(extraHeader)), C.size_t(len(extraHeader))}
 }
 
 //export on_accept_unix
