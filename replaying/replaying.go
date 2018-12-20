@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net"
 	"strconv"
-	"strings"
 
 	"github.com/v2pro/koala/recording"
 	"github.com/v2pro/plz/countlog"
@@ -114,13 +113,4 @@ func (replayingSession *ReplayingSession) Finish(response []byte) *ReplayedSessi
 	}
 	replayedSession.Actions = append(replayedSession.Actions, replayedSession.ReturnInbound)
 	return replayedSession
-}
-
-func (replayingSession *ReplayingSession) ShouldTraceFile(fileName string) bool {
-	for _, tracePath := range replayingSession.TracePaths {
-		if strings.HasPrefix(fileName, tracePath) {
-			return true
-		}
-	}
-	return false
 }

@@ -3,12 +3,6 @@ set -e
 set -x
 
 case $1 in
-    "tracer" )
-        # trace & record to file, only for testing purpose
-        export CGO_CFLAGS="-DKOALA_LIBC_NETWORK_HOOK -DKOALA_LIBC_FILE_HOOK"
-        export CGO_CPPFLAGS=$CGO_CFLAGS
-        exec go build -tags="koala_tracer koala_recorder" -buildmode=c-shared -o output/koala-tracer.so github.com/v2pro/koala/cmd/recorder
-        ;;
     "recorder" )
         # record to file, only for testing purpose
         export CGO_CFLAGS="-DKOALA_LIBC_NETWORK_HOOK -DKOALA_LIBC_FILE_HOOK"

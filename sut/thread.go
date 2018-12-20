@@ -13,7 +13,6 @@ import (
 	"github.com/v2pro/koala/envarg"
 	"github.com/v2pro/koala/recording"
 	"github.com/v2pro/koala/replaying"
-	"github.com/v2pro/koala/trace"
 	"github.com/v2pro/plz/countlog"
 )
 
@@ -39,6 +38,7 @@ type Thread struct {
 }
 
 type SendFlags int
+type RecvFlags int
 
 func (thread *Thread) ExportState() map[string]interface{} {
 	thread.mutex.Lock()
@@ -51,39 +51,9 @@ func (thread *Thread) ExportState() map[string]interface{} {
 	return state
 }
 
-func (thread *Thread) BeforeSend(socketFD SocketFD, bodySize int, flags SendFlags) ([]byte, int) {
-	if !envarg.IsTracing() {
-		return nil, bodySize
-	}
-	if thread.recordingSession == nil {
-		return nil, bodySize
-	}
-	if _, ok := thread.ignoreSocks[socketFD]; ok {
-		return nil, bodySize
-	}
-	sock := thread.lookupSocket(socketFD)
-	if sock == nil {
-		countlog.Warn("event!sut.unknown-before-send",
-			"threadID", thread.threadID,
-			"socketFD", socketFD)
-		return nil, bodySize
-	}
-	if sock.isServer {
-		return nil, bodySize
-	}
-	thread.recordingSession.BeforeSendToOutbound(thread, sock.addr, sock.localAddr, int(sock.socketFD))
-	extraHeader, toSendBodySize := sock.beforeSend(thread.recordingSession, bodySize)
-	countlog.Trace("event!sut.before_send",
-		"socketFD", socketFD,
-		"threadID", thread.threadID,
-		"bodySize", bodySize,
-		"toSendBodySize", toSendBodySize,
-		"extraHeader", extraHeader)
-	return extraHeader, toSendBodySize
-}
-
 func (thread *Thread) OnSend(socketFD SocketFD, span []byte, flags SendFlags, extraHeaderSentSize int) {
 	if len(span) == 0 {
+		countlog.Debug("event!sut.send-ignore", "threadID", thread.threadID, "socketFD", socketFD)
 		return
 	}
 	if _, ok := thread.ignoreSocks[socketFD]; ok {
@@ -108,9 +78,6 @@ func (thread *Thread) OnSend(socketFD SocketFD, span []byte, flags SendFlags, ex
 					"threadID", thread.threadID)
 			}
 		}
-		if thread.recordingSession != nil && envarg.IsTracing() {
-			sock.afterSend(thread.recordingSession, extraHeaderSentSize, len(span))
-		}
 	}
 	countlog.Trace(event,
 		"threadID", thread.threadID,
@@ -122,27 +89,9 @@ func (thread *Thread) OnSend(socketFD SocketFD, span []byte, flags SendFlags, ex
 		"contentLen", len(span))
 }
 
-func (thread *Thread) AfterSend(socketFD SocketFD, extraHeaderSentSize int, bodySentSize int) {
-	if !envarg.IsTracing() {
-		return
-	}
-	if _, ok := thread.ignoreSocks[socketFD]; ok {
-		return
-	}
-	sock := getGlobalSock(socketFD)
-	if sock == nil {
-		countlog.Warn("event!sut.unknown-after-send",
-			"threadID", thread.threadID,
-			"socketFD", socketFD)
-		return
-	}
-	sock.afterSend(thread.recordingSession, extraHeaderSentSize, bodySentSize)
-}
-
-type RecvFlags int
-
 func (thread *Thread) OnRecv(socketFD SocketFD, span []byte, flags RecvFlags) []byte {
 	if _, ok := thread.ignoreSocks[socketFD]; ok {
+		countlog.Debug("event!sut.recv-ignore", "threadID", thread.threadID, "socketFD", socketFD)
 		return span
 	}
 	sock := thread.lookupSocket(socketFD)
@@ -168,9 +117,6 @@ func (thread *Thread) OnRecv(socketFD SocketFD, span []byte, flags RecvFlags) []
 		"addr", &sock.addr,
 		"content", span,
 		"contentLen", len(span))
-	if envarg.IsTracing() && thread.recordingSession != nil {
-		span = sock.onRecv(thread.recordingSession, span)
-	}
 	if span == nil {
 		return nil
 	}
@@ -319,20 +265,12 @@ func (thread *Thread) OnOpeningFile(fileName string, flags int) string {
 		return ""
 	}
 	originalFileName := fileName
-	shouldTrace := thread.replayingSession.ShouldTraceFile(fileName)
 	fileName = thread.tryMockFile(fileName)
-	if shouldTrace {
-		fileName = thread.instrumentFile(fileName)
-	}
 	fileName = thread.tryRedirectFile(fileName)
-	shouldTrace = thread.replayingSession.ShouldTraceFile(fileName)
 	fileName = thread.tryMockFile(fileName)
-	if shouldTrace {
-		fileName = thread.instrumentFile(fileName)
-	}
 	countlog.Trace("event!sut.opening_file",
 		"threadID", thread.threadID,
-		"shouldTrace", shouldTrace,
+		"replayingSessionId", thread.replayingSession.SessionId,
 		"originalFile", originalFileName,
 		"finalFile", fileName)
 	return fileName
@@ -347,14 +285,6 @@ func (thread *Thread) tryRedirectFile(fileName string) string {
 				return redirectedFileName
 			}
 		}
-	}
-	return fileName
-}
-
-func (thread *Thread) instrumentFile(fileName string) string {
-	instrumentedFileName := trace.InstrumentFile(fileName)
-	if instrumentedFileName != "" {
-		return instrumentedFileName
 	}
 	return fileName
 }

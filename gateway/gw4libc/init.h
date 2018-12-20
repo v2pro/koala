@@ -5,9 +5,8 @@
 extern "C" {
 #endif
 
-void go_initialized(int is_tracing);
+void go_initialized();
 int is_go_initialized();
-int is_tracing();
 
 #ifdef __cplusplus
 }
