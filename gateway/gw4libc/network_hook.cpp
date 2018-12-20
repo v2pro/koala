@@ -30,7 +30,6 @@ INTERPOSE(bind)(int socketFD, const struct sockaddr *addr, socklen_t length) {
 }
 
 INTERPOSE(send)(int socketFD, const void *buffer, size_t size, int flags) {
-    // not in tracing mode
     ssize_t sent_size = real::send(socketFD, buffer, size, flags);
     if (sent_size < 0) {
         return sent_size;
