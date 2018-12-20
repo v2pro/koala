@@ -202,10 +202,6 @@ func (thread *Thread) OnAccept(serverSocketFD SocketFD, clientSocketFD SocketFD,
 		addr:     addr,
 	}
 	setGlobalSock(clientSocketFD, thread.socks[clientSocketFD])
-
-	// multiple consecutive requests, each request need clear thread.ignoreSocks
-	// because clientFD maybe reuse, check fd is in ignoreSockFD and addr is same
-	// if not same and delete
 	thread.delReusedIgnoreFD(clientSocketFD, addr)
 	countlog.Debug("event!sut.accept",
 		"threadID", thread.threadID,
@@ -221,6 +217,7 @@ func (thread *Thread) OnAcceptUnix(serverSocketFD SocketFD, clientSocketFD Socke
 		unixAddr: addr,
 	}
 	setGlobalSock(clientSocketFD, thread.socks[clientSocketFD])
+	thread.delReusedIgnoreFD(clientSocketFD, net.TCPAddr{})
 	countlog.Debug("event!sut.accept_unix",
 		"threadID", thread.threadID,
 		"serverSocketFD", serverSocketFD,
@@ -267,6 +264,7 @@ func (thread *Thread) OnConnect(socketFD SocketFD, remoteAddr net.TCPAddr) {
 		}
 		thread.socks[socketFD].localAddr = localAddr
 		replaying.StoreTmp(*localAddr, thread.replayingSession)
+		thread.delReusedIgnoreFD(socketFD, *localAddr)
 	}
 	countlog.Trace("event!sut.connect",
 		"threadID", thread.threadID,
@@ -291,6 +289,7 @@ func (thread *Thread) OnConnectUnix(socketFD SocketFD, remoteAddr net.UnixAddr) 
 		}
 		thread.socks[socketFD].localAddr = localAddr
 		replaying.StoreTmp(*localAddr, thread.replayingSession)
+		thread.delReusedIgnoreFD(socketFD, *localAddr)
 	}
 	countlog.Trace("event!sut.connect",
 		"threadID", thread.threadID,
@@ -440,6 +439,9 @@ func (thread *Thread) IgnoreSocketFD(socketFD SocketFD, remoteAddr net.TCPAddr) 
 }
 
 // in case of fd reused
+// multiple consecutive requests, each request need clear thread.ignoreSocks
+// because clientFD maybe reuse, check fd is in ignoreSockFD and addr is same
+// if not same and delete
 func (thread *Thread) delReusedIgnoreFD(socketFD SocketFD, newAddr net.TCPAddr) {
 	if val, ok := thread.ignoreSocks[socketFD]; ok {
 		if val.String() != newAddr.String() {
