@@ -64,7 +64,7 @@ func (replayingSession *ReplayingSession) similarityMatch(
 			return fmt.Sprintf("%v", scores)
 		})
 
-    if maxScore < MatchThreshold {
+	if maxScore < MatchThreshold {
 		return -1, 0, nil
 	}
 	return maxScoreIndex, scores[maxScoreIndex], replayingSession.CallOutbounds[maxScoreIndex]
