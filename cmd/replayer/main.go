@@ -8,7 +8,11 @@ import (
 
 func init() {
 	envarg.SetupLogging()
-	witch.Start(":8318")
+	addrStr := envarg.GetenvFromC("KOALA_WITCH_ADDR")
+	if addrStr == "" {
+		addrStr = ":8318"
+	}
+	witch.Start(addrStr)
 }
 
 func main() {

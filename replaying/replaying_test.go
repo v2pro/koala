@@ -54,8 +54,8 @@ func Test_match_best_score(t *testing.T) {
 	replayingSession := ReplayingSession{
 		CallOutbounds: []*recording.CallOutbound{talk1, talk2},
 	}
-	_, _, matched := replayingSession.MatchOutboundTalk(nil, -1, []byte{1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8})
-	should.Equal(&talk1, matched)
+	_, _, matched := Matcher.DoMatch(nil, -1, []byte{1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8}, &replayingSession)
+	should.Equal(talk1, matched)
 }
 
 func Test_match_not_matched(t *testing.T) {
@@ -66,9 +66,9 @@ func Test_match_not_matched(t *testing.T) {
 	replayingSession := ReplayingSession{
 		CallOutbounds: []*recording.CallOutbound{talk1, talk2, talk3},
 	}
-	index, _, _ := replayingSession.MatchOutboundTalk(nil, -1, []byte{1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8})
+	index, _, _ := Matcher.DoMatch(nil, -1, []byte{1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8}, &replayingSession)
 	should.Equal(0, index)
-	index, _, _ = replayingSession.MatchOutboundTalk(nil, 0, []byte{1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8})
+	index, _, _ = Matcher.DoMatch(nil, 0, []byte{1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8}, &replayingSession)
 	should.Equal(1, index)
 }
 
@@ -88,7 +88,7 @@ func Test_bad_case(t *testing.T) {
 	reqStr := get(replayedSession, "Actions", 22, "Request").(string)
 	req, _ := base64.StdEncoding.DecodeString(reqStr)
 	fmt.Println(string(req))
-	index, mark, matched := origSession.MatchOutboundTalk(nil, -1, req)
+	index, mark, matched := Matcher.DoMatch(nil, -1, req, origSession)
 	should.NotNil(matched)
 	fmt.Println(string(matched.Request))
 	fmt.Println(mark)
@@ -379,7 +379,7 @@ func Test_bad_case3(t *testing.T) {
 	reqBytes := unescape(req.(string))
 	fmt.Println(reqBytes)
 
-	index, mark, matched := origSession.MatchOutboundTalk(nil, 22, []byte(reqBytes))
+	index, mark, matched := Matcher.DoMatch(nil, 22, []byte(reqBytes), origSession)
 	should.NotNil(matched)
 	fmt.Println(string(matched.Request))
 	fmt.Println(mark)
@@ -404,7 +404,7 @@ func Test_chunk_match(t *testing.T) {
 	reqBytes := unescape(req.(string))
 	fmt.Println(reqBytes)
 
-	index, mark, matched := origSession.MatchOutboundTalk(nil, 0, []byte(reqBytes))
+	index, mark, matched := Matcher.DoMatch(nil, 0, []byte(reqBytes), origSession)
 	should.NotNil(matched)
 	fmt.Println(string(matched.Request))
 	fmt.Println(mark)

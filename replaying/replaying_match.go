@@ -6,27 +6,14 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/v2pro/koala/envarg"
 	"github.com/v2pro/koala/recording"
 	"github.com/v2pro/plz/countlog"
 )
 
 var expect100 = []byte("Expect: 100-continue")
 
-func (replayingSession *ReplayingSession) MatchOutboundTalk(
-	ctx context.Context, connLastMatchedIndex int, request []byte) (int, float64, *recording.CallOutbound) {
-
-	if envarg.ReplayingMatchStrategy() == replayingSimHashMatch {
-		return replayingSession.similarityMatch(ctx, connLastMatchedIndex, request)
-	} else {
-		lastMatchedIndex, mark, matchedTalk := replayingSession.chunkMatch(ctx, connLastMatchedIndex, request)
-		if matchedTalk == nil && connLastMatchedIndex >= 0 {
-			// rematch from begin and lastMatchedIndex = -1 maybe first chunk has more weight
-			// TODO: reduce cutToChunks to once, now is twice
-			return replayingSession.chunkMatch(ctx, -1, request)
-		}
-		return lastMatchedIndex, mark, matchedTalk
-	}
+func init() {
+	InitMatcher()
 }
 
 func (replayingSession *ReplayingSession) chunkMatch(

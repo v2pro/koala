@@ -55,8 +55,11 @@ func on_connect(threadID C.pid_t, socketFD C.int, remoteAddr *C.struct_sockaddr_
 		IP:   ch.Int2ip(sockaddr_in_sin_addr_get(remoteAddr)),
 		Port: int(ch.Ntohs(sockaddr_in_sin_port_get(remoteAddr))),
 	}
+
+	//IsOutboundBypassAddr: the addr of outbound will be bypassed at recording or replaying, eg: service discovery
+	//IsOutboundBypassPort: the port of outbound will bypass at replaying, eg: xdebug
 	origAddrStr := origAddr.String()
-	if origAddrStr == "127.0.0.1:18500" || (envarg.IsReplaying() && envarg.IsOutboundBypassPort(origAddr.Port)) {
+	if envarg.IsOutboundBypassAddr(origAddrStr) || envarg.IsReplaying() && envarg.IsOutboundBypassPort(origAddr.Port) {
 		sut.OperateThread(sut.ThreadID(threadID), func(thread *sut.Thread) {
 			thread.IgnoreSocketFD(sut.SocketFD(socketFD), origAddr)
 		})
@@ -65,6 +68,7 @@ func on_connect(threadID C.pid_t, socketFD C.int, remoteAddr *C.struct_sockaddr_
 	sut.OperateThread(sut.ThreadID(threadID), func(thread *sut.Thread) {
 		thread.OnConnect(sut.SocketFD(socketFD), origAddr)
 	})
+	
 	if envarg.IsReplaying() && origAddrStr != envarg.OutboundAddr().String() {
 		countlog.Trace("event!gw4libc.redirect_connect_target",
 			"origAddr", &origAddr, "redirectTo", envarg.OutboundAddr())

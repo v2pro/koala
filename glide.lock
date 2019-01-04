@@ -1,5 +1,5 @@
-hash: 9b5ffb96d051edbf339bb653ad3fe2471cabeef02c5a568d85e1bccb61aa5e4c
-updated: 2017-11-29T17:44:10.717940785+08:00
+hash: 6fc77286ce4ab638d958ee47cca9bb4fb1541fd73479add7c864c9f7bc931fc3
+updated: 2018-12-30T16:36:00.937019987+08:00
 imports:
 - name: github.com/json-iterator/go
   version: ff2b70c1dbffdd98567bd8c2f9449d97c0d04c88
@@ -14,6 +14,11 @@ imports:
   - witch
   - witch/statik
 testImports:
+- name: github.com/wilcosheh/tfidf
+  version: 2847b6a5524e45e742dabb5eee12354729dff0d5
+  subpackages:
+  - seg
+  - util
 - name: github.com/davecgh/go-spew
   version: 6d212800a42e8ab5c146b8ace3490ee17e5225f9
   subpackages:
@@ -23,7 +28,9 @@ testImports:
   subpackages:
   - difflib
 - name: github.com/stretchr/testify
-  version: 69483b4bd14f5845b5a1e55bca19e954e827f1d0
+  version: f35b8ab0b5a2cef36673838d662e249dd9c94686
   subpackages:
   - assert
   - require
+- name: github.com/yanyiwu/gojieba
+  version: 6e14c5c21cec8e7b26f319f3bcc3dddffacc703a

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 	"unsafe"
+	"regexp"
 
 	"github.com/v2pro/plz/countlog"
 )
@@ -20,6 +21,7 @@ var logFile string
 var logLevel = countlog.LevelDebug
 var logFormat string
 var outboundBypassPorts = make(map[int]bool, 10)
+var outboundBypassAddrs = make(map[string]bool, 10)
 var gcGlobalStatusTimeout = 5 * time.Second
 var replayingMatchStrategy string
 var replayingMatchThreshold = 0.7
@@ -29,6 +31,7 @@ func init() {
 	initOutboundAddr()
 	initSutAddr()
 	initOutboundBypassPort()
+	initOutboundBypassAddr()
 	initReplayingMatchStrategy()
 	initGcGlobalStatusTimeout()
 	initLog()
@@ -37,6 +40,7 @@ func init() {
 		"logLevel", logLevel, "logFile", logFile, "logFormat", logFormat,
 		"inboundReadTimeout", inboundReadTimeout,
 		"outboundBypassPorts", outboundBypassPorts,
+		"outboundBypassAddrs", outboundBypassAddrs,
 		"replayingMatchStrategy", replayingMatchStrategy,
 		"replayingMatchThreshold", replayingMatchThreshold,
 		"isReplaying", IsReplaying(), "isRecording", IsRecording())
@@ -128,6 +132,21 @@ func initOutboundBypassPort() {
 	}
 }
 
+
+func initOutboundBypassAddr() {
+	addrStr := GetenvFromC("KOALA_OUTBOUND_BYPASS_ADDR")
+	if addrStr == "" {
+		return
+	}
+	for _, addr := range strings.Split(addrStr, ",") {
+		//addr support both :port(eg :8500)  and  ip:port(eg 127.0.0.1:8500)
+		match, _ := regexp.MatchString(`(^(\d+\.)*\d*:\d+$)`, addr)
+		if match {
+			outboundBypassAddrs[addr] = true
+		}
+	}
+}
+
 func initGcGlobalStatusTimeout() {
 	timeoutStr := GetenvFromC("KOALA_GC_GLOBAL_STATUS_TIMEOUT")
 	if timeoutStr != "" {
@@ -191,6 +210,21 @@ func LogFormat() string {
 func IsOutboundBypassPort(portInt int) bool {
 	if _, ok := outboundBypassPorts[portInt]; ok {
 		return true
+	}
+	return false
+}
+
+func IsOutboundBypassAddr(addr string) bool {
+	//case validate ip:port
+	if _, ok := outboundBypassAddrs[addr]; ok {
+		return true
+	} else {
+		//case validate :port
+		ind := strings.Index(addr, ":")
+		onlyPort := addr[ind:]
+		if _, ok = outboundBypassAddrs[onlyPort]; ok {
+			return true
+		}
 	}
 	return false
 }
