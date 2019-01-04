@@ -4,9 +4,9 @@
 
 # Parameters
 
-* KOALA_INBOUND_ADDR: ip:port, the address inbound server will bind to
-* KOALA_SUT_ADDR: ip:port, the address inbound will call
-* KOALA_OUTBOUND_ADDR: ip:port, the address all outgoing traffic will be redirected to
+* KOALA_INBOUND_ADDR: ip:port, the address inbound server will bind to, default :2514
+* KOALA_SUT_ADDR: ip:port, the address inbound will call, default 127.0.0.1:2515
+* KOALA_OUTBOUND_ADDR: ip:port, the address all outgoing traffic will be redirected to, default 127.0.0.1:2516
 * KOALA_LOG_FILE: STDOUT/STDERR/filepath, if using filepath, the log will rotate every hour
 * KOALA_LOG_LEVEL: TRACE/DEBUG/INFO/ERROR/FATAL
 * KOALA_INBOUND_READ_TIMEOUT: a duration string, set the timeout of inbound read response from sut
@@ -14,6 +14,8 @@
 * KOALA_GC_GLOBAL_STATUS_TIMEOUT: a duration string, set the timeout of gc for koala global status, eg thread, socket
 * KOALA_REPLAYING_MATCH_STRATEGY: set outbound replaying match strategy, default use chunk match strategy, support `sim` for similarity match
 * KOALA_REPLAYING_MATCH_THRESHOLD: set outbound replaying similarity match threshold
+* KOALA_WITCH_ADDR: ip:port, witch: a WEB UI to make log and snapshot visible, default :8318
+* KOALA_OUTBOUND_BYPASS_ADDR: ip:port or :port, split by comma, the address of outbound will be bypassed when recording or replaying a session, eg service discovery address
 
 # Build tags
 

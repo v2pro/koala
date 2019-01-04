@@ -101,7 +101,7 @@ func handleOutbound(conn *net.TCPConn) {
 		}
 		var matchedTalk *recording.CallOutbound
 		var mark float64
-		connLastMatchedIndex, mark, matchedTalk = replayingSession.MatchOutboundTalk(ctx, connLastMatchedIndex, request)
+		connLastMatchedIndex, mark, matchedTalk = replaying.Matcher.DoMatch(ctx, connLastMatchedIndex, request, replayingSession)
 		if callOutbound.MatchedActionIndex != fakeIndexSimulated {
 			if matchedTalk == nil {
 				callOutbound.MatchedRequest = nil

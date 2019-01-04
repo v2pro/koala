@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/v2pro/koala/envarg"
 	"github.com/v2pro/koala/recording"
 	"github.com/v2pro/koala/replaying/similarity"
 	"github.com/v2pro/plz/countlog"
@@ -65,7 +64,7 @@ func (replayingSession *ReplayingSession) similarityMatch(
 			return fmt.Sprintf("%v", scores)
 		})
 
-	if maxScore < envarg.ReplayingMatchThreshold() {
+    if maxScore < MatchThreshold {
 		return -1, 0, nil
 	}
 	return maxScoreIndex, scores[maxScoreIndex], replayingSession.CallOutbounds[maxScoreIndex]
